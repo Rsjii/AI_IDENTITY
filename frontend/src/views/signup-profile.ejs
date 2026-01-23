@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/output.css">
+    <script>
+        // ✅ IMMEDIATE theme application (prevents flash)
+        (function() {
+            const theme = localStorage.getItem('theme') || 'light';
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <style>
+        .primary { color: #3B82F6; }
+        .bg-primary { background-color: #3B82F6; }
+        .hover\:bg-secondary:hover { background-color: #1D4ED8; }
+        .focus\:ring-primary:focus { --tw-ring-color: #3B82F6; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div class="px-4 py-6 sm:px-0">
+        <div class="max-w-md mx-auto">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-900 p-4 sm:p-6 lg:p-8">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">Complete Profile</h1>
+                <p class="text-gray-600 dark:text-gray-300 text-center mb-6">
+                    Please complete your profile information
+                </p>
+                
+                <form id="profileForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                        <input
+                        type="email"
+                        id="profileEmail"
+                        name="email"
+                        readonly
+                        value="<%= email || '' %>"
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 dark:text-white text-base min-h-[44px]"
+                        aria-label="Email"
+                      />                        
+                        <div id="email-error" class="text-red-600 dark:text-red-400 text-sm mt-1 hidden"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name *</label>
+                        <input type="text" id="name" name="name" placeholder="Enter your full name" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base min-h-[44px] placeholder-gray-400 dark:placeholder-gray-500" required aria-label="Full Name" maxlength="50">
+                        <div id="name-error" class="text-red-600 dark:text-red-400 text-sm mt-1 hidden"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="handle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username *</label>
+                        <input type="text" id="handle" name="handle" placeholder="Choose a username" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base min-h-[44px] placeholder-gray-400 dark:placeholder-gray-500" required aria-label="Username" maxlength="20">
+                        <div id="handle-error" class="text-red-600 dark:text-red-400 text-sm mt-1 hidden"></div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">3-20 characters, letters, numbers, and underscores only</p>
+                    </div>                    
+                    
+                    <div class="mb-4">
+                        <label for="dob" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Date of Birth *
+                          </label>
+                          <input
+                            type="date"
+                            id="dob"
+                            name="dob"
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base min-h-[44px]"
+                            aria-label="Date of Birth"
+                          />                        
+                        <div id="dob-error" class="text-red-600 dark:text-red-400 text-sm mt-1 hidden"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone Number (Optional)</label>
+                        <input type="tel" id="phone" name="phone" placeholder="Enter your phone number (e.g. +91 1234567890)" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base min-h-[44px] placeholder-gray-400 dark:placeholder-gray-500" aria-label="Phone Number" maxlength="20">
+                        <div id="phone-error" class="text-red-600 dark:text-red-400 text-sm mt-1 hidden"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Profile Image (Optional)</label>
+                        <input type="file" id="profileImageFile" name="profileImageFile" accept="image/*" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Select an image file (JPG, PNG, GIF, WebP - Max 5MB)</p>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-primary text-white py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg hover:bg-secondary transition-colors font-semibold mb-4 min-h-[44px] touch-manipulation text-base" aria-label="Complete Profile">Complete Profile</button>
+                    
+                    <div class="text-center">
+                        <a href="/auth" class="text-sm text-gray-600 dark:text-gray-400 hover:text-primary">← Back to Login/Signup</a>
+                    </div>
+                    
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                </form>                
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.csrfToken = '<%= csrfToken %>';
+        
+        // Helper function to show field errors
+        function showFieldError(fieldName, message) {
+            const errorDiv = document.getElementById(`${fieldName}-error`);
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+                // Add error styling to input
+                const input = document.getElementById(fieldName);
+                if (input) {
+                    input.classList.add('border-red-500', 'dark:border-red-500');
+                    input.classList.remove('border-gray-300', 'dark:border-gray-600');
+                }
+            }
+        }
+        
+        // Helper function to clear all errors
+        function clearAllErrors() {
+            const errorFields = ['email', 'name', 'handle', 'dob', 'phone', 'bio'];
+            errorFields.forEach(field => {
+                const errorDiv = document.getElementById(`${field}-error`);
+                if (errorDiv) {
+                    errorDiv.classList.add('hidden');
+                    errorDiv.textContent = '';
+                }
+                const input = document.getElementById(field);
+                if (input) {
+                    input.classList.remove('border-red-500', 'dark:border-red-500');
+                    input.classList.add('border-gray-300', 'dark:border-gray-600');
+                }
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get email from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailFromUrl = urlParams.get('email');
+            const emailInput = document.getElementById('profileEmail');
+            
+            if (emailFromUrl && emailInput && !emailInput.value) {
+                emailInput.value = decodeURIComponent(emailFromUrl);
+            }
+            
+            
+            // Clear errors on input
+            ['name', 'handle', 'dob', 'phone', 'bio'].forEach(field => {
+                const input = document.getElementById(field);
+                if (input) {
+                    input.addEventListener('input', () => {
+                        const errorDiv = document.getElementById(`${field}-error`);
+                        if (errorDiv) {
+                            errorDiv.classList.add('hidden');
+                            input.classList.remove('border-red-500', 'dark:border-red-500');
+                            input.classList.add('border-gray-300', 'dark:border-gray-600');
+                        }
+                    });
+                }
+            });
+            
+            // Form submission
+            document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Clear previous errors
+                clearAllErrors();
+                
+                const formData = new FormData(e.target);
+                
+                // Handle profile image
+                const profileImageFile = formData.get('profileImageFile');
+                let finalProfileImage = null;
+                
+                if (profileImageFile && profileImageFile.size > 0) {
+                    try {
+                        // Upload file first
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('profileImage', profileImageFile);
+                        
+                        const uploadResponse = await fetch('/api/profile/upload', {
+                            method: 'POST',
+                            body: uploadFormData
+                        });
+                        
+                        const uploadJson = await uploadResponse.json().catch(() => ({}));
+                        
+                        if (uploadResponse.ok && uploadJson && uploadJson.success) {
+                            finalProfileImage = uploadJson.imageUrl;
+                        } else {
+                            const msg = uploadJson?.error || (uploadResponse.status === 413 ? 'Image too large. Max size is 5MB.' : 'File upload failed');
+                            throw new Error(msg);
+                        }
+                    } catch (error) {
+                        showNotification(error?.message || 'Failed to upload image. Please try again.', 'error');
+                        return;
+                    }
+                }
+                
+                const data = {
+                    email: formData.get('email'),
+                    name: formData.get('name'),
+                    handle: formData.get('handle'),
+                    dob: formData.get('dob'),
+                    phone: formData.get('phone'),
+                    bio: formData.get('bio'),
+                    profileImage: finalProfileImage
+                };
+                
+                try {
+                    const response = await fetch('/api/auth/signup/profile', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': window.csrfToken
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        // Store JWT token
+                        if (result.token) {
+                            localStorage.setItem('jwtToken', result.token);
+                            localStorage.setItem('user', JSON.stringify(result.user));
+                        }
+                        
+                        showNotification('Profile completed successfully!', 'success');
+                        setTimeout(() => {
+                            window.location.replace(result.redirect || '/dashboard');
+                        }, 1000);
+                    } else {
+                        // Handle validation errors
+                        if (result.fieldErrors) {
+                            // Show field-specific errors
+                            Object.keys(result.fieldErrors).forEach(field => {
+                                showFieldError(field, result.fieldErrors[field]);
+                            });
+                        } else if (result.details && Array.isArray(result.details)) {
+                            // Fallback: use details array
+                            result.details.forEach((err) => {
+                                const field = err.path[0];
+                                if (field) {
+                                    showFieldError(field, err.message);
+                                }
+                            });
+                        } else {
+                            // Generic error
+                            showNotification(result.error || 'Failed to complete profile', 'error');
+                        }
+                    }
+                } catch (error) {
+                    showNotification('Network error. Please try again.', 'error');
+                }
+            });
+        });
+    </script>
+    <%- include('partials/modal-helpers') %>
+    <!-- ✅ Global Toast / Notification System (for standalone page) -->
+    <script>
+        (function () {
+            window.UI = window.UI || {};
+            if (window.UI.showToast) return; // don't override if layout already defined
+
+            window.UI.showToast = function (message, type = 'success', opts = {}) {
+                const duration = typeof opts.duration === 'number' ? opts.duration : 3000;
+                const existing = document.getElementById('global-toast');
+                if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+                const el = document.createElement('div');
+                el.id = 'global-toast';
+                el.className =
+                    'fixed top-4 right-4 z-50 max-w-sm w-[90vw] sm:w-auto px-4 py-3 sm:px-6 sm:py-4 ' +
+                    'rounded-xl shadow-2xl transition-all duration-300 transform opacity-0 translate-y-2';
+
+                let bgClasses, icon;
+                if (type === 'success') {
+                    bgClasses = 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
+                    icon = '✅';
+                } else if (type === 'error') {
+                    bgClasses = 'bg-gradient-to-r from-red-500 to-rose-500 text-white';
+                    icon = '❌';
+                } else {
+                    bgClasses = 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white';
+                    icon = 'ℹ️';
+                }
+
+                el.className += ' ' + bgClasses;
+                el.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">${icon}</span>
+                        <div class="flex flex-col text-left">
+                            <span class="font-semibold">${message}</span>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(el);
+
+                requestAnimationFrame(() => {
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                });
+
+                setTimeout(() => {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(-8px)';
+                    setTimeout(() => {
+                        if (el.parentNode) el.parentNode.removeChild(el);
+                    }, 300);
+                }, duration);
+            };
+        })();
+    </script>
+    
+    <script>
+        // ✅ Unified notification wrapper for signup-profile
+        function showNotification(message, type = 'success') {
+            if (window.UI && typeof window.UI.showToast === 'function') {
+                window.UI.showToast(message, type);
+            }
+        }
+    </script>
+</body>
+</html>

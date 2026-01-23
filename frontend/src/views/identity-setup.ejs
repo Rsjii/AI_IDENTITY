@@ -1,0 +1,252 @@
+<%- include('layout', { title: 'Setup Your Identity' }) %>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
+  <div class="max-w-2xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sm:p-8">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Setup Your Identity</h1>
+      <p class="text-gray-600 dark:text-gray-400 mb-6">
+        Define how you communicate. This will be used to generate replies that sound like you.
+      </p>
+
+      <form id="identityForm">
+        <!-- Basic Info -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Basic Information</h2>
+          
+          <div class="mb-4">
+            <label for="displayName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Display Name *
+            </label>
+            <input
+              type="text"
+              id="displayName"
+              name="displayName"
+              required
+              placeholder="Your name"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+              maxlength="50"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="primaryUse" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Primary Use *
+            </label>
+            <select
+              id="primaryUse"
+              name="primaryUse"
+              required
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="founder">Founder</option>
+              <option value="creator">Creator</option>
+              <option value="ops">Operations</option>
+              <option value="sales">Sales</option>
+              <option value="support">Support</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Defaults -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Communication Defaults</h2>
+          
+          <div class="mb-4">
+            <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Language
+            </label>
+            <select
+              id="language"
+              name="language"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="english">English</option>
+              <option value="hinglish">Hinglish</option>
+              <option value="hindi">Hindi</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="replyLength" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Default Reply Length
+            </label>
+            <select
+              id="replyLength"
+              name="replyLength"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="short">Short</option>
+              <option value="normal" selected>Normal</option>
+              <option value="long">Long</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="directness" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Directness
+            </label>
+            <select
+              id="directness"
+              name="directness"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="soft">Soft</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="blunt">Blunt</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="emoji" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Emoji Usage
+            </label>
+            <select
+              id="emoji"
+              name="emoji"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              <option value="none">None</option>
+              <option value="low" selected>Low</option>
+              <option value="medium">Medium</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Rules -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rules</h2>
+          
+          <div class="mb-4">
+            <label for="alwaysRules" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Always Rules (min 3) *
+            </label>
+            <textarea
+              id="alwaysRules"
+              name="alwaysRules"
+              required
+              placeholder="One rule per line. Example:&#10;Ask context before calls&#10;Keep replies short"
+              rows="4"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            ></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One rule per line (max 120 chars each)</p>
+          </div>
+
+          <div class="mb-4">
+            <label for="neverRules" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Never Rules (min 3) *
+            </label>
+            <textarea
+              id="neverRules"
+              name="neverRules"
+              required
+              placeholder="One rule per line. Example:&#10;Never sound desperate&#10;Never overpromise"
+              rows="4"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            ></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One rule per line (max 120 chars each)</p>
+          </div>
+        </div>
+
+        <!-- Boundaries (Optional) -->
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Boundaries (Optional)</h2>
+          
+          <div class="mb-4">
+            <label for="noTopics" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Topics to Avoid (comma-separated)
+            </label>
+            <input
+              type="text"
+              id="noTopics"
+              name="noTopics"
+              placeholder="politics, religion, nsfw"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="escalateIf" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Escalate If (one per line)
+            </label>
+            <textarea
+              id="escalateIf"
+              name="escalateIf"
+              placeholder="Investor asks for money&#10;Legal threat"
+              rows="3"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            ></textarea>
+          </div>
+        </div>
+
+        <div id="error-message" class="mb-4 text-red-600 dark:text-red-400 hidden"></div>
+
+        <button
+          type="submit"
+          class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+        >
+          Create Identity
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.csrfToken = '<%= csrfToken %>';
+
+  document.getElementById('identityForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = {
+      identityJson: {
+        displayName: document.getElementById('displayName').value,
+        primaryUse: document.getElementById('primaryUse').value,
+        defaults: {
+          language: document.getElementById('language').value,
+          length: document.getElementById('replyLength').value,
+          directness: document.getElementById('directness').value,
+          emoji: document.getElementById('emoji').value,
+        },
+        hardRules: {
+          always: document.getElementById('alwaysRules').value.split('\n').filter(r => r.trim()),
+          never: document.getElementById('neverRules').value.split('\n').filter(r => r.trim()),
+        },
+        boundaries: {
+          noTopics: document.getElementById('noTopics').value.split(',').map(t => t.trim()).filter(t => t),
+          escalateIf: document.getElementById('escalateIf').value.split('\n').filter(e => e.trim()),
+        },
+        decisionPolicy: {
+          defaultAction: 'reply',
+          riskTolerance: 'low',
+        },
+        styleAnchors: {},
+      },
+    };
+
+    try {
+      const response = await fetch('/api/identity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': window.csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create identity');
+      }
+
+      // Redirect to mirror
+      window.location.href = '/mirror';
+    } catch (error: any) {
+      const errorEl = document.getElementById('error-message');
+      errorEl.textContent = error.message || 'Failed to create identity';
+      errorEl.classList.remove('hidden');
+    }
+  });
+</script>
+
