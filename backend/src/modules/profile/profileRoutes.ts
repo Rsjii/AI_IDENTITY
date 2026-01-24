@@ -44,8 +44,8 @@ router.post(
       });
     });
   },
+  requireJWTFromCookie, // ✅ FIX: Check auth first (401), then CSRF (403) - better DX for SPA
   validateCSRF,
-  requireJWTFromCookie,
   updateProfile
 );
 router.post(

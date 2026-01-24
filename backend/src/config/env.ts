@@ -33,8 +33,8 @@ const envInfo = {
   APP_ENV_from_env: process.env['APP_ENV'] || 'NOT_SET',
 };
 
-// Log environment config only in dev mode (logger not available yet)
-if (isDev) {
+// Log environment config only if explicitly requested (avoid noisy logs)
+if (isDev && process.env.LOG_ENV_CONFIG === 'true') {
   console.log('🔧 [ENV] Environment Configuration:', JSON.stringify(envInfo, null, 2));
 }
 
@@ -104,8 +104,13 @@ export const config = {
   
   // OTP Configuration
   otp: {
-    expiryMinutes: Number(process.env['OTP_EXPIRY_MINUTES']),
-    codeLength: Number(process.env['OTP_CODE_LENGTH'])
+    // ✅ defaults if env missing/invalid
+    expiryMinutes: Number.isFinite(Number(process.env['OTP_EXPIRY_MINUTES']))
+      ? Number(process.env['OTP_EXPIRY_MINUTES'])
+      : 10,
+    codeLength: Number.isFinite(Number(process.env['OTP_CODE_LENGTH']))
+      ? Number(process.env['OTP_CODE_LENGTH'])
+      : 6,
   }
 };
 

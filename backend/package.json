@@ -4,7 +4,8 @@
   "description": "Selflyx Backend API Server",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "dev:verbose": "tsx watch --clear-screen=false --log-level=debug src/server.ts",
     "build": "tsc --noEmitOnError false || exit 0",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
@@ -17,7 +18,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "compare-schema": "node scripts/compareTableSchema.js",
-    "migrate:event-indexes": "node scripts/runEventIndexesMigration.js"
+    "migrate:event-indexes": "node scripts/runEventIndexesMigration.js",
+    "clear-db": "tsx src/scripts/clearDatabase.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

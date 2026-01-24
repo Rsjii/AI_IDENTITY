@@ -30,7 +30,7 @@ export const generateJWT = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string =>
       expiresIn: JWT_EXPIRES_IN,
       issuer: 'ai-twin-app'
     });
-    logger.info(`JWT generated for user: ${payload.email}`);
+    logger.debug(`JWT generated for user: ${payload.email}`);
     return token;
   } catch (error) {
     logger.error('JWT generation error:', error);
@@ -41,7 +41,7 @@ export const generateJWT = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string =>
 export const verifyJWT = (token: string): JWTPayload => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET_FINAL) as JWTPayload;
-    logger.info(`JWT verified for user: ${decoded.email}`);
+    logger.debug(`JWT verified for user: ${decoded.email}`);
     return decoded;
   } catch (error) {
     logger.error('JWT verification error:', error);

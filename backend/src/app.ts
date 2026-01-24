@@ -1,8 +1,7 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import path from 'path';
@@ -17,6 +16,7 @@ import { pool } from './config/db';
 import { errorHandlerMiddleware } from './middleware/errorHandler';
 import { globalRateLimit } from './middleware/rateLimit';
 import { extractJWTFromCookie } from './middleware/jwtCookie';
+import { generateCSRFToken } from './middleware/csrf';
 
 // API routes
 import authRoutes from './modules/auth/authRoutes';
@@ -96,9 +96,17 @@ app.use(session({
   },
 }));
 
+// CSRF token endpoint for React SPA
+app.get('/api/csrf', (req: Request, res: Response) => {
+  generateCSRFToken(req, res, () => {
+    res.json({ csrfToken: res.locals.csrfToken || '' });
+  });
+});
+
 // Profile completion guard (block access until profile completed)
 app.use(async (req, res, next) => {
   try {
+    const isApiRequest = req.originalUrl.startsWith('/api/');
     const path = req.path || '';
 
     // Skip static assets
@@ -124,6 +132,11 @@ app.use(async (req, res, next) => {
       return next();
     }
 
+    // ✅ Allow home page for everyone
+    if (path === '/' || path === '') {
+      return next();
+    }
+
     // If not logged in, nothing to do
     if (!req.user || !req.user.email) {
       return next();
@@ -139,6 +152,7 @@ app.use(async (req, res, next) => {
       '/forgot-password',
       '/reset-password',
       '/api/auth',
+      '/api/csrf', // ✅ Allow CSRF token fetch for React SPA (needed even if profile incomplete)
       '/identity',
       '/mirror',
     ];
@@ -162,22 +176,34 @@ app.use(async (req, res, next) => {
       if (req.session) {
         req.session.destroy(() => {});
       }
+      if (isApiRequest) {
+        return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED', redirect: '/auth' });
+      }
       return res.redirect('/auth');
     }
 
     if (!fullUser.profileCompleted) {
+      if (isApiRequest) {
+        return res.status(403).json({ error: 'Profile not completed', errorCode: 'PROFILE_INCOMPLETE', redirect: '/auth' });
+      }
       return res.redirect('/auth');
     }
 
     return next();
-  } catch (err) {
-    logger.error('ProfileCompletionGuard error:', err);
-    return res.redirect('/auth');
+  } catch (err: any) {
+    logger.error('ProfileCompletionGuard error:', {
+      error: err.message,
+      stack: err.stack,
+      path: req.path,
+    });
+    // Don't redirect on error - let the request continue
+    return next();
   }
 });
 
 // Global user exposure to EJS
 app.use(async (req, res, next) => {
+  if (req.originalUrl.startsWith('/api/')) return next();
   if (!res.locals.user && req.user) {
     try {
       const { userQueries } = await import('./config/database');
@@ -227,6 +253,7 @@ app.use(async (req, res, next) => {
 
 // Global render wrapper
 app.use((req, res, next) => {
+  if (req.originalUrl.startsWith('/api/')) return next();
   const originalRender = res.render.bind(res);
 
   res.render = (view: string, options?: any, callback?: any) => {
@@ -245,20 +272,21 @@ app.use((req, res, next) => {
 // ✅ ENHANCED: Request/Response logging middleware (before routes)
 app.use((req, res, next) => {
   const start = Date.now();
-  
-  // Log request
+
+  // Log request (body only in dev to avoid logging sensitive data)
   logger.info({
     method: req.method,
     path: req.path,
     query: req.query,
-    body: req.method === 'POST' || req.method === 'PUT' ? req.body : undefined,
+    ...(isDev && (req.method === 'POST' || req.method === 'PUT') ? { body: req.body } : {}),
     ip: req.ip,
   }, `📥 ${req.method} ${req.path}`);
-  
+
   // Log response when finished
   res.on('finish', () => {
     const duration = Date.now() - start;
     const logLevel = res.statusCode >= 400 ? 'error' : 'info';
+
     logger[logLevel]({
       method: req.method,
       path: req.path,
@@ -266,22 +294,10 @@ app.use((req, res, next) => {
       duration: `${duration}ms`,
       ip: req.ip,
     }, `📤 ${req.method} ${req.path} → ${res.statusCode} (${duration}ms)`);
-    
-    // ✅ Also console.log for immediate visibility
-    if (res.statusCode >= 400) {
-      console.error(`❌ [${req.method}] ${req.path} → ${res.statusCode} (${duration}ms)`);
-    }
   });
-  
+
   next();
 });
-
-// Logging
-if (config.nodeEnv === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -310,11 +326,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // ========== ROUTE MOUNTING ==========
+
 // Page routes (HTML rendering)
 app.use('/', pageRoutes);
 
 // API Routes
-app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/identity', identityRoutes);
 app.use('/api/profile', profileRoutes);

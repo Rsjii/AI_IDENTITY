@@ -1,5 +1,5 @@
 import app from './app';
-import { config, isProd } from './config/env';
+import { config, isProd, isDev } from './config/env';
 import { logger } from './config/logger';
 import { db } from './config/db';
 import { initializeDatabase } from './config/database';
@@ -84,16 +84,42 @@ async function startServer() {
     initializePostHog();
 
     // Test database connection
-    await db.query('SELECT 1');
-    logger.info('Database connected successfully');
+    let dbConnected = false;
 
-    // Initialize database tables (with retry logic)
     try {
-      await initializeDatabase();
-      logger.info('Database tables initialized');
-    } catch (dbError) {
-      logger.warn('Database initialization failed, continuing anyway:', dbError.message);
-      // Continue startup even if DB init fails (tables might already exist)
+      await db.query('SELECT 1');
+      dbConnected = true;
+      logger.info('✅ Database connected successfully');
+    } catch (dbError: any) {
+      const errorCode = dbError?.code || 'NO_CODE';
+      const errorMessage = dbError?.message || 'Unknown error';
+
+      // Dev mode: allow boot without DB (DNS/network issues are common)
+      if (config.appEnv === 'local' && (errorCode === 'ENOTFOUND' || errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED')) {
+        logger.warn('⚠️ Database connection failed in dev mode. Starting in degraded mode.');
+        logger.warn(`   Error: ${errorCode} - ${errorMessage}`);
+        logger.warn('   Skipping DB initialization. DB-dependent routes will fail until DNS/network is fixed.');
+        dbConnected = false;
+      } else {
+        // In production or for other errors, fail fast
+        logger.error('❌ Database connection failed:', {
+          code: errorCode,
+          message: errorMessage,
+          hostname: errorMessage.includes('ENOTFOUND') ? 'DNS resolution failed - check DATABASE_URL hostname' : undefined,
+        });
+        throw dbError;
+      }
+    }
+
+    // Initialize database tables only if DB is reachable
+    if (dbConnected) {
+      try {
+        await initializeDatabase();
+        logger.info('✅ Database tables initialized');
+      } catch (dbError: any) {
+        logger.warn('⚠️ Database initialization failed, continuing anyway:', dbError?.message || dbError);
+        // Continue startup even if DB init fails (tables might already exist)
+      }
     }
 
     // ✅ Pre-warm Groq API (non-blocking, don't wait for it)
@@ -107,7 +133,7 @@ async function startServer() {
       logger.info(`📊 Environment: ${config.nodeEnv}`);
       logger.info(`🔗 OpenAI API configured: ${config.openaiApiKey ? 'Yes' : 'No'}`);
       logger.info(`📧 Email configured: ${config.mail.smtp.user ? 'Yes' : 'No'}`);
-      logger.info(`✅ Database: Connected`);
+      logger.info(`💾 Database: ${dbConnected ? '✅ Connected' : '⚠️ Degraded mode (DB unavailable)'}`);
     });
 
     // Handle server errors
@@ -124,7 +150,13 @@ async function startServer() {
           process.exit(1);
           break;
         case 'EADDRINUSE':
-          logger.error(`${bind} is already in use`);
+          logger.error(`❌ ${bind} is already in use`);
+          logger.error(`\n💡 To fix this:`);
+          logger.error(`   1. Kill the process using port ${config.port}:`);
+          logger.error(`      Windows: netstat -ano | findstr :${config.port}`);
+          logger.error(`      Then: taskkill /PID <PID> /F`);
+          logger.error(`   2. Or change PORT in .env file to a different port (e.g., 5001)`);
+          logger.error(`   3. Or wait a few seconds for the port to be released\n`);
           process.exit(1);
           break;
         default:
@@ -145,8 +177,13 @@ async function startServer() {
       process.exit(0);
     });
 
-  } catch (error) {
-    logger.error('Failed to start server:', error);
+  } catch (error: any) {
+    logger.error({ err: error }, 'Failed to start server');
+    // ✅ Only log to console in dev mode (logger already handles production)
+    if (isDev) {
+      console.error('\n❌ SERVER STARTUP ERROR:', error?.message || error);
+      if (error?.stack) console.error(error.stack);
+    }
     process.exit(1);
   }
 }

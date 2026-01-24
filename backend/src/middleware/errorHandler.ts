@@ -21,7 +21,7 @@ export const errorHandlerMiddleware = (
   res: Response,
   next: NextFunction
 ): void => {
-  const isApiRequest = req.path.startsWith('/api/');
+  const isApiRequest = req.originalUrl.startsWith('/api/');
   const requestId = req.requestId || null;
 
   if (err instanceof AppError) {
@@ -42,16 +42,6 @@ export const errorHandlerMiddleware = (
       userAgent: req.get('user-agent'),
       ...(err.details && { details: err.details }), // ✅ Always log details (not exposed to user)
     }, '⚠️ APP_ERROR caught:');
-    
-    // ✅ Also log to console for immediate visibility
-    console.warn('⚠️ [APP_ERROR]', {
-      errorCode: err.errorCode,
-      statusCode: err.statusCode,
-      message: err.message,
-      path: req.path,
-      method: req.method,
-      details: err.details,
-    });
 
     // ✅ Event logging - include details for debugging
     try {
@@ -141,15 +131,6 @@ export const errorHandlerMiddleware = (
     body: isProd ? undefined : req.body, // Only in dev
     query: isProd ? undefined : req.query, // Only in dev
   }, '❌ UNHANDLED ERROR - Full stack trace:');
-  
-  // ✅ Also log to console directly for immediate visibility
-  console.error('❌ [ERROR_HANDLER] Unhandled error:', {
-    name: err.name,
-    message: err.message,
-    path: req.path,
-    method: req.method,
-    stack: err.stack?.substring(0, 500), // First 500 chars of stack
-  });
 
   // ✅ Event logging for unhandled errors
   try {

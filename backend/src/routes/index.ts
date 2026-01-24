@@ -12,21 +12,10 @@ const router = Router();
 // Generate CSRF token for all page routes
 router.use(generateCSRFToken);
 
-// Auth pages
-router.use(authPageRoutes);
-
-// Identity pages
-router.use(identityPageRoutes);
-
-// History pages
-router.use(historyPageRoutes);
-
-// Admin pages
-router.use(adminPageRoutes);
-
-// Landing page
+// ✅ Landing page - MUST be first to avoid route conflicts
 router.get('/', asyncHandler(async (req, res) => {
   try {
+    logger.info('Rendering landing page', { path: req.path, hasUser: !!res.locals.user });
     return res.render('marketing/landing_mvp', {
       title: 'Identity Mirror',
       user: res.locals.user || null,
@@ -38,8 +27,20 @@ router.get('/', asyncHandler(async (req, res) => {
       stack: error.stack,
       path: req.path,
     });
-    throw error;
+    throw error; // Let asyncHandler catch it
   }
 }));
+
+// Auth pages
+router.use(authPageRoutes);
+
+// Identity pages
+router.use(identityPageRoutes);
+
+// History pages
+router.use(historyPageRoutes);
+
+// Admin pages
+router.use(adminPageRoutes);
 
 export default router;

@@ -160,32 +160,16 @@ const resetPasswordSchema = z.object({
 
 export const signup = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // ✅ ENHANCED: Detailed signup request logging
-    logger.info({
-      body: req.body,
-      method: req.method,
-      path: req.path,
-      ip: req.ip,
-    }, '=== 📝 SIGNUP REQUEST START ===');
-    
-    // ✅ Also console.log for immediate visibility
-    console.log('📝 [SIGNUP] Request received:', {
-      email: req.body?.email,
-      hasPassword: !!req.body?.password,
-      referralCode: req.body?.referralCode,
-    });
-    
     const { email, password, referralCode } = signupSchema.parse(req.body);
     
-    logger.info(`Attempting signup for email: ${email}`);
+    logger.info({ email: String(email).toLowerCase() }, 'Attempting signup');
     
     // Check if user already exists
     let existingUser;
     try {
       existingUser = await userQueries.findByEmail(email.toLowerCase());
     } catch (dbError: any) {
-      logger.error('Failed to check existing user:', dbError);
-      console.error('❌ [SIGNUP] Database error checking user:', dbError?.message || dbError);
+      logger.error({ err: dbError }, 'Failed to check existing user');
       // If we can't check, fail safe - don't allow signup
       return res.status(500).json({
         error: 'Database error. Please try again later.',
@@ -258,13 +242,13 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
         source: referralCode ? 'referral' : 'direct'
       });
     } catch (eventError) {
-      logger.warn('Failed to log signup event:', eventError);
+      logger.warn({ err: eventError }, 'Failed to log signup event');
     }
 
     // ✅ Identify user in PostHog
     identifyPostHogUser(user.id, {
       handle: user.handle,
-      createdAt: user.createdAt.toISOString()
+      createdAt: user.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString()) : new Date().toISOString()
     });
 
 // If they were referred, link them
@@ -286,7 +270,10 @@ if (referrerId) {
   // Generate OTP
     const otp = generateOTP(config.otp.codeLength);
     const hashedOTP = await hashOTP(otp);
-    const expiresAt = new Date(Date.now() + config.otp.expiryMinutes * 60 * 1000);
+    
+    // ✅ FIX: Ensure expiryMinutes is valid, use default if not
+    const expiryMinutes = Number.isFinite(config.otp.expiryMinutes) ? config.otp.expiryMinutes : 10;
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
     
     await otpQueries.create(email.toLowerCase(), hashedOTP, expiresAt, 'signup');
     logger.info(`OTP created for ${email}`);
@@ -313,23 +300,14 @@ if (referrerId) {
       redirect: '/signup/verify?email=' + encodeURIComponent(email)
     });
   } catch (error: any) {
-    // ✅ ENHANCED: Log full error details to console
     logger.error({
       err: error,
       message: error?.message || 'Unknown signup error',
       stack: error?.stack,
       name: error?.name,
-      body: req.body,
       path: req.path,
       method: req.method,
     }, '❌ SIGNUP ERROR - Full details:');
-    
-    // ✅ Also log to console directly for visibility
-    console.error('❌ [SIGNUP] Error caught:', {
-      message: error?.message,
-      stack: error?.stack,
-      body: req.body,
-    });
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -378,10 +356,15 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
       });
     }
     
-    // ✅ Check if OTP is expired
-    const now = new Date();
-    if (new Date(otpRecord.expiresAt) < now) {
-      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${now}`);
+    // ✅ Check if OTP is expired (robust Date parsing with timezone support)
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    
+    // If expiresAt is invalid -> treat as expired (and log)
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
+      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${new Date(nowMs).toISOString()}, ExpiresAtMs: ${expiresAtMs}, NowMs: ${nowMs}`);
       return res.status(400).json({
         error: 'OTP has expired. Please request a new one.',
         errorCode: 'OTP_EXPIRED'
@@ -418,7 +401,6 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     });
   } catch (error: any) {
     logger.error('Signup verify error:', error);
-    console.error('❌ [SIGNUP_VERIFY] Error:', error?.message || error, error?.stack?.substring(0, 300));
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -501,8 +483,7 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
       }
     });
   } catch (error: any) {
-    logger.error('Complete profile error:', error);
-    console.error('❌ [COMPLETE_PROFILE] Error:', error?.message || error, error?.stack?.substring(0, 300));
+    logger.error({ err: error }, 'Complete profile error');
 
     // ✅ 1) Zod validation errors → fieldErrors map (already there)
     if (error instanceof z.ZodError) {
@@ -591,7 +572,6 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     });
   } catch (error) {
     logger.error('Forgot password error:', error);
-    console.error('❌ [FORGOT_PASSWORD] Error:', (error as any)?.message || error);
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -621,10 +601,15 @@ export const forgotPasswordVerify = async (req: Request, res: Response, next: Ne
       });
     }
     
-    // ✅ Check if OTP is expired
-    const now = new Date();
-    if (new Date(otpRecord.expiresAt) < now) {
-      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${now}`);
+    // ✅ Check if OTP is expired (robust Date parsing with timezone support)
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    
+    // If expiresAt is invalid -> treat as expired (and log)
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
+      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${new Date(nowMs).toISOString()}, ExpiresAtMs: ${expiresAtMs}, NowMs: ${nowMs}`);
       return res.status(400).json({
         error: 'OTP has expired. Please request a new one.',
         errorCode: 'OTP_EXPIRED'
@@ -658,7 +643,6 @@ export const forgotPasswordVerify = async (req: Request, res: Response, next: Ne
     });
   } catch (error) {
     logger.error('Forgot password verify error:', error);
-    console.error('❌ [FORGOT_PASSWORD_VERIFY] Error:', (error as any)?.message || error);
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -689,9 +673,14 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    // ✅ Check if OTP has expired
-    const now = new Date();
-    if (new Date(otpRecord.expiresAt) < now) {
+    // ✅ Check if OTP has expired (robust Date parsing with timezone support)
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    
+    // If expiresAt is invalid -> treat as expired
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
       return res.status(400).json({
         error: 'OTP has expired. Please request a new one.',
         errorCode: 'OTP_EXPIRED'
@@ -727,7 +716,6 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     });
   } catch (error) {
     logger.error('Reset password error:', error);
-    console.error('❌ [RESET_PASSWORD] Error:', (error as any)?.message || error);
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -850,7 +838,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   });    
   } catch (error) {
     logger.error('Login error:', error);
-    console.error('❌ [LOGIN] Error:', (error as any)?.message || error);
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -880,10 +867,15 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       });
     }
     
-    // ✅ Check if OTP is expired
-    const now = new Date();
-    if (new Date(otpRecord.expiresAt) < now) {
-      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${now}`);
+    // ✅ Check if OTP is expired (robust Date parsing with timezone support)
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    
+    // If expiresAt is invalid -> treat as expired (and log)
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
+      logger.warn(`OTP expired for ${email}. ExpiresAt: ${otpRecord.expiresAt}, Now: ${new Date(nowMs).toISOString()}, ExpiresAtMs: ${expiresAtMs}, NowMs: ${nowMs}`);
       return res.status(400).json({
         error: 'OTP has expired. Please request a new one.',
         errorCode: 'OTP_EXPIRED'
@@ -968,8 +960,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     }
   });    
   } catch (error) {
-    logger.error('Login verify error:', error);
-    console.error('❌ [LOGIN_VERIFY] Error:', (error as any)?.message || error);
+    logger.error({ err: error }, 'Login verify error');
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -1059,8 +1050,7 @@ export const changePassword = async (req: AuthenticatedRequest, res: Response, n
       message: 'Password changed successfully' 
     });
   } catch (error) {
-    logger.error('Change password error:', error);
-    console.error('❌ [CHANGE_PASSWORD] Error:', (error as any)?.message || error);
+    logger.error({ err: error }, 'Change password error');
     
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
@@ -1210,9 +1200,14 @@ export const setPassword = async (req: AuthenticatedRequest, res: Response, next
       });
     }
 
-    // Check if OTP is expired
-    const now = new Date();
-    if (new Date(otpRecord.expiresAt) < now) {
+    // ✅ Check if OTP is expired (robust Date parsing with timezone support)
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    
+    // If expiresAt is invalid -> treat as expired
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
       return res.status(400).json({
         error: 'OTP has expired. Please request a new one.',
         errorCode: 'OTP_EXPIRED'
@@ -1284,7 +1279,7 @@ export const logout = (req: Request, res: Response, next: NextFunction) => {
     }
 
    // Clear JWT cookie
-    res.clearCookie('jwtToken', {
+   res.clearCookie('jwtToken', {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'lax' : 'strict',

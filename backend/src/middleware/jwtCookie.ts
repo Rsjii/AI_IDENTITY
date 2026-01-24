@@ -1,104 +1,82 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyJWT, JWTPayload } from '../services/jwtService';
+import { verifyJWT } from '../services/jwtService';
 import { logger } from '../config/logger';
 import { isProd } from '../config/env';
 
 export const extractJWTFromCookie = (req: Request, res: Response, next: NextFunction) => {
   try {
-    // ✅ ADD: Debug logging for production
-    if (isProd) {
-      logger.info('Cookie extraction - cookies:', Object.keys(req.cookies || {}));
-    }
-    
-    // Try to get JWT from cookie first
     const tokenFromCookie = req.cookies?.['jwtToken'];
-    
+
     if (tokenFromCookie) {
       try {
         const decoded = verifyJWT(tokenFromCookie);
-        // Map JWT payload to expected user structure
         req.user = {
           userId: decoded.userId,
           email: decoded.email,
           handle: decoded.handle,
-          id: decoded.userId // Add id field for compatibility
+          id: decoded.userId,
         };
-        
-        // ✅ ADD: Verify email is set
+
         if (!req.user.email) {
-          logger.error('JWT decoded but email missing:', decoded);
-          //Don't set req.user if email is missing
+          logger.warn({ decoded }, 'JWT decoded but email missing');
           req.user = undefined;
-          return next();
         }
-        
-        logger.info(`JWT extracted from cookie for user: ${decoded.email}`);
-        return next();
       } catch (error) {
-        logger.warn('Invalid JWT token in cookie:', error);
-        // Clear invalid cookie
+        logger.warn({ err: error }, 'Invalid JWT token in cookie');
         res.clearCookie('jwtToken', {
           httpOnly: true,
           secure: isProd,
           sameSite: isProd ? 'lax' : 'strict',
-          path: '/'
+          path: '/',
         });
       }
-    } else {
-      // ✅ ADD: Log when no cookie found
-      if (isProd) {
-        logger.info('No jwtToken cookie found in request');
-      }
     }
-    
-    // If no valid JWT found, continue without user
+
     next();
   } catch (error) {
-    logger.error('JWT cookie extraction error:', error);
+    logger.error({ err: error }, 'JWT cookie extraction error');
     next();
   }
 };
 
 export const requireJWTFromCookie = (req: Request, res: Response, next: NextFunction) => {
+  const isApiRequest = req.originalUrl.startsWith('/api/');
   try {
-    // Try to get JWT from cookie first
     const tokenFromCookie = req.cookies?.['jwtToken'];
-    
+
     if (!tokenFromCookie) {
-      logger.warn('No JWT token found in cookie');
-      if (req.path.startsWith('/api/')) {
+      if (isApiRequest) {
         return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
       }
       return res.redirect('/auth');
     }
-    
+
     try {
       const decoded = verifyJWT(tokenFromCookie);
-      // Map JWT payload to expected user structure
       req.user = {
         userId: decoded.userId,
         email: decoded.email,
         handle: decoded.handle,
-        id: decoded.userId // Add id field for compatibility
+        id: decoded.userId,
       };
-      logger.info(`JWT verified from cookie for user: ${decoded.email}`);
       return next();
     } catch (error) {
-      logger.warn('Invalid JWT token in cookie:', error);
+      logger.warn({ err: error }, 'Invalid JWT token in cookie');
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
         sameSite: isProd ? 'lax' : 'strict',
-        path: '/'
+        path: '/',
       });
-      if (req.path.startsWith('/api/')) {
+
+      if (isApiRequest) {
         return res.status(401).json({ error: 'Invalid token', errorCode: 'INVALID_TOKEN' });
       }
       return res.redirect('/auth');
     }
   } catch (error) {
-    logger.error('JWT cookie verification error:', error);
-    if (req.path.startsWith('/api/')) {
+    logger.error({ err: error }, 'JWT cookie verification error');
+    if (isApiRequest) {
       return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
     }
     return res.redirect('/auth');

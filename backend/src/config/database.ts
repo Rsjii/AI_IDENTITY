@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS "OTP" (
     "email" TEXT NOT NULL,
     "purpose" TEXT NOT NULL DEFAULT 'generic',
     "codeHash" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMPTZ NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "used" BOOLEAN NOT NULL DEFAULT false,
     CONSTRAINT "OTP_pkey" PRIMARY KEY ("id")
 );
@@ -205,10 +205,10 @@ export async function initializeDatabase() {
 export const userQueries = {
   create: async (email: string, handle?: string, passwordHash?: string, referralCode?: string) => {
     const id = generateBackendId.user();
-    const now = new Date();
+    // Use CURRENT_TIMESTAMP instead of Date object to avoid timezone/format issues
     const result = await db.query(
-      'INSERT INTO "User" (id, email, handle, "passwordHash", "referralCode", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [id, email, handle, passwordHash, referralCode, now, now]
+      'INSERT INTO "User" (id, email, handle, "passwordHash", "referralCode", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *',
+      [id, email, handle, passwordHash, referralCode]
     );
     return result.rows[0];
   },
@@ -323,9 +323,11 @@ export const userQueries = {
 export const otpQueries = {
   create: async (email: string, codeHash: string, expiresAt: Date, purpose: string) => {
     const id = generateBackendId.otp();
+    // Convert Date to ISO string to avoid timestamp format issues
+    const expiresAtString = expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt;
     const result = await db.query(
-      'INSERT INTO "OTP" (id, email, purpose, "codeHash", "expiresAt") VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [id, email, purpose, codeHash, expiresAt]
+      'INSERT INTO "OTP" (id, email, purpose, "codeHash", "expiresAt") VALUES ($1, $2, $3, $4, $5::timestamptz) RETURNING *',
+      [id, email, purpose, codeHash, expiresAtString]
     );
     return result.rows[0];
   },

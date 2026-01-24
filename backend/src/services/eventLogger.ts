@@ -51,8 +51,6 @@ export class EventLogger {
    */
   static async log(userId: string | null, type: string, meta?: StandardEventMeta): Promise<void> {
     try {
-      const utcTimestamp = new Date().toISOString();
-      
       // Enhance meta with public IDs if userId provided
       let enhancedMeta: StandardEventMeta = { ...meta };
       if (userId) {
@@ -61,13 +59,12 @@ export class EventLogger {
       
       await db.query(`
         INSERT INTO "Event" ("id", "userId", "type", "meta", "createdAt")
-        VALUES ($1, $2, $3, $4, $5::timestamptz)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
       `, [
         generateId.event(),
         userId || null,
         type,
-        JSON.stringify(enhancedMeta || {}),
-        utcTimestamp
+        JSON.stringify(enhancedMeta || {})
       ]);
       
       // Log to console in development
