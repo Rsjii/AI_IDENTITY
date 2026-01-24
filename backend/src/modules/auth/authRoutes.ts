@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, signupVerify, completeProfile, login, loginVerify, forgotPassword, forgotPasswordVerify, resetPassword, logout, changePassword, resendOTP, requestSetPasswordOTP, setPassword } from './authController';
+import { signup, signupVerify, completeProfile, login, loginVerify, forgotPassword, forgotPasswordVerify, resetPassword, logout, changePassword, resendOTP, requestSetPasswordOTP, setPassword, me } from './authController';
 import {
     otpRequestRateLimit,
     loginRateLimit,
@@ -36,6 +36,9 @@ router.post('/change-password', requireJWTFromCookie, sanitizeInput, validateCSR
 // Set password routes (for Google-only users)
 router.post('/set-password/request-otp', requireJWTFromCookie, sanitizeInput, validateCSRF, otpRequestRateLimit, requestSetPasswordOTP);
 router.post('/set-password', requireJWTFromCookie, sanitizeInput, validateCSRF, otpVerifyRateLimit, setPassword);
+
+// Get current user
+router.get('/me', requireJWTFromCookie, me);
 
 // Logout
 router.post('/logout', logout);

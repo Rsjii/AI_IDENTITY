@@ -243,6 +243,31 @@ export const mirror = async (req: AuthenticatedRequest, res: Response, next: Nex
       });
     }
 
+    // ✅ Surface LLM configuration issues clearly
+    const msg = String(error?.message || '');
+    const msgLower = msg.toLowerCase();
+
+    if (msgLower.includes('invalid api key') || msgLower.includes('invalid_api_key')) {
+      return res.status(503).json({
+        error: 'LLM configuration error (invalid API key). Fix GROQ_API_KEY / OPENAI_API_KEY in backend .env and restart server.',
+        errorCode: 'LLM_AUTH_FAILED',
+      });
+    }
+
+    if (msgLower.includes('no llm api key configured')) {
+      return res.status(503).json({
+        error: 'LLM not configured. Set GROQ_API_KEY / GROQ_API_KEY_ANONYMOUS or OPENAI_API_KEY in backend .env and restart server.',
+        errorCode: 'LLM_NOT_CONFIGURED',
+      });
+    }
+
+    if (msgLower.includes('openai') || msgLower.includes('groq api error') || msgLower.includes('all groq models failed')) {
+      return res.status(503).json({
+        error: 'LLM provider error. Please retry in a minute or check server logs.',
+        errorCode: 'LLM_UPSTREAM_ERROR',
+      });
+    }
+
     handleErrorWithResponse(error, res, 'Failed to generate mirror reply.');
   }
 };

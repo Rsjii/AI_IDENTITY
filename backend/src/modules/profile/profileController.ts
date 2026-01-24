@@ -111,10 +111,11 @@ export const updateProfile = async (req: Request, res: Response) => {
                       
       bio: z.string().max(300, 'Bio too long').optional(),
       profileImage: z.string().nullable().optional(),
+      timeZone: z.string().max(64).optional(),
     });    
 
     // ✅ FIX: Parse from req.body (multer will parse multipart/form-data)
-    const { name, handle, dob, phone, bio, profileImage } = updateProfileSchema.parse(req.body);
+    const { name, handle, dob, phone, bio, profileImage, timeZone } = updateProfileSchema.parse(req.body);
 
     // Get current user data
     const currentUser = await userQueries.findByEmail(req.user.email);
@@ -166,7 +167,8 @@ export const updateProfile = async (req: Request, res: Response) => {
       finalDob,
       finalPhone,
       finalBio,
-      finalProfileImage
+      finalProfileImage,
+      timeZone
     );
 
     // ✅ If handle changed, store timestamp

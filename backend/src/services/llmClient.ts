@@ -291,31 +291,36 @@ export class LLMClient {
 
     logger.info('🔄 Using OpenAI API (fallback)');
     const startedAt = Date.now();
-    
-    const completion = await this.openai.chat.completions.create({
-      model: options.model || 'gpt-4o-mini',
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      max_tokens: options.maxTokens || 512,
-      temperature: options.temperature || 0.7,
-      ...(options.responseFormat ? { response_format: options.responseFormat } : {})
-    });
 
-    const durationMs = Date.now() - startedAt;
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: options.model || 'gpt-4o-mini',
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        max_tokens: options.maxTokens || 512,
+        temperature: options.temperature || 0.7,
+        ...(options.responseFormat ? { response_format: options.responseFormat } : {})
+      });
 
-    logger.info('✅ Successfully used OpenAI API', {
-      durationMs,
-      usage: completion.usage || null,
-      model: completion.model
-    });
-    
-    return {
-      content: completion.choices[0]?.message?.content?.trim() || '',
-      model: completion.model || 'gpt-4o-mini',
-      tokensUsed: completion.usage?.total_tokens || 0,
-      // ✅ ADD: Actual breakdown
-      inputTokens: completion.usage?.prompt_tokens || 0,
-      outputTokens: completion.usage?.completion_tokens || 0
-    };
+      const durationMs = Date.now() - startedAt;
+
+      logger.info('✅ Successfully used OpenAI API', {
+        durationMs,
+        usage: completion.usage || null,
+        model: completion.model
+      });
+
+      return {
+        content: completion.choices[0]?.message?.content?.trim() || '',
+        model: completion.model || 'gpt-4o-mini',
+        tokensUsed: completion.usage?.total_tokens || 0,
+        // ✅ ADD: Actual breakdown
+        inputTokens: completion.usage?.prompt_tokens || 0,
+        outputTokens: completion.usage?.completion_tokens || 0
+      };
+    } catch (err: any) {
+      logger.error({ err }, '❌ OpenAI call failed');
+      throw err;
+    }
   }
 }
 

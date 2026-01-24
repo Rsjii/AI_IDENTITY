@@ -10,7 +10,7 @@ import { createError, ErrorCodes, AppError } from '../../utils/errors';
 import { handleErrorWithResponse } from '../../utils/errorHandler';
 import { logEvent } from '../../services/eventLogger';
 import { EventLogger } from '../../services/eventLogger';
-import { EVENT_TYPES } from '../../config/constants';
+import { EVENT_TYPES, ADMIN_EMAILS } from '../../config/constants';
 import { identifyPostHogUser } from '../../services/posthogService';
 
 const emailService = new EmailService();
@@ -1264,6 +1264,39 @@ export const setPassword = async (req: AuthenticatedRequest, res: Response, next
     // Handle other errors
     handleErrorWithResponse(error, res, 'Failed to set password. Please try again.');
   }
+};
+
+export const me = async (req: Request, res: Response) => {
+  if (!req.user?.email) {
+    return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
+  }
+
+  const user = await userQueries.findByEmail(String(req.user.email).toLowerCase());
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
+  }
+
+  const isAdmin = ADMIN_EMAILS.includes(String(user.email).toLowerCase());
+
+  return res.json({
+    success: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      handle: user.handle,
+      name: user.name,
+      bio: user.bio,
+      dob: user.dob,
+      phone: user.phone,
+      profileImage: user.profileImage,
+      profileCompleted: user.profileCompleted,
+      active: user.active,
+      isAdmin,
+      hasPassword: Boolean(user.passwordHash),
+      hasGoogle: Boolean(user.googleId),
+      timeZone: (user as any).timeZone || null,
+    },
+  });
 };
 
 export const logout = (req: Request, res: Response, next: NextFunction) => {

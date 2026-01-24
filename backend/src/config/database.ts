@@ -215,7 +215,7 @@ export const userQueries = {
 
   findByEmail: async (email: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted" FROM "User" WHERE email = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone" FROM "User" WHERE email = $1',
       [email]
     );
     return result.rows[0];

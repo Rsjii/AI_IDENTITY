@@ -331,6 +331,7 @@ app.use(passport.session());
 app.use('/', pageRoutes);
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/identity', identityRoutes);
 app.use('/api/profile', profileRoutes);

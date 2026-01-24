@@ -1,0 +1,154 @@
+import { getCSRFToken, refreshCSRFToken } from './csrf';
+
+export interface ApiError {
+  error: string;
+  errorCode?: string;
+  details?: any;
+  redirect?: string;
+}
+
+/**
+ * API fetch wrapper with automatic CSRF token handling
+ */
+export async function apiFetch<T = any>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  // Get CSRF token for POST/PUT/PATCH/DELETE
+  const method = options.method?.toUpperCase() || 'GET';
+  const needsCSRF = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+  let csrfToken = '';
+  if (needsCSRF) {
+    try {
+      csrfToken = await getCSRFToken();
+    } catch (error) {
+      console.error('Failed to get CSRF token:', error);
+      // Continue without token, backend will return 403
+    }
+  }
+
+  // Merge headers
+  const headers = new Headers(options.headers);
+  if (csrfToken) {
+    headers.set('X-CSRF-Token', csrfToken);
+  }
+  headers.set('Content-Type', 'application/json');
+
+  // Make request
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include', // Always include cookies (JWT)
+  });
+
+  // Handle CSRF errors (retry once)
+  if (response.status === 403) {
+    const errorData = await response.json().catch(() => ({}));
+    if (errorData.errorCode === 'CSRF_INVALID' && needsCSRF) {
+      // Refresh token and retry once
+      try {
+        csrfToken = await refreshCSRFToken();
+        headers.set('X-CSRF-Token', csrfToken);
+        
+        const retryResponse = await fetch(url, {
+          ...options,
+          headers,
+          credentials: 'include',
+        });
+
+        if (!retryResponse.ok) {
+          const retryError = await retryResponse.json().catch(() => ({}));
+          throw new ApiError(
+            retryError.error || 'Request failed',
+            retryError.errorCode,
+            retryError
+          );
+        }
+
+        return retryResponse.json();
+      } catch (retryError) {
+        throw retryError;
+      }
+    }
+  }
+
+  // Handle other errors
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({
+      error: `HTTP ${response.status}: ${response.statusText}`,
+    }));
+
+    const apiError = new Error(errorData.error || 'Request failed') as Error & ApiError;
+    apiError.errorCode = errorData.errorCode;
+    apiError.details = errorData.details;
+    apiError.redirect = errorData.redirect;
+    throw apiError;
+  }
+
+  // Handle empty responses
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    return {} as T;
+  }
+
+  return response.json();
+}
+
+// Custom Error class for API errors
+export class ApiError extends Error {
+  errorCode?: string;
+  details?: any;
+  redirect?: string;
+
+  constructor(message: string, errorCode?: string, details?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.errorCode = errorCode;
+    this.details = details;
+  }
+}
+
+/**
+ * API fetch wrapper for FormData (file uploads)
+ */
+export async function apiFetchForm<T = any>(
+  url: string,
+  options: RequestInit & { body: FormData }
+): Promise<T> {
+  const method = options.method?.toUpperCase() || 'POST';
+
+  let csrfToken = '';
+  try {
+    csrfToken = await getCSRFToken();
+  } catch {
+    // ignore
+  }
+
+  const headers = new Headers(options.headers);
+  if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+  // ✅ IMPORTANT: do NOT set Content-Type here (browser sets multipart boundary)
+
+  const response = await fetch(url, {
+    ...options,
+    method,
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({
+      error: `HTTP ${response.status}: ${response.statusText}`,
+    }));
+    const apiError = new Error(errorData.error || 'Request failed') as Error & ApiError;
+    apiError.errorCode = errorData.errorCode;
+    apiError.details = errorData.details;
+    apiError.redirect = errorData.redirect;
+    throw apiError;
+  }
+
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) return {} as T;
+  return response.json();
+}
+
