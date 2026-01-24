@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { RATE_LIMITS, formatRetryAfter } from '../config/rateLimitConfig';
-import { OPERATION_RATE_LIMITS, EVENT_TYPES } from '../config/constants';
+import { EVENT_TYPES } from '../config/constants';
 import { PostgreSQLRateLimitStore } from '../config/rateLimitStore';
 import { EventLogger } from '../services/eventLogger';
 import { logger } from '../config/logger';
@@ -121,11 +121,7 @@ export const globalRateLimit = rateLimit({
     
     // ✅ Skip routes with specific rate limiters
     const hasSpecificLimiter = path.startsWith('/api/auth') ||
-           path.startsWith('/api/chat') ||
-           path.startsWith('/api/public-chat') ||
-           path.startsWith('/api/enhanced-chat') ||
-           path.startsWith('/api/twin') ||
-           path.startsWith('/api/public-twin');
+           path.startsWith('/api/identity');
     
     return isStatic || hasSpecificLimiter;
   },
@@ -141,32 +137,6 @@ export const globalRateLimit = rateLimit({
   },
 });
 
-
-// Twin creation rate limiter
-export const twinCreationRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.twinCreation.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: RATE_LIMITS.twinCreation.windowMs,
-  max: RATE_LIMITS.twinCreation.max,
-  keyGenerator: (req) => rlKey('twinCreation', getUserOrIp(req)),
-  message: {
-    error: `Twin creation limit exceeded. You can create ${RATE_LIMITS.twinCreation.max} twins per hour.`,
-    retryAfter: formatRetryAfter(RATE_LIMITS.twinCreation.windowMs)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // ✅ FIX: Only count when twin creation actually succeeds (2xx/3xx responses)
-  skipFailedRequests: true,
-  handler: (req, res) => {
-    const key = rlKey('twinCreation', getUserOrIp(req));
-    logRateLimitViolation(req, 'twinCreation', key, RATE_LIMITS.twinCreation.max, RATE_LIMITS.twinCreation.windowMs);
-    return res.status(429).json({
-      success: false,
-      error: `Twin creation limit exceeded. You can create ${RATE_LIMITS.twinCreation.max} twins per hour.`,
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.twinCreation.windowMs)
-    });
-  },
-});
 
 // Draft generation rate limiter
 export const draftGenerationRateLimit = rateLimit({
@@ -218,31 +188,7 @@ export const otpRequestRateLimit = rateLimit({
   },
 });
 
-// Profile link generation rate limiter
-export const profileLinkRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.profileLink.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: RATE_LIMITS.profileLink.windowMs,
-  max: RATE_LIMITS.profileLink.max,
-  keyGenerator: (req) => rlKey('profileLink', getUserOrIp(req)),
-  message: {
-    error: `Profile link generation limit exceeded. You can generate ${RATE_LIMITS.profileLink.max} links per hour.`,
-    retryAfter: formatRetryAfter(RATE_LIMITS.profileLink.windowMs)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const key = rlKey('profileLink', getUserOrIp(req));
-    logRateLimitViolation(req, 'profileLink', key, RATE_LIMITS.profileLink.max, RATE_LIMITS.profileLink.windowMs);
-    return res.status(429).json({
-      success: false,
-      error: `Profile link generation limit exceeded. You can generate ${RATE_LIMITS.profileLink.max} links per hour.`,
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.profileLink.windowMs)
-    });
-  },
-});
-
-// Invite creation rate limiter
+// Invite creation rate limiter (still used for referral system)
 export const inviteCreationRateLimit = rateLimit({
   store: createRateLimitStore(RATE_LIMITS.inviteCreation.windowMs), // ✅ Use PostgreSQL store with windowMs
   windowMs: RATE_LIMITS.inviteCreation.windowMs,
@@ -262,6 +208,69 @@ export const inviteCreationRateLimit = rateLimit({
       error: `Invite creation limit exceeded. You can create ${RATE_LIMITS.inviteCreation.max} invites per day.`,
       errorCode: 'RATE_LIMIT_EXCEEDED',
       retryAfter: formatRetryAfter(RATE_LIMITS.inviteCreation.windowMs)
+    });
+  },
+});
+
+// Identity creation rate limiter
+export const identityCreateRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).identityCreate.windowMs),
+  windowMs: (RATE_LIMITS as any).identityCreate.windowMs,
+  max: (RATE_LIMITS as any).identityCreate.max,
+  keyGenerator: (req) => rlKey('identityCreate', getUserOrIp(req)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  handler: (req, res) => {
+    const key = rlKey('identityCreate', getUserOrIp(req));
+    logRateLimitViolation(req, 'identityCreate', key, (RATE_LIMITS as any).identityCreate.max, (RATE_LIMITS as any).identityCreate.windowMs);
+    return res.status(429).json({
+      success: false,
+      error: 'Identity creation limit exceeded. Please try again later.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).identityCreate.windowMs),
+    });
+  },
+});
+
+// Trust confirmation rate limiter
+export const trustConfirmRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).trustConfirm.windowMs),
+  windowMs: (RATE_LIMITS as any).trustConfirm.windowMs,
+  max: (RATE_LIMITS as any).trustConfirm.max,
+  keyGenerator: (req) => rlKey('trustConfirm', getUserOrIp(req)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  handler: (req, res) => {
+    const key = rlKey('trustConfirm', getUserOrIp(req));
+    logRateLimitViolation(req, 'trustConfirm', key, (RATE_LIMITS as any).trustConfirm.max, (RATE_LIMITS as any).trustConfirm.windowMs);
+    return res.status(429).json({
+      success: false,
+      error: 'Too many confirmations. Please slow down.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).trustConfirm.windowMs),
+    });
+  },
+});
+
+// Daily mirror rate limiter
+export const mirrorDailyRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).mirrorDaily.windowMs),
+  windowMs: (RATE_LIMITS as any).mirrorDaily.windowMs,
+  max: (RATE_LIMITS as any).mirrorDaily.max,
+  keyGenerator: (req) => rlKey('mirrorDaily', getUserOrIp(req)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  handler: (req, res) => {
+    const key = rlKey('mirrorDaily', getUserOrIp(req));
+    logRateLimitViolation(req, 'mirrorDaily', key, (RATE_LIMITS as any).mirrorDaily.max, (RATE_LIMITS as any).mirrorDaily.windowMs);
+    return res.status(429).json({
+      success: false,
+      error: 'Daily mirror limit exceeded. Try again tomorrow.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).mirrorDaily.windowMs),
     });
   },
 });
@@ -289,112 +298,6 @@ export const apiRateLimit = rateLimit({
     });
   },
 });
-
-// Public chat message rate limiter (for anonymous users - strict)
-export const publicChatRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.publicChatAnon.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: RATE_LIMITS.publicChatAnon.windowMs,
-  max: RATE_LIMITS.publicChatAnon.max,
-  keyGenerator: (req) => {
-    // ✅ FIX: Add unique prefix to prevent key conflicts with other limiters
-    // For anonymous users: use IP address (most reliable)
-    // IP tracking works even if visitorId changes
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    return `publicChatAnon:${ip}`;
-  },
-  message: {
-    error: 'Too many messages. Please wait before sending another.',
-    retryAfter: formatRetryAfter(RATE_LIMITS.publicChatAnon.windowMs)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false, // ✅ FIX: Disable double-count validation (we have multiple independent limiters)
-  handler: (req, res) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `publicChatAnon:${ip}`;
-    logRateLimitViolation(req, 'publicChatAnon', key, RATE_LIMITS.publicChatAnon.max, RATE_LIMITS.publicChatAnon.windowMs);
-    res.status(429).json({
-      success: false,
-      error: 'Too many messages. Please wait before sending another.',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.publicChatAnon.windowMs)
-    });
-  },
-  skip: (req) => {
-    // Skip rate limiting for authenticated users (they get higher limit)
-    // Authenticated users are handled by publicChatRateLimitAuthenticated
-    return !!req.user?.id || !!req.user?.userId;
-  }
-});
-
-// Public chat rate limiter (for authenticated users - higher limit)
-export const publicChatRateLimitAuthenticated = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.publicChatAuth.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: RATE_LIMITS.publicChatAuth.windowMs,
-  max: RATE_LIMITS.publicChatAuth.max,
-  keyGenerator: (req) => {
-    // ✅ FIX: Add unique prefix to prevent key conflicts
-    // Use userId if authenticated, otherwise IP
-    const identifier = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    return `publicChatAuth:${identifier}`;
-  },
-  message: {
-    error: 'Too many messages. Please wait before sending another.',
-    retryAfter: formatRetryAfter(RATE_LIMITS.publicChatAuth.windowMs)
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false, // ✅ FIX: Disable double-count validation (we have multiple independent limiters)
-  handler: (req, res) => {
-    const identifier = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    const key = `publicChatAuth:${identifier}`;
-    logRateLimitViolation(req, 'publicChatAuth', key, RATE_LIMITS.publicChatAuth.max, RATE_LIMITS.publicChatAuth.windowMs);
-    res.status(429).json({
-      success: false,
-      error: 'Too many messages. Please wait before sending another.',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.publicChatAuth.windowMs)
-    });
-  },
-  skip: (req) => {
-    // ✅ FIX: Skip for anonymous users (they are handled by publicChatRateLimit)
-    // Only run for authenticated users
-    return !req.user?.id && !req.user?.userId;
-  }
-});
-
-// Public chat DAILY cap for anonymous users (login wall)
-// ✅ Goal: after N messages/day, force login
-export const publicChatDailyAnonLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.publicChatDailyAnon.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: RATE_LIMITS.publicChatDailyAnon.windowMs,
-  max: RATE_LIMITS.publicChatDailyAnon.max,
-  keyGenerator: (req) => {
-    // ✅ FIX: Add unique prefix to prevent key conflicts with other limiters
-    // Anonymous-only: IP is the most reliable
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    return `publicChatDailyAnon:${ip}`;
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: false, // ✅ FIX: Disable double-count validation (we have multiple independent limiters)
-  skip: (req) => {
-    // Logged-in users should not hit anonymous daily wall
-    return !!req.user?.id || !!req.user?.userId;
-  },
-  handler: (req, res) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `publicChatDailyAnon:${ip}`;
-    logRateLimitViolation(req, 'publicChatDailyAnon', key, RATE_LIMITS.publicChatDailyAnon.max, RATE_LIMITS.publicChatDailyAnon.windowMs);
-    return res.status(429).json({
-      success: false,
-      error: 'Daily limit reached. Please login to continue.',
-      errorCode: 'LOGIN_REQUIRED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.publicChatDailyAnon.windowMs),
-    });
-  },
-});
-
 
 // Login attempts limiter (per email/IP)
 export const loginRateLimit = rateLimit({
@@ -576,108 +479,6 @@ export const deleteAccountSuccessRateLimit = rateLimit({
   },
 });
 
-// ✅ Twin deletion rate limiter (shared limit for both /twin/manage and twin-settings)
-export const twinDeletionRateLimit = rateLimit({
-  store: createRateLimitStore(OPERATION_RATE_LIMITS.TWIN_DELETION.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: OPERATION_RATE_LIMITS.TWIN_DELETION.windowMs,
-  max: OPERATION_RATE_LIMITS.TWIN_DELETION.max,
-  keyGenerator: (req: any) => {
-    // ✅ Use user ID with explicit prefix to ensure shared limit across both deletion routes
-    // This ensures if user deletes once from /twin/manage and once from twin-settings, it counts as 2
-    const userId = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    // ✅ Explicit prefix ensures both routes use the same key (shared limit)
-    return `twin_deletion:${userId}`;
-  },
-  message: {
-    error: `Too many twin deletion attempts. Please try again later.`,
-    errorCode: 'RATE_LIMIT_EXCEEDED',
-    retryAfter: formatRetryAfter(OPERATION_RATE_LIMITS.TWIN_DELETION.windowMs),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const userId = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    const key = `twin_deletion:${userId}`;
-    logRateLimitViolation(req, 'twinDeletion', key, OPERATION_RATE_LIMITS.TWIN_DELETION.max, OPERATION_RATE_LIMITS.TWIN_DELETION.windowMs);
-    // ✅ Custom handler to ensure proper JSON response for frontend error handling
-    res.status(429).json({
-      success: false,
-      error: `Too many twin deletion attempts. Please try again later.`,
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(OPERATION_RATE_LIMITS.TWIN_DELETION.windowMs),
-    });
-  },
-  skip: (req) => {
-    // Skip rate limiting in development
-    return process.env.NODE_ENV === 'development';
-  },
-});
-
-// ✅ Twin deletion SUCCESS cooldown limiter (1 per 24h per user)
-export const twinDeletionSuccessRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.twinDeletionSuccess.windowMs),
-  windowMs: RATE_LIMITS.twinDeletionSuccess.windowMs,
-  max: RATE_LIMITS.twinDeletionSuccess.max,
-  keyGenerator: (req: any) => rlKey('twinDeletionSuccess', getUserOrIp(req)),
-  standardHeaders: true,
-  legacyHeaders: false,
-  // ✅ Only count SUCCESSFUL deletions
-  skipFailedRequests: true,
-  handler: (req, res) => {
-    const key = rlKey('twinDeletionSuccess', getUserOrIp(req));
-    logRateLimitViolation(
-      req,
-      'twinDeletionSuccess',
-      key,
-      RATE_LIMITS.twinDeletionSuccess.max,
-      RATE_LIMITS.twinDeletionSuccess.windowMs
-    );
-    return res.status(429).json({
-      success: false,
-      error: 'Twin deletion cooldown active. You can delete a twin once per 24 hours. Please try again later.',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.twinDeletionSuccess.windowMs),
-    });
-  },
-  skip: () => process.env.NODE_ENV === 'development',
-});
-
-// ✅ Twin visibility toggle rate limiter (shared limit for make-public and make-private)
-export const twinVisibilityToggleRateLimit = rateLimit({
-  store: createRateLimitStore(OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.windowMs), // ✅ Use PostgreSQL store with windowMs
-  windowMs: OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.windowMs,
-  max: OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.max,
-  keyGenerator: (req: any) => {
-    // ✅ Use user ID with explicit prefix to ensure shared limit across both make-public and make-private
-    // This ensures if user toggles once from dashboard/settings and once from /twin/manage, it counts as 2
-    const userId = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    // ✅ Explicit prefix ensures both routes use the same key (shared limit)
-    return `twin_visibility_toggle:${userId}`;
-  },
-  message: {
-    error: `Too many visibility changes. Please try again later.`,
-    errorCode: 'RATE_LIMIT_EXCEEDED',
-    retryAfter: formatRetryAfter(OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.windowMs),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const userId = req.user?.id || req.user?.userId || req.ip || 'unknown';
-    const key = `twin_visibility_toggle:${userId}`;
-    logRateLimitViolation(req, 'twinVisibilityToggle', key, OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.max, OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.windowMs);
-    // ✅ Custom handler to ensure proper JSON response for frontend error handling
-    res.status(429).json({
-      success: false,
-      error: `Too many visibility changes. Please try again later.`,
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(OPERATION_RATE_LIMITS.TWIN_VISIBILITY_TOGGLE.windowMs),
-    });
-  },
-  skip: (req) => {
-    return process.env.NODE_ENV === 'development';
-  },
-});
-
 // ✅ Contact form rate limiter (IP + email based)
 export const contactFormRateLimit = rateLimit({
   store: createRateLimitStore(RATE_LIMITS.contactForm.windowMs), // ✅ Use PostgreSQL store with windowMs
@@ -728,46 +529,6 @@ export const contactFormDailyLimit = rateLimit({
       error: 'Daily contact form limit reached. Please try again tomorrow.',
       errorCode: 'DAILY_LIMIT_EXCEEDED',
       retryAfter: formatRetryAfter(RATE_LIMITS.contactFormDaily.windowMs)
-    });
-  },
-});
-
-// ✅ ADD: Private chat message limiter (counts ALL requests incl. banned/common fast-path)
-export const privateChatMessageRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.privateChatMessageAuth.windowMs),
-  windowMs: RATE_LIMITS.privateChatMessageAuth.windowMs,
-  max: RATE_LIMITS.privateChatMessageAuth.max,
-  keyGenerator: (req) => rlKey('privateChatMsg', getUserOrIp(req)),
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const key = rlKey('privateChatMsg', getUserOrIp(req));
-    logRateLimitViolation(req, 'privateChatMessageAuth', key, RATE_LIMITS.privateChatMessageAuth.max, RATE_LIMITS.privateChatMessageAuth.windowMs);
-    return res.status(429).json({
-      success: false,
-      error: 'Too many messages. Please wait before sending another.',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.privateChatMessageAuth.windowMs),
-    });
-  },
-});
-
-// ✅ ADD: Enhanced reply limiter (counts ALL requests incl. banned/common fast-path)
-export const enhancedChatReplyRateLimit = rateLimit({
-  store: createRateLimitStore(RATE_LIMITS.enhancedChatReplyAuth.windowMs),
-  windowMs: RATE_LIMITS.enhancedChatReplyAuth.windowMs,
-  max: RATE_LIMITS.enhancedChatReplyAuth.max,
-  keyGenerator: (req) => rlKey('enhancedReply', getUserOrIp(req)),
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const key = rlKey('enhancedReply', getUserOrIp(req));
-    logRateLimitViolation(req, 'enhancedChatReplyAuth', key, RATE_LIMITS.enhancedChatReplyAuth.max, RATE_LIMITS.enhancedChatReplyAuth.windowMs);
-    return res.status(429).json({
-      success: false,
-      error: 'Too many requests. Please slow down.',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: formatRetryAfter(RATE_LIMITS.enhancedChatReplyAuth.windowMs),
     });
   },
 });

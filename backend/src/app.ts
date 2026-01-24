@@ -22,6 +22,9 @@ import { extractJWTFromCookie } from './middleware/jwtCookie';
 import authRoutes from './modules/auth/authRoutes';
 import googleAuthRoutes from './modules/auth/googleAuthRoutes';
 import identityRoutes from './modules/identity/identityRoutes';
+import profileRoutes from './modules/profile/profileRoutes';
+import adminRoutes from './modules/admin/adminRoutes';
+import historyRoutes from './modules/history/historyRoutes';
 
 // Page routes
 import pageRoutes from './routes';
@@ -32,7 +35,7 @@ const app = express();
 // Global requestId middleware
 app.use((req, res, next) => {
   const requestId = randomUUID();
-  (req as any).requestId = requestId;
+  req.requestId = requestId;
   res.locals.requestId = requestId;
   next();
 });
@@ -136,6 +139,8 @@ app.use(async (req, res, next) => {
       '/forgot-password',
       '/reset-password',
       '/api/auth',
+      '/identity',
+      '/mirror',
     ];
 
     const isAllowed = allowedPrefixes.some(prefix => path.startsWith(prefix));
@@ -176,6 +181,7 @@ app.use(async (req, res, next) => {
   if (!res.locals.user && req.user) {
     try {
       const { userQueries } = await import('./config/database');
+      const { ADMIN_EMAILS } = await import('./config/constants');
       const fullUser = await userQueries.findByEmail(req.user.email);
 
       if (fullUser) {
@@ -198,6 +204,8 @@ app.use(async (req, res, next) => {
           hasGoogle: false,
         };
       }
+      // Set isAdmin flag
+      res.locals.isAdmin = ADMIN_EMAILS.includes(String(req.user.email).toLowerCase());
     } catch (error) {
       res.locals.user = {
         id: req.user.userId || req.user.id,
@@ -207,7 +215,12 @@ app.use(async (req, res, next) => {
         hasPassword: false,
         hasGoogle: false,
       };
+      res.locals.isAdmin = false;
     }
+  } else if (res.locals.user && !res.locals.hasOwnProperty('isAdmin')) {
+    // If user already set but isAdmin not set, check it
+    const { ADMIN_EMAILS } = await import('./config/constants');
+    res.locals.isAdmin = ADMIN_EMAILS.includes(String(res.locals.user.email).toLowerCase());
   }
   next();
 });
@@ -226,6 +239,40 @@ app.use((req, res, next) => {
     return originalRender(view, opts, callback as any);
   };
 
+  next();
+});
+
+// ✅ ENHANCED: Request/Response logging middleware (before routes)
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  // Log request
+  logger.info({
+    method: req.method,
+    path: req.path,
+    query: req.query,
+    body: req.method === 'POST' || req.method === 'PUT' ? req.body : undefined,
+    ip: req.ip,
+  }, `📥 ${req.method} ${req.path}`);
+  
+  // Log response when finished
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const logLevel = res.statusCode >= 400 ? 'error' : 'info';
+    logger[logLevel]({
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`,
+      ip: req.ip,
+    }, `📤 ${req.method} ${req.path} → ${res.statusCode} (${duration}ms)`);
+    
+    // ✅ Also console.log for immediate visibility
+    if (res.statusCode >= 400) {
+      console.error(`❌ [${req.method}] ${req.path} → ${res.statusCode} (${duration}ms)`);
+    }
+  });
+  
   next();
 });
 
@@ -270,6 +317,9 @@ app.use('/', pageRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/identity', identityRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/history', historyRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -309,9 +359,9 @@ app.use(errorHandlerMiddleware);
 
 // 404 handler
 app.use((_req, res) => {
-  res.status(404).render('404', {
+  res.status(404).render('errors/404', {
     title: 'Page Not Found',
-    csrfToken: res.locals['csrfToken'] || '',
+    csrfToken: res.locals.csrfToken || '',
   });
 });
 

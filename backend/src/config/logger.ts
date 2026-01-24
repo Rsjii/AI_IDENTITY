@@ -9,8 +9,15 @@ const logger = pino({
       colorize: true,
       translateTime: 'SYS:standard',
       ignore: 'pid,hostname',
+      singleLine: false,
+      errorLikeObjectKeys: ['err', 'error'],
     },
   } : undefined,
+  // ✅ Force all errors to console
+  serializers: {
+    err: pino.stdSerializers.err,
+    error: pino.stdSerializers.err,
+  },
 });
 
 export { logger };

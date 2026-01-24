@@ -1,17 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AuthenticatedRequest } from '../../middleware/auth';
-import { createError, ErrorCodes } from '../../utils/errors';
+import { ErrorCodes } from '../../utils/errors';
 import { handleErrorWithResponse } from '../../utils/errorHandler';
 import { logger } from '../../config/logger';
 import {
-  identityQueries,
-  identityVersionQueries,
-  mirrorRunQueries,
-  trustEventQueries,
-} from '../../config/database';
-import { generateMirrorReply } from './identityService';
-import { llmClient } from '../../services/llmClient';
+  createIdentity as createIdentityService,
+  getIdentityByUserId,
+  updateIdentityVersion as updateIdentityVersionService,
+  generateMirrorReplyWithLogging,
+  logTrustEvent,
+} from './identityService';
 
 // Schemas
 const createIdentitySchema = z.object({
@@ -56,26 +55,8 @@ export const createIdentity = async (req: AuthenticatedRequest, res: Response, n
 
     const { identityJson } = createIdentitySchema.parse(req.body);
 
-    // Check if identity already exists
-    const existing = await identityQueries.findByUserId(req.user.id);
-    if (existing) {
-      return res.status(409).json({
-        error: 'Identity already exists. Use PUT to update.',
-        errorCode: ErrorCodes.CONFLICT,
-      });
-    }
-
-    // Create identity
-    const identity = await identityQueries.create(req.user.id);
-
-    // Create v1
-    const version = await identityVersionQueries.create(identity.id, 'v1', identityJson);
-
-    // Activate v1
-    await identityVersionQueries.updateStatus(version.id, 'active');
-    await identityQueries.updateActiveVersion(identity.id, version.id);
-
-    logger.info(`Identity created for user ${req.user.id}`);
+    // Create identity using service
+    const { identity, version } = await createIdentityService(req.user.id, identityJson);
 
     res.json({
       success: true,
@@ -92,6 +73,14 @@ export const createIdentity = async (req: AuthenticatedRequest, res: Response, n
         error: 'Validation failed',
         errorCode: ErrorCodes.VALIDATION_ERROR,
         details: error.errors,
+      });
+    }
+
+    // Handle service errors
+    if (error.message === 'Identity already exists. Use update to modify.') {
+      return res.status(409).json({
+        error: 'Identity already exists. Use PUT to update.',
+        errorCode: ErrorCodes.CONFLICT,
       });
     }
 
@@ -112,22 +101,16 @@ export const getIdentity = async (req: AuthenticatedRequest, res: Response, next
       });
     }
 
-    const identity = await identityQueries.findByUserId(req.user.id);
-    if (!identity) {
+    // Get identity using service
+    const result = await getIdentityByUserId(req.user.id);
+    if (!result) {
       return res.status(404).json({
         error: 'Identity not found',
         errorCode: ErrorCodes.NOT_FOUND,
       });
     }
 
-    // Get active version
-    let activeVersion = null;
-    if (identity.activeVersionId) {
-      activeVersion = await identityVersionQueries.findById(identity.activeVersionId);
-      if (activeVersion && typeof activeVersion.identityJson === 'string') {
-        activeVersion.identityJson = JSON.parse(activeVersion.identityJson);
-      }
-    }
+    const { identity, activeVersion } = result;
 
     res.json({
       success: true,
@@ -167,27 +150,8 @@ export const updateIdentityVersion = async (req: AuthenticatedRequest, res: Resp
     const versionId = req.params.id;
     const { identityJson } = updateIdentitySchema.parse(req.body);
 
-    // Verify version exists and belongs to user
-    const version = await identityVersionQueries.findById(versionId);
-    if (!version) {
-      return res.status(404).json({
-        error: 'Identity version not found',
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-
-    const identity = await identityQueries.findById(version.identityId);
-    if (!identity || identity.userId !== req.user.id) {
-      return res.status(403).json({
-        error: 'Access denied',
-        errorCode: ErrorCodes.FORBIDDEN,
-      });
-    }
-
-    // Update
-    await identityVersionQueries.updateIdentityJson(versionId, identityJson);
-
-    logger.info(`Identity version ${versionId} updated`);
+    // Update using service
+    await updateIdentityVersionService(versionId, req.user.id, identityJson);
 
     res.json({
       success: true,
@@ -201,6 +165,21 @@ export const updateIdentityVersion = async (req: AuthenticatedRequest, res: Resp
         error: 'Validation failed',
         errorCode: ErrorCodes.VALIDATION_ERROR,
         details: error.errors,
+      });
+    }
+
+    // Handle service errors
+    if (error.message === 'Identity version not found') {
+      return res.status(404).json({
+        error: 'Identity version not found',
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    if (error.message === 'Access denied') {
+      return res.status(403).json({
+        error: 'Access denied',
+        errorCode: ErrorCodes.FORBIDDEN,
       });
     }
 
@@ -223,60 +202,19 @@ export const mirror = async (req: AuthenticatedRequest, res: Response, next: Nex
 
     const { context, incomingMessage } = mirrorSchema.parse(req.body);
 
-    // Get identity
-    const identity = await identityQueries.findByUserId(req.user.id);
-    if (!identity || !identity.activeVersionId) {
-      return res.status(404).json({
-        error: 'Identity not found. Please create your identity first.',
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-
-    // Get active version
-    const version = await identityVersionQueries.findById(identity.activeVersionId);
-    if (!version) {
-      return res.status(404).json({
-        error: 'Active identity version not found',
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-
-    // Parse identity JSON
-    let identityJson: any;
-    if (typeof version.identityJson === 'string') {
-      identityJson = JSON.parse(version.identityJson);
-    } else {
-      identityJson = version.identityJson;
-    }
-
-    // Generate reply
-    const startTime = Date.now();
-    const { reply, rulesApplied } = await generateMirrorReply(identityJson, incomingMessage, context);
-    const latencyMs = Date.now() - startTime;
-
-    // Get token usage from llmClient (if available)
-    // Note: llmClient doesn't expose last usage, so we'll log it separately
-    const model = 'gpt-4o-mini'; // Default, actual model comes from llmClient
-
-    // Save mirror run
-    const mirrorRun = await mirrorRunQueries.create(
-      version.id,
+    // Generate mirror reply using service
+    const result = await generateMirrorReplyWithLogging(
+      req.user.id,
       context,
-      incomingMessage,
-      reply,
-      rulesApplied,
-      model,
-      undefined, // tokensIn - would need to track
-      undefined, // tokensOut - would need to track
+      incomingMessage
     );
-
-    logger.info(`Mirror run created: ${mirrorRun.id}`);
 
     res.json({
       success: true,
-      reply,
-      rulesApplied,
-      mirrorRunId: mirrorRun.id,
+      decision: result.decision,
+      reply: result.reply,
+      rulesApplied: result.rulesApplied,
+      mirrorRunId: result.mirrorRunId,
     });
   } catch (error: any) {
     logger.error('Mirror error:', error);
@@ -286,6 +224,22 @@ export const mirror = async (req: AuthenticatedRequest, res: Response, next: Nex
         error: 'Validation failed',
         errorCode: ErrorCodes.VALIDATION_ERROR,
         details: error.errors,
+      });
+    }
+
+    // Handle service errors
+    if (error.message === 'Identity not found. Please create your identity first.' ||
+        error.message === 'Active identity version not found') {
+      return res.status(404).json({
+        error: error.message,
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    if (error.message === 'Daily token quota exceeded. Try again tomorrow.') {
+      return res.status(429).json({
+        error: error.message,
+        errorCode: 'TOKEN_QUOTA_EXCEEDED',
       });
     }
 
@@ -308,36 +262,8 @@ export const confirmTrust = async (req: AuthenticatedRequest, res: Response, nex
 
     const { mirrorRunId, event, note } = trustConfirmSchema.parse(req.body);
 
-    // Verify mirror run exists and belongs to user
-    const mirrorRun = await mirrorRunQueries.findById(mirrorRunId);
-    if (!mirrorRun) {
-      return res.status(404).json({
-        error: 'Mirror run not found',
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-
-    // Verify version belongs to user
-    const version = await identityVersionQueries.findById(mirrorRun.identityVersionId);
-    if (!version) {
-      return res.status(404).json({
-        error: 'Identity version not found',
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-
-    const identity = await identityQueries.findById(version.identityId);
-    if (!identity || identity.userId !== req.user.id) {
-      return res.status(403).json({
-        error: 'Access denied',
-        errorCode: ErrorCodes.FORBIDDEN,
-      });
-    }
-
-    // Create trust event
-    await trustEventQueries.create(mirrorRunId, version.id, event, note);
-
-    logger.info(`Trust event logged: ${event} for mirror run ${mirrorRunId}`);
+    // Log trust event using service
+    await logTrustEvent(req.user.id, mirrorRunId, event, note);
 
     res.json({
       success: true,
@@ -351,6 +277,22 @@ export const confirmTrust = async (req: AuthenticatedRequest, res: Response, nex
         error: 'Validation failed',
         errorCode: ErrorCodes.VALIDATION_ERROR,
         details: error.errors,
+      });
+    }
+
+    // Handle service errors
+    if (error.message === 'Mirror run not found' ||
+        error.message === 'Identity version not found') {
+      return res.status(404).json({
+        error: error.message,
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    if (error.message === 'Access denied') {
+      return res.status(403).json({
+        error: 'Access denied',
+        errorCode: ErrorCodes.FORBIDDEN,
       });
     }
 

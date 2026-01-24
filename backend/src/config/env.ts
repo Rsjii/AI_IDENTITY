@@ -91,7 +91,7 @@ export const config = {
   // App Configuration
   nodeEnv: NODE_ENV,
   appEnv: APP_ENV,
-  port: Number(process.env['PORT']),
+  port: Number(process.env['PORT']) || 5000,
 
   // ✅ Admin analytics enabled in all environments (protected by admin email check)
   enableAdminAnalytics: true,

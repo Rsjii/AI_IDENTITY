@@ -1,0 +1,74 @@
+<% 
+const bodyContent = `
+  <div class="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950 text-white">
+    <div class="absolute inset-0 bg-black/10"></div>
+    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+      <div class="text-center">
+        <div class="flex justify-center items-center space-x-3 mb-6">
+          <div class="w-14 h-14 bg-white/20 dark:bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-2xl border border-white/20">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+          </div>
+          <h1 class="text-4xl sm:text-6xl font-extrabold">Selflyx</h1>
+        </div>
+
+        <h2 class="text-2xl sm:text-4xl font-bold mb-5">Reply like you. Without thinking.</h2>
+        <p class="text-base sm:text-xl text-blue-100 max-w-2xl mx-auto mb-8">
+          Paste a message. Get a reply that matches your tone, boundaries, and rules.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <a href="/auth"
+             class="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 rounded-xl font-semibold
+                    bg-white text-blue-700 hover:bg-blue-50 transition-all shadow-2xl">
+            Get Started
+          </a>
+
+          ${typeof user !== 'undefined' && user && user.id ? `
+            <a href="/mirror"
+               class="w-full sm:w-auto inline-flex justify-center items-center px-8 py-4 rounded-xl font-semibold
+                      bg-white/15 hover:bg-white/20 border border-white/25 backdrop-blur-xl transition-all">
+              Open Mirror
+            </a>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="bg-white dark:bg-gray-950 py-12 sm:py-16">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white/70 dark:bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/60 dark:border-white/10 shadow-lg">
+          <div class="text-3xl mb-3">1️⃣</div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Define Identity</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-300">Your tone, boundaries, and rules.</p>
+        </div>
+
+        <div class="bg-white/70 dark:bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/60 dark:border-white/10 shadow-lg">
+          <div class="text-3xl mb-3">2️⃣</div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Paste Message</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-300">You paste an incoming message.</p>
+        </div>
+
+        <div class="bg-white/70 dark:bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/60 dark:border-white/10 shadow-lg">
+          <div class="text-3xl mb-3">3️⃣</div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Confirm Trust</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-300">Approve/reject. We log it to improve consistency.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+%>
+<%- include('../shared/layout', {
+  title: title,
+  user: user,
+  csrfToken: csrfToken,
+  fullBleed: true,
+  metaDescription: 'Reply like you. Without thinking. Paste a message and get a reply that matches your identity.',
+  ogTitle: 'Identity Mirror',
+  ogDescription: 'Reply like you. Without thinking.',
+  body: bodyContent
+}) %>

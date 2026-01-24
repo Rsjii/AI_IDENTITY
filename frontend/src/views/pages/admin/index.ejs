@@ -1,0 +1,138 @@
+<%- include('../../shared/layout', { title, user, csrfToken, body: `
+    <div class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Admin Analytics</h1>
+          <p class="text-sm text-gray-600 dark:text-gray-300">Users, usage, trust, events (Today / 7D / 30D).</p>
+        </div>
+        <div class="flex gap-2">
+          <button data-range="today" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">Today</button>
+          <button data-range="7d" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">7 Days</button>
+          <button data-range="30d" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">30 Days</button>
+        </div>
+      </div>
+    
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">Total Users</div>
+          <div id="a-usersTotal" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">New Users</div>
+          <div id="a-usersNew" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">Mirror Runs</div>
+          <div id="a-runs" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tokens</div>
+          <div id="a-tokens" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+      </div>
+    
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">✅ Trust Yes</div>
+          <div id="a-yes" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">❌ Trust No</div>
+          <div id="a-no" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+      </div>
+    
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <input id="q" class="w-full sm:w-96 px-4 py-3 rounded-xl bg-white/70 dark:bg-white/5 border border-white/20 dark:border-white/10"
+               placeholder="Search email/handle/name…" />
+        <button id="refresh" class="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold">
+          Refresh
+        </button>
+      </div>
+    
+      <div class="overflow-hidden rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-gray-600 dark:text-gray-300">
+              <tr>
+                <th class="p-4">User</th>
+                <th class="p-4">Identity</th>
+                <th class="p-4">Runs (range)</th>
+                <th class="p-4">Tokens</th>
+                <th class="p-4">Last run</th>
+              </tr>
+            </thead>
+            <tbody id="users" class="divide-y divide-white/10">
+              <tr><td class="p-4 text-gray-600 dark:text-gray-300" colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      let RANGE = '7d';
+      function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+    
+      async function loadOverview(){
+        const res = await fetch('/api/admin/overview?range=' + encodeURIComponent(RANGE));
+        const j = await res.json();
+        const d = j.data || {};
+        document.getElementById('a-usersTotal').textContent = d.usersTotal ?? 0;
+        document.getElementById('a-usersNew').textContent = d.usersNew ?? 0;
+        document.getElementById('a-runs').textContent = d.mirrorRuns ?? 0;
+        document.getElementById('a-tokens').textContent = d.tokens ?? 0;
+        document.getElementById('a-yes').textContent = d.trustYes ?? 0;
+        document.getElementById('a-no').textContent = d.trustNo ?? 0;
+      }
+    
+      async function loadUsers(){
+        const q = document.getElementById('q').value || '';
+        const res = await fetch('/api/admin/users?range=' + encodeURIComponent(RANGE) + '&q=' + encodeURIComponent(q));
+        const j = await res.json();
+        const rows = j.rows || [];
+        const tbody = document.getElementById('users');
+    
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td class="p-4 text-gray-600 dark:text-gray-300" colspan="5">No users found.</td></tr>';
+          return;
+        }
+    
+        tbody.innerHTML = rows.map(u => {
+          const last = u.lastMirrorAt ? (window.TimeUtils ? TimeUtils.formatRelativeTime(u.lastMirrorAt) : new Date(u.lastMirrorAt).toLocaleString()) : '—';
+          const lastFull = u.lastMirrorAt ? (window.TimeUtils ? TimeUtils.formatLocalDateTime(u.lastMirrorAt) : new Date(u.lastMirrorAt).toLocaleString()) : '';
+          const name = u.name || u.handle || u.email;
+          const ident = u.hasIdentity ? '✅' : '—';
+          return (
+            '<tr class="text-gray-900 dark:text-white hover:bg-white/40 dark:hover:bg-white/5 transition-colors cursor-pointer" ' +
+            'onclick="window.location.href=\\'/admin/users/' + esc(u.id) + '\\'">' +
+              '<td class="p-4"><div class="font-semibold">'+esc(name)+'</div><div class="text-xs text-gray-500 dark:text-gray-400">'+esc(u.email)+'</div></td>' +
+              '<td class="p-4">'+esc(ident)+'</td>' +
+              '<td class="p-4">'+esc(u.mirrorRuns || 0)+'</td>' +
+              '<td class="p-4">'+esc(u.tokens || 0)+'</td>' +
+              '<td class="p-4" title="'+esc(lastFull)+'">'+esc(last)+'</td>' +
+            '</tr>'
+          );
+        }).join('');
+      }
+    
+      function setRange(r){
+        RANGE = r;
+        document.querySelectorAll('.range-btn').forEach(b => {
+          b.classList.toggle('bg-gradient-to-r', b.dataset.range === RANGE);
+          b.classList.toggle('from-indigo-500', b.dataset.range === RANGE);
+          b.classList.toggle('to-blue-600', b.dataset.range === RANGE);
+          b.classList.toggle('text-white', b.dataset.range === RANGE);
+        });
+        loadOverview();
+        loadUsers();
+      }
+    
+      document.querySelectorAll('.range-btn').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
+      document.getElementById('refresh').addEventListener('click', () => { loadOverview(); loadUsers(); });
+      document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadUsers(); });
+    
+      setRange('7d');
+    </script>
+    ` }) %>
+

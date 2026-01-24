@@ -17,8 +17,6 @@ export const QUERY_LIMITS = {
     RECENT_ACTIVITY: 20,
     RECENT_EVENTS: 50,
     
-    // Chat/Messages
-    CHAT_MESSAGES: 50,
     RECENT_MESSAGES: 10,
     LAST_MESSAGE: 1,
     
@@ -42,10 +40,6 @@ export const QUERY_LIMITS = {
     
     // Training
     TRAINING_SAMPLES: 10,
-    
-    // Discover
-    DISCOVER_RESULTS: 20,
-    TRENDING_LIMIT: 10,
   } as const;
 
   // Add after line 49:
@@ -102,31 +96,7 @@ export const EVENT_TYPES = {
   INVITE_SENT: 'invite_sent',
   INVITE_ACCEPTED: 'invite_accepted',
   
-  // Twin Management
-  TWIN_CREATED: 'twin_created',
-  TWIN_CREATION_FAILED: 'twin_creation_failed',
-  ENHANCED_TWIN_CREATED: 'enhanced_twin_created',
-  TWIN_MADE_PUBLIC: 'twin_made_public',
-  TWIN_MADE_PRIVATE: 'twin_made_private',
-  TWIN_DELETED: 'twin_deleted',
-  
-  // Chat & Messaging
-  CHAT_STARTED: 'chat_started',
-  CHAT_CONTINUED: 'chat_continued',
-  CHAT_CREATED: 'chat_created',
-  CHAT_MESSAGE: 'chat_message',
-  CHAT_DELETED: 'chat_deleted',
-  PUBLIC_CHAT_STARTED: 'public_chat_started',
-  DRAFT_GENERATED: 'draft_generated',
-  MESSAGE_APPROVED: 'message_approved',
-  MESSAGE_BLOCKED: 'message_blocked', // ✅ restricted content ke liye
-  
   // Social
-  TWIN_LIKED: 'twin_liked',
-  TWIN_UNLIKED: 'twin_unliked',
-  TWIN_FOLLOWED: 'twin_followed',
-  TWIN_UNFOLLOWED: 'twin_unfollowed',
-  TWIN_SHARED: 'twin_shared',
   SHARE_CLICKED: 'share_clicked',
   PROFILE_VIEWED: 'profile_viewed', // ✅ Profile view tracking
   
@@ -150,8 +120,6 @@ export const EVENT_TYPES = {
   // Add if profile_completed is needed:
   PROFILE_COMPLETED: 'profile_completed', // Optional - add if you want to track this
   
-  // Add if enhanced_twin_creation_failed is needed separately:
-  ENHANCED_TWIN_CREATION_FAILED: 'enhanced_twin_creation_failed', // Optional
   
   // User Account Management
   ACCOUNT_DELETED: 'account_deleted',
@@ -159,29 +127,6 @@ export const EVENT_TYPES = {
 
 // Token Quotas - Daily limits for LLM usage
 export const TOKEN_QUOTAS = {
-  // Anonymous public chat: hard wall → login required
-  ANON_DAILY_TOKENS: 10000,
-
   // Logged-in: daily cap (adjust as you want)
   USER_DAILY_TOKENS: 80000,
-} as const;
-
-// ✅ MEMORY LIMITS - Prevent memory overload in LLM prompts
-export const MEMORY_LIMITS = {
-  MAX_FACTS: 30,
-  MAX_PREFERENCES: 30,
-  MAX_ALWAYS_NEVER_CHARS: 150, // Per item in always/never arrays (increased from 120 to 150)
-  MAX_BIO_CHARS: 150, // Maximum characters for twin bio/oneLineBio
-} as const;
-
-// ✅ RATE LIMITS - Prevent abuse of critical operations
-export const OPERATION_RATE_LIMITS = {
-  TWIN_DELETION: {
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    max: 2, // Max 2 deletions per 24 hours (comment matches code)
-  },
-  TWIN_VISIBILITY_TOGGLE: {
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // Max 3 toggles per hour (comment matches code)
-  },
 } as const;

@@ -1,4 +1,4 @@
-<%- include('layout', { title: 'Access Denied - Selflyx', body: `
+<%- include('../shared/layout', { title: 'Access Denied - Selflyx', body: `
 <div class="px-4 py-6 sm:px-0 mobile-p-4">
     <div class="max-w-md mx-auto text-center">
         <div class="text-6xl mb-6 mobile-text-5xl">🚫</div>
@@ -11,13 +11,10 @@
             <a href="/" class="block bg-primary text-white px-6 py-3 rounded-lg hover:bg-secondary transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center" aria-label="Go Home">
                 Go Home
             </a>
-            <a href="/dashboard" class="block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center" aria-label="Go to Dashboard">
-                Dashboard
+            <a href="/mirror" class="block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center" aria-label="Go to Mirror">
+                Mirror
             </a>
         </div>
-        <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            Need help? <a href="/help-center" class="text-primary hover:underline">Visit Help Center</a>.
-        </p>
     </div>
 </div>
 ` }) %>

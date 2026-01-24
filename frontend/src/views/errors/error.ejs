@@ -4,7 +4,7 @@
       ? message
       : 'An error occurred';
 %>
-<%- include('layout', {
+<%- include('../shared/layout', {
   title: 'Error - Selflyx',
   body:
     '<div class="px-4 py-6 sm:px-0 mobile-p-4">' +
@@ -18,12 +18,12 @@
           '<a href="/" class="block bg-primary text-white px-6 py-3 rounded-lg hover:bg-secondary transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center">' +
             'Go Home' +
           '</a>' +
-          '<a href="/dashboard" class="block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center">' +
-            'Dashboard' +
+          '<a href="/mirror" class="block bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors font-semibold min-h-[48px] sm:min-h-[44px] touch-manipulation text-base text-center">' +
+            'Mirror' +
           '</a>' +
         '</div>' +
         '<p class="mt-4 text-sm text-gray-500 dark:text-gray-400">' +
-          'Need help? <a href="/help-center" class="text-primary hover:underline">Visit Help Center</a>.' +
+          'Need help? <a href="/auth" class="text-primary hover:underline">Contact Support</a>.' +
         '</p>' +
       '</div>' +
     '</div>'

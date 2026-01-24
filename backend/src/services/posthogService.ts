@@ -58,12 +58,8 @@ export function capturePostHogEvent(
       ...properties,
       // Ensure we never send raw IDs
       userId: undefined,
-      twinId: undefined,
-      chatId: undefined,
       // Keep only public/tokenized IDs
       publicUserId: properties?.publicUserId,
-      publicTwinId: properties?.publicTwinId,
-      publicChatId: properties?.publicChatId,
       source: properties?.source,
       wv: properties?.wv,
       deviceType: properties?.deviceType,

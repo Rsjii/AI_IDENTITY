@@ -1,38 +1,29 @@
 /**
  * ============================================================================
- * ID TOKENIZATION SYSTEM - PHASE 6 COMPLETE
+ * ID TOKENIZATION SYSTEM - MVP Identity Engine
  * ============================================================================
  * 
  * SECURITY RULES:
  * 
  * 1. NEVER expose raw database IDs in:
- *    - Public URLs (/public-twin/chat/:twinToken)
+ *    - Public URLs
  *    - API responses (use sanitize* functions)
- *    - HTML attributes (data-twin-id, data-chat-id)
+ *    - HTML attributes
  *    - JavaScript variables in EJS templates
  *    - localStorage/sessionStorage
  * 
  * 2. ALWAYS use sanitization functions:
  *    - sanitizeUser() for user objects
- *    - sanitizeTwin() for twin objects
- *    - sanitizeChat() for private chat objects
- *    - sanitizePublicChat() for public chat objects
- *    - sanitizeMessage() for message objects
+ *    - sanitizeEvent() for event objects
+ *    - sanitizeInvite() for invite objects
  * 
  * 3. ALWAYS validate tokens before use:
  *    - Use validateAndDetokenize() for basic validation
- *    - Use validateTwinTokenAndOwnership() for private twin operations
- *    - Use validateChatTokenAndAccess() for chat operations
- *    - Use validatePublicTwinToken() for public twin access
  * 
  * 4. ALWAYS log token operations:
  *    - Invalid tokens are logged automatically
  *    - Expired tokens are logged automatically
  *    - Successful detokenization is logged for audit
- * 
- * 5. GRADUAL DEPRECATION:
- *    - Private APIs can return both { id, publicId } temporarily
- *    - Eventually remove raw `id` from all user-facing responses
  * 
  * ============================================================================
  */
@@ -58,12 +49,10 @@ const ALGORITHM = 'aes-256-gcm'; // Better than CBC for security
 /**
  * Resource types that can be tokenized
  * - 'user': User IDs
- * - 'twin': Twin IDs  
- * - 'chat': Chat IDs (both Chat and PublicChat)
  * - 'event': Event IDs (optional, currently using 'user' as fallback)
  * - 'invite': Invite IDs (optional, currently using 'user' as fallback)
  */
-export type ResourceType = 'user' | 'twin' | 'chat' | 'event' | 'invite';
+export type ResourceType = 'user' | 'event' | 'invite';
 
 interface TokenizedIdV1 {
   type: ResourceType;
@@ -77,7 +66,7 @@ interface TokenizedIdV1 {
  * This ensures tokens match across page loads and API responses
  * 
  * @param id - Internal database ID
- * @param type - Resource type ('user' | 'twin' | 'chat' | 'event' | 'invite')
+ * @param type - Resource type ('user' | 'event' | 'invite')
  * @returns Base64URL-encoded token safe for URLs (format: v2.<data>.<signature>)
  * 
  * @example
@@ -229,7 +218,7 @@ export function detokenizeId(token: string, context?: { userId?: string; endpoin
  * 1. All sanitize functions MUST:
  *    - Remove raw DB `id` fields
  *    - Replace with `publicId` (tokenized version)
- *    - Tokenize all foreign key IDs (userId, twinId, chatId, etc.)
+ *    - Tokenize all foreign key IDs (userId, etc.)
  *    - Remove sensitive fields (passwords, internal IDs, etc.)
  * 
  * 2. Public routes & HTML:
@@ -242,9 +231,6 @@ export function detokenizeId(token: string, context?: { userId?: string; endpoin
  * 
  * 4. Resource type mapping:
  *    - User → 'user'
- *    - Twin → 'twin'  
- *    - Chat/PublicChat → 'chat'
- *    - Message/PublicMessage → 'chat' (messages belong to chats)
  *    - Event → 'user' (events belong to users)
  *    - Invite → 'user' (invites are user-related)
  */
@@ -282,214 +268,6 @@ export function sanitizeUser(user: any, includeEmail: boolean = false): any {
   delete sanitized.passwordHash;
   delete sanitized.internalId;
   delete sanitized.id; // Remove original ID
-  
-  return sanitized;
-}
-
-/**
- * Sanitize twin object
- * 
- * @param twin - Twin object from database
- * @returns Sanitized twin object with publicId and publicUserId instead of raw IDs
- */
-export function sanitizeTwin(twin: any): any {
-  if (!twin) return null;
-  
-  const sanitized: any = {
-    publicHandle: twin.publicHandle,
-    bio: twin.bio,
-    profileImage: twin.profileImage,
-    likeCount: twin.likeCount,
-    followCount: twin.followCount,
-    chatCount: twin.chatCount,
-    verified: twin.verified,
-    isPublic: twin.isPublic,
-    createdAt: twin.createdAt,
-    updatedAt: twin.updatedAt,
-    sampleReply: twin.sampleReply,
-    // ✅ NEW: keep interaction + creator flags for discover/public UIs
-    hasLiked: twin.hasLiked ?? false,
-    hasFollowed: twin.hasFollowed ?? false,
-    isOwnTwin: twin.isOwnTwin ?? false,
-    // if backend already computed disabled flags, keep them; otherwise derive from allow* if present
-    likesDisabled: twin.likesDisabled ?? (twin.allowLikes === false),
-    followsDisabled: twin.followsDisabled ?? (twin.allowFollows === false),
-    sharesDisabled: twin.sharesDisabled ?? (twin.allowShares === false),
-    userName: twin.userName,
-    userHandle: twin.userHandle,
-    userProfileImage: twin.userProfileImage,
-  };
-  
-  // Tokenize IDs
-  if (twin.id) {
-    sanitized.publicId = tokenizeId(twin.id, 'twin');
-  }
-  if (twin.userId) {
-    sanitized.publicUserId = tokenizeId(twin.userId, 'user');
-  }
-  
-  // Remove original IDs
-  delete sanitized.id;
-  delete sanitized.userId;
-  
-  return sanitized;
-}
-
-/**
- * Sanitize chat object (for private Chat entities)
- * 
- * @param chat - Chat object from database
- * @returns Sanitized chat object with publicId, publicTwinId, publicUserId
- */
-export function sanitizeChat(chat: any): any {
-  if (!chat) return null;
-  
-  const sanitized: any = {
-    title: chat.title,
-    messageCount: chat.messageCount,
-    createdAt: chat.createdAt,
-    updatedAt: chat.updatedAt
-  };
-  
-  // Tokenize IDs
-  if (chat.id) {
-    sanitized.publicId = tokenizeId(chat.id, 'chat');
-  }
-  if (chat.twinId) {
-    sanitized.publicTwinId = tokenizeId(chat.twinId, 'twin');
-  }
-  if (chat.userId) {
-    sanitized.publicUserId = tokenizeId(chat.userId, 'user');
-  }
-  
-  // Remove original IDs
-  delete sanitized.id;
-  delete sanitized.twinId;
-  delete sanitized.userId;
-  
-  return sanitized;
-}
-
-/**
- * Sanitize public chat object (for PublicChat entities)
- * 
- * @param publicChat - PublicChat object from database
- * @returns Sanitized public chat object with publicId, publicTwinId, publicUserId
- */
-export function sanitizePublicChat(publicChat: any): any {
-  if (!publicChat) return null;
-  
-  const sanitized: any = {
-    title: publicChat.title,
-    messageCount: publicChat.messageCount || 0,
-    createdAt: publicChat.createdAt,
-    lastActivity: publicChat.lastActivity,
-    summary: publicChat.summary,
-    showChatHistory: publicChat.showChatHistory
-  };
-
-  // ✅ NEW: map DB last_message → lastMessage for frontend
-  if (publicChat.last_message) {
-    // If controller passed plain text
-    if (typeof publicChat.last_message === 'string') {
-      sanitized.lastMessage = {
-        content: publicChat.last_message,
-        createdAt: publicChat.last_message_time || publicChat.lastActivity || publicChat.createdAt,
-        // relativeTime is optional; TimeUtils in frontend will compute if missing
-        relativeTime: undefined
-      };
-    } else {
-      // If controller ever sends structured object
-      sanitized.lastMessage = {
-        content: publicChat.last_message.content,
-        createdAt: publicChat.last_message.createdAt || publicChat.last_message_time || publicChat.lastActivity || publicChat.createdAt,
-        relativeTime: publicChat.last_message.relativeTime
-      };
-    }
-  }
-  
-  // Tokenize IDs
-  if (publicChat.id) {
-    sanitized.publicId = tokenizeId(publicChat.id, 'chat');
-  }
-  if (publicChat.twinId) {
-    sanitized.publicTwinId = tokenizeId(publicChat.twinId, 'twin');
-  }
-  if (publicChat.userId) {
-    sanitized.publicUserId = tokenizeId(publicChat.userId, 'user');
-  }
-  // Note: visitorId is not tokenized as it's already anonymous/opaque
-  
-  // Remove original IDs
-  delete sanitized.id;
-  delete sanitized.twinId;
-  delete sanitized.userId;
-  
-  return sanitized;
-}
-
-/**
- * Sanitize message object (for private Message entities)
- * 
- * @param message - Message object from database
- * @returns Sanitized message object with publicId and publicChatId
- * 
- * Note: Messages use 'chat' type since they belong to chats
- */
-export function sanitizeMessage(message: any): any {
-  if (!message) return null;
-  
-  const sanitized: any = {
-    content: message.content,
-    sender: message.sender,
-    approved: message.approved,
-    createdAt: message.createdAt,
-    updatedAt: message.updatedAt
-  };
-  
-  // Tokenize IDs
-  // Note: Using 'chat' type for message.id since messages are part of chats
-  if (message.id) {
-    sanitized.publicId = tokenizeId(message.id, 'chat');
-  }
-  if (message.chatId) {
-    sanitized.publicChatId = tokenizeId(message.chatId, 'chat');
-  }
-  
-  // Remove original IDs
-  delete sanitized.id;
-  delete sanitized.chatId;
-  
-  return sanitized;
-}
-
-/**
- * Sanitize public message object (for PublicMessage entities)
- * 
- * @param publicMessage - PublicMessage object from database
- * @returns Sanitized public message object with publicId and publicChatId
- */
-export function sanitizePublicMessage(publicMessage: any): any {
-  if (!publicMessage) return null;
-  
-  const sanitized: any = {
-    content: publicMessage.content,
-    sender: publicMessage.sender,
-    approved: publicMessage.approved,
-    createdAt: publicMessage.createdAt
-  };
-  
-  // Tokenize IDs
-  if (publicMessage.id) {
-    sanitized.publicId = tokenizeId(publicMessage.id, 'chat');
-  }
-  if (publicMessage.chatId) {
-    sanitized.publicChatId = tokenizeId(publicMessage.chatId, 'chat');
-  }
-  
-  // Remove original IDs
-  delete sanitized.id;
-  delete sanitized.chatId;
   
   return sanitized;
 }

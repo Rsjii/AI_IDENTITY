@@ -22,13 +22,15 @@ export const errorHandlerMiddleware = (
   next: NextFunction
 ): void => {
   const isApiRequest = req.path.startsWith('/api/');
-  const requestId = (req as any).requestId || null;
+  const requestId = req.requestId || null;
 
   if (err instanceof AppError) {
     // ✅ Enhanced logging with structured context
-    const userId = (req as any).user?.userId || (req as any).user?.id || null;
+    const userId = req.user?.userId || req.user?.id || null;
     
-    logger.warn('AppError caught', {
+    // ✅ ENHANCED: Log AppError with full context
+    logger.warn({
+      err: err,
       errorCode: err.errorCode,
       statusCode: err.statusCode,
       message: err.message,
@@ -39,6 +41,16 @@ export const errorHandlerMiddleware = (
       ip: req.ip,
       userAgent: req.get('user-agent'),
       ...(err.details && { details: err.details }), // ✅ Always log details (not exposed to user)
+    }, '⚠️ APP_ERROR caught:');
+    
+    // ✅ Also log to console for immediate visibility
+    console.warn('⚠️ [APP_ERROR]', {
+      errorCode: err.errorCode,
+      statusCode: err.statusCode,
+      message: err.message,
+      path: req.path,
+      method: req.method,
+      details: err.details,
     });
 
     // ✅ Event logging - include details for debugging
@@ -82,26 +94,26 @@ export const errorHandlerMiddleware = (
     }    
 
     if (err.statusCode === 404) {
-      return res.status(404).render('404', {
+      return res.status(404).render('errors/404', {
         title: 'Page Not Found',
         message: err.message,
         user: req.user || null,
-        csrfToken: res.locals['csrfToken'] || '',
+        csrfToken: res.locals.csrfToken || '',
         // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
       });
     }
 
     if (err.statusCode === 403) {
-      return res.status(403).render('403', {
+      return res.status(403).render('errors/403', {
         title: 'Access Denied',
         message: err.message,
         user: req.user || null,
-        csrfToken: res.locals['csrfToken'] || '',
+        csrfToken: res.locals.csrfToken || '',
         // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
       });
     }
 
-    return res.status(err.statusCode).render('error', {
+    return res.status(err.statusCode).render('errors/error', {
       title: 'Error',
       message: err.message,
       errorCode: err.errorCode,
@@ -112,9 +124,11 @@ export const errorHandlerMiddleware = (
   }
 
   // ✅ Enhanced unhandled error logging
-  const userId = (req as any).user?.userId || (req as any).user?.id || null;
+  const userId = req.user?.userId || req.user?.id || null;
   
-  logger.error('Unhandled error in request handler', {
+  // ✅ ENHANCED: Log with error object for better formatting
+  logger.error({
+    err: err,
     name: err.name,
     message: err.message,
     stack: err.stack,
@@ -126,6 +140,15 @@ export const errorHandlerMiddleware = (
     userAgent: req.get('user-agent'),
     body: isProd ? undefined : req.body, // Only in dev
     query: isProd ? undefined : req.query, // Only in dev
+  }, '❌ UNHANDLED ERROR - Full stack trace:');
+  
+  // ✅ Also log to console directly for immediate visibility
+  console.error('❌ [ERROR_HANDLER] Unhandled error:', {
+    name: err.name,
+    message: err.message,
+    path: req.path,
+    method: req.method,
+    stack: err.stack?.substring(0, 500), // First 500 chars of stack
   });
 
   // ✅ Event logging for unhandled errors
@@ -159,7 +182,7 @@ export const errorHandlerMiddleware = (
     return;
   }
 
-  return res.status(500).render('error', {
+  return res.status(500).render('errors/error', {
     title: 'Error',
     message: 'An unexpected error occurred',
     errorCode: ErrorCodes.INTERNAL_ERROR,

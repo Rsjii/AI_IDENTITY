@@ -60,12 +60,15 @@ export const extractJWTFromCookie = (req: Request, res: Response, next: NextFunc
 };
 
 export const requireJWTFromCookie = (req: Request, res: Response, next: NextFunction) => {
-  try {  
+  try {
     // Try to get JWT from cookie first
     const tokenFromCookie = req.cookies?.['jwtToken'];
     
     if (!tokenFromCookie) {
       logger.warn('No JWT token found in cookie');
+      if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
+      }
       return res.redirect('/auth');
     }
     
@@ -79,7 +82,7 @@ export const requireJWTFromCookie = (req: Request, res: Response, next: NextFunc
         id: decoded.userId // Add id field for compatibility
       };
       logger.info(`JWT verified from cookie for user: ${decoded.email}`);
-      next();
+      return next();
     } catch (error) {
       logger.warn('Invalid JWT token in cookie:', error);
       res.clearCookie('jwtToken', {
@@ -87,11 +90,17 @@ export const requireJWTFromCookie = (req: Request, res: Response, next: NextFunc
         secure: isProd,
         sameSite: isProd ? 'lax' : 'strict',
         path: '/'
-      });      
+      });
+      if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ error: 'Invalid token', errorCode: 'INVALID_TOKEN' });
+      }
       return res.redirect('/auth');
     }
   } catch (error) {
     logger.error('JWT cookie verification error:', error);
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ error: 'Authentication required', errorCode: 'UNAUTHORIZED' });
+    }
     return res.redirect('/auth');
   }
 };

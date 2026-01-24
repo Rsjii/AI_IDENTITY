@@ -43,14 +43,14 @@ export async function getAuth(req: any, res: Response) {
     }
 
     // Show login/signup page
-    return res.render('auth', {
+    return res.render('auth/auth', {
       title: 'Login / Signup - Selflyx',
       user: null,
       csrfToken: res.locals['csrfToken'],
     });
   } catch (err) {
     logger.error('getAuth error:', err);
-    return res.render('auth', {
+    return res.render('auth/auth', {
       title: 'Login / Signup - Selflyx',
       user: null,
       csrfToken: res.locals['csrfToken'],
@@ -77,7 +77,7 @@ export function getSignup(req: any, res: Response) {
  */
 export function getLoginVerify(req: any, res: Response) {
   const email = req.query['email'] as string;
-  res.render('login-verify', {
+  res.render('auth/login-verify', {
     title: 'Verify OTP - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken'],
@@ -93,7 +93,7 @@ export function getVerifyOtp(req: any, res: Response) {
   const type = req.query['type'] as string; // 'signup' or 'forgot'
   // ✅ REMOVED: const otp = req.query['otp'] as string;
   
-  res.render('verify-otp', {
+  res.render('auth/verify-otp', {
     title: 'Verify OTP - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken'],
@@ -118,7 +118,7 @@ export function getSignupProfile(req: any, res: Response) {
     return res.redirect('/auth');
   }
   
-  res.render('signup-profile', {
+  res.render('auth/signup-profile', {
     title: 'Complete Profile - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken'],
@@ -130,7 +130,7 @@ export function getSignupProfile(req: any, res: Response) {
  * Forgot Password page
  */
 export function getForgotPassword(req: any, res: Response) {
-  res.render('forgot-password', {
+  res.render('auth/forgot-password', {
     title: 'Forgot Password - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken']
@@ -143,7 +143,7 @@ export function getForgotPassword(req: any, res: Response) {
 export function getForgotPasswordVerify(req: any, res: Response) {
   const email = req.query['email'] as string;
   
-  res.render('forgot-password-verify', {
+  res.render('auth/forgot-password-verify', {
     title: 'Verify Reset Code - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken'],
@@ -157,7 +157,7 @@ export function getForgotPasswordVerify(req: any, res: Response) {
 export function getResetPassword(req: any, res: Response) {
   const email = req.query['email'] as string;
   
-  res.render('reset-password', {
+  res.render('auth/reset-password', {
     title: 'Reset Password - Selflyx',
     user: null,
     csrfToken: res.locals['csrfToken'],

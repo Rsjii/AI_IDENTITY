@@ -18,7 +18,7 @@ router.get('/identity/setup', requireJWTFromCookie, asyncHandler(async (req: any
     return res.redirect('/mirror');
   }
 
-  return res.render('identity-setup', {
+  return res.render('identity/identity-setup', {
     title: 'Setup Your Identity',
     user: res.locals.user || req.user,
     csrfToken: res.locals.csrfToken || '',
@@ -34,8 +34,24 @@ router.get('/mirror', requireJWTFromCookie, asyncHandler(async (req: any, res) =
     return res.redirect('/identity/setup');
   }
 
-  return res.render('mirror', {
+  return res.render('identity/mirror', {
     title: 'Identity Mirror',
+    user: res.locals.user || req.user,
+    csrfToken: res.locals.csrfToken || '',
+  });
+}));
+
+// Identity edit page
+router.get('/identity/edit', requireJWTFromCookie, asyncHandler(async (req: any, res) => {
+  // Check if identity exists
+  const identity = await identityQueries.findByUserId(req.user.id);
+  if (!identity) {
+    // No identity, redirect to setup
+    return res.redirect('/identity/setup');
+  }
+
+  return res.render('identity/identity-edit', {
+    title: 'Edit Identity',
     user: res.locals.user || req.user,
     csrfToken: res.locals.csrfToken || '',
   });

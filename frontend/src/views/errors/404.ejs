@@ -4,7 +4,7 @@
       ? message
       : "The page you're looking for doesn't exist or has been moved.";
 %>
-<%- include('layout', {
+<%- include('../shared/layout', {
   title: 'Page Not Found - Selflyx',
   body:
     '<div class="px-4 py-6 sm:px-0 mobile-p-4">' +
@@ -21,7 +21,7 @@
           '</a>' +
         '</div>' +
         '<p class="mt-4 text-sm text-gray-500 dark:text-gray-400">' +
-          'Need help? <a href="/help-center" class="text-primary hover:underline">Visit Help Center</a>.' +
+          'Need help? <a href="/auth" class="text-primary hover:underline">Contact Support</a>.' +
         '</p>' +
       '</div>' +
     '</div>'

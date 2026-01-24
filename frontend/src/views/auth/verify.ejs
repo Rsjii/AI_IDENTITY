@@ -1,4 +1,4 @@
-<%- include('layout', { title: 'Verify OTP - Selflyx', body: `
+<%- include('../shared/layout', { title: 'Verify OTP - Selflyx', body: `
 <div class="px-4 py-6 sm:px-0">
     <div class="max-w-md mx-auto">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-900 p-4 sm:p-6 lg:p-8">
@@ -80,7 +80,7 @@ document.getElementById('verifyForm').addEventListener('submit', async (e) => {
         if (response.ok) {
             showFlashMessage('Login successful!', 'success');
             setTimeout(() => {
-                window.location.href = '/dashboard';
+                window.location.href = '/mirror';
             }, 1000);
         } else {
             showFlashMessage(result.error || 'Invalid OTP', 'error');

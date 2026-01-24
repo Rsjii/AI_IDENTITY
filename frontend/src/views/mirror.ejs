@@ -1,23 +1,26 @@
 <%- include('layout', { title: 'Identity Mirror' }) %>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-  <div class="max-w-3xl mx-auto">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sm:p-8">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Identity Mirror</h1>
-      <p class="text-gray-600 dark:text-gray-400 mb-6">
-        Paste an incoming message and see how you would reply.
-      </p>
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 py-8 px-4">
+  <div class="max-w-4xl mx-auto">
+    <!-- Main Card - Glassy Premium -->
+    <div class="bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-xl p-6 sm:p-8 lg:p-10">
+      <div class="mb-8">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">Identity Mirror</h1>
+        <p class="text-gray-600 dark:text-gray-300 text-lg">
+          Paste an incoming message and see how you would reply.
+        </p>
+      </div>
 
-      <form id="mirrorForm" class="mb-6">
-        <div class="mb-4">
-          <label for="context" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <form id="mirrorForm" class="mb-8">
+        <div class="mb-6">
+          <label for="context" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
             Context *
           </label>
           <select
             id="context"
             name="context"
             required
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-3 bg-white/80 dark:bg-white/10 backdrop-blur-sm border border-gray-200 dark:border-white/20 rounded-xl dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
           >
             <option value="linkedin_dm">LinkedIn DM</option>
             <option value="email">Email</option>
@@ -28,8 +31,8 @@
           </select>
         </div>
 
-        <div class="mb-4">
-          <label for="incomingMessage" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <div class="mb-6">
+          <label for="incomingMessage" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
             Incoming Message *
           </label>
           <textarea
@@ -37,42 +40,69 @@
             name="incomingMessage"
             required
             placeholder="Paste the message you received..."
-            rows="4"
-            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            rows="5"
+            class="w-full px-4 py-3 bg-white/80 dark:bg-white/10 backdrop-blur-sm border border-gray-200 dark:border-white/20 rounded-xl dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
           ></textarea>
         </div>
 
         <button
           type="submit"
-          class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          id="generate-btn"
+          class="w-full rounded-xl py-3.5 font-semibold text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
         >
-          Generate Reply
+          <span id="generate-btn-text">Generate Reply</span>
+          <span id="generate-btn-loading" class="hidden">Generating...</span>
         </button>
       </form>
 
+      <!-- Decision Preview Box -->
+      <div id="decision-box" class="hidden mb-6 rounded-xl border border-gray-200 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-xl px-5 py-4 shadow-lg">
+        <div class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 font-semibold">Decision</div>
+        <div id="decision-text" class="text-lg font-bold text-gray-900 dark:text-white mb-1"></div>
+        <div id="decision-reason" class="text-sm text-gray-600 dark:text-gray-300"></div>
+      </div>
+
+      <!-- Result Section -->
       <div id="result" class="hidden">
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Suggested Reply</h2>
+        <div class="border-t border-gray-200/50 dark:border-white/10 pt-8">
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Suggested Reply</h2>
           
-          <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-            <p id="reply-text" class="text-gray-900 dark:text-white whitespace-pre-wrap"></p>
+          <!-- Reply Box - Glassy -->
+          <div class="bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-xl p-5 mb-6 shadow-lg">
+            <p id="reply-text" class="text-gray-900 dark:text-white whitespace-pre-wrap leading-relaxed"></p>
           </div>
 
-          <div id="rules-applied" class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            <strong>Rules applied:</strong>
-            <ul id="rules-list" class="list-disc list-inside mt-2"></ul>
+          <!-- Rules Applied -->
+          <div id="rules-applied" class="mb-6 bg-white/40 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-white/10">
+            <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Rules Applied:</div>
+            <ul id="rules-list" class="list-disc list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400"></ul>
           </div>
 
-          <div class="flex gap-4">
+          <!-- Action Buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               id="confirm-yes"
-              class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-semibold"
+              class="flex-1 rounded-xl py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/20 hover:shadow-green-500/30 transition-all font-semibold transform hover:scale-[1.02] active:scale-[0.98]"
             >
               ✅ Yes, this sounds like me
             </button>
             <button
+              id="confirm-no"
+              class="flex-1 rounded-xl py-3 px-4 bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all font-semibold transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+              ❌ No
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <button
+              id="edit-identity-btn"
+              class="flex-1 rounded-xl py-3 px-4 bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-gray-200 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/20 transition-all font-semibold"
+            >
+              ✏️ Edit Identity
+            </button>
+            <button
               id="regenerate-btn"
-              class="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors font-semibold"
+              class="flex-1 rounded-xl py-3 px-4 bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-gray-200 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/20 transition-all font-semibold"
             >
               🔄 Regenerate
             </button>
@@ -80,7 +110,7 @@
         </div>
       </div>
 
-      <div id="error-message" class="mt-4 text-red-600 dark:text-red-400 hidden"></div>
+      <div id="error-message" class="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 hidden"></div>
     </div>
   </div>
 </div>
@@ -88,6 +118,15 @@
 <script>
   window.csrfToken = '<%= csrfToken %>';
   let currentMirrorRunId = null;
+
+  // Toast helper
+  function showToast(message, type = 'success') {
+    if (window.UI && typeof window.UI.showToast === 'function') {
+      window.UI.showToast(message, type);
+    } else {
+      alert(message);
+    }
+  }
 
   document.getElementById('mirrorForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -98,6 +137,19 @@
     if (!incomingMessage.trim()) {
       return;
     }
+
+    // Show loading state
+    const generateBtn = document.getElementById('generate-btn');
+    const generateBtnText = document.getElementById('generate-btn-text');
+    const generateBtnLoading = document.getElementById('generate-btn-loading');
+    generateBtn.disabled = true;
+    generateBtnText.classList.add('hidden');
+    generateBtnLoading.classList.remove('hidden');
+
+    // Hide previous result
+    document.getElementById('result').classList.add('hidden');
+    document.getElementById('decision-box').classList.add('hidden');
+    document.getElementById('error-message').classList.add('hidden');
 
     try {
       const response = await fetch('/api/identity/mirror', {
@@ -116,29 +168,45 @@
         throw new Error(data.error || 'Failed to generate reply');
       }
 
-      // Show result
-      document.getElementById('reply-text').textContent = data.reply;
+      // Show decision preview
+      if (data.decision) {
+        const decisionText = document.getElementById('decision-text');
+        const decisionReason = document.getElementById('decision-reason');
+        const action = (data.decision.action || '').toUpperCase();
+        decisionText.textContent = action;
+        decisionReason.textContent = data.decision.reason || '';
+        document.getElementById('decision-box').classList.remove('hidden');
+      }
+
+      // Show reply
+      document.getElementById('reply-text').textContent = data.reply || '';
       
       const rulesList = document.getElementById('rules-list');
       rulesList.innerHTML = '';
       if (data.rulesApplied && data.rulesApplied.length > 0) {
-        data.rulesApplied.forEach((rule: string) => {
+        data.rulesApplied.forEach((rule) => {
           const li = document.createElement('li');
           li.textContent = rule;
           rulesList.appendChild(li);
         });
       } else {
-        rulesList.innerHTML = '<li>No specific rules applied</li>';
+        rulesList.innerHTML = '<li class="text-gray-400 dark:text-gray-500">No specific rules applied</li>';
       }
 
       currentMirrorRunId = data.mirrorRunId;
       document.getElementById('result').classList.remove('hidden');
       document.getElementById('error-message').classList.add('hidden');
-    } catch (error: any) {
+    } catch (error) {
       const errorEl = document.getElementById('error-message');
       errorEl.textContent = error.message || 'Failed to generate reply';
       errorEl.classList.remove('hidden');
       document.getElementById('result').classList.add('hidden');
+      document.getElementById('decision-box').classList.add('hidden');
+    } finally {
+      // Reset button state
+      generateBtn.disabled = false;
+      generateBtnText.classList.remove('hidden');
+      generateBtnLoading.classList.add('hidden');
     }
   });
 
@@ -160,15 +228,45 @@
       });
 
       if (response.ok) {
-        alert('✅ Confirmed! This helps improve your identity.');
+        showToast('Identity confirmed.', 'success');
       }
     } catch (error) {
       console.error('Failed to confirm:', error);
+      showToast('Failed to confirm.', 'error');
     }
+  });
+
+  document.getElementById('confirm-no').addEventListener('click', async () => {
+    if (!currentMirrorRunId) return;
+
+    try {
+      const response = await fetch('/api/identity/trust/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': window.csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          mirrorRunId: currentMirrorRunId,
+          event: 'confirm_no',
+        }),
+      });
+
+      if (response.ok) {
+        showToast('Noted. This helps improve your identity.', 'info');
+      }
+    } catch (error) {
+      console.error('Failed to reject:', error);
+      showToast('Failed to save feedback.', 'error');
+    }
+  });
+
+  document.getElementById('edit-identity-btn').addEventListener('click', () => {
+    window.location.href = '/identity/edit';
   });
 
   document.getElementById('regenerate-btn').addEventListener('click', () => {
     document.getElementById('mirrorForm').dispatchEvent(new Event('submit'));
   });
 </script>
-

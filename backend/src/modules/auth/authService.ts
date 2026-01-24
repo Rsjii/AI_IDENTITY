@@ -200,7 +200,7 @@ export class EmailService {
 
         if (error) {
           logger.error('❌ [EMAIL] Resend API error (contact form):', {
-            statusCode: error?.statusCode,
+            statusCode: (error as any)?.statusCode,
             message: error?.message,
           });
           return false;

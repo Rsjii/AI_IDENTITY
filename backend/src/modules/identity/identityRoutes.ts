@@ -9,7 +9,7 @@ import {
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { sanitizeInput } from '../../middleware/validation';
 import { validateCSRF } from '../../middleware/csrf';
-import { draftGenerationRateLimit } from '../../middleware/rateLimit';
+import { draftGenerationRateLimit, identityCreateRateLimit, trustConfirmRateLimit, mirrorDailyRateLimit } from '../../middleware/rateLimit';
 
 const router = Router();
 
@@ -17,7 +17,7 @@ const router = Router();
 router.use(requireJWTFromCookie);
 
 // Create identity
-router.post('/', sanitizeInput, validateCSRF, createIdentity);
+router.post('/', sanitizeInput, validateCSRF, identityCreateRateLimit, createIdentity);
 
 // Get identity
 router.get('/me', getIdentity);
@@ -26,10 +26,10 @@ router.get('/me', getIdentity);
 router.put('/version/:id', sanitizeInput, validateCSRF, updateIdentityVersion);
 
 // Mirror (generate reply)
-router.post('/mirror', sanitizeInput, validateCSRF, draftGenerationRateLimit, mirror);
+router.post('/mirror', sanitizeInput, validateCSRF, draftGenerationRateLimit, mirrorDailyRateLimit, mirror);
 
 // Trust confirmation
-router.post('/trust/confirm', sanitizeInput, validateCSRF, confirmTrust);
+router.post('/trust/confirm', sanitizeInput, validateCSRF, trustConfirmRateLimit, confirmTrust);
 
 export default router;
 

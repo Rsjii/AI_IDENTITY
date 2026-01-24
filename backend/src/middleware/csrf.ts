@@ -43,7 +43,7 @@ export const generateCSRFToken = (req: Request, res: Response, next: NextFunctio
   res.locals.csrfToken = newToken;
 
   // Ensure token persists before render
-  req.session.save((err) => {
+  req.session.save((err: any) => {
     if (err) {
       return next(err);
     }
@@ -52,7 +52,7 @@ export const generateCSRFToken = (req: Request, res: Response, next: NextFunctio
 };
 
 export const validateCSRF = (req: Request, _res: Response, next: NextFunction) => {
-  const requestId = (req as any).requestId || null;
+  const requestId = req.requestId || null;
 
   const raw = req.headers['x-csrf-token'];
   const token = Array.isArray(raw) ? raw[0] : raw;

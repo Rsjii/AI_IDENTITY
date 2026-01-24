@@ -10,21 +10,13 @@ import { isDev } from '../config/env';
 export interface StandardEventMeta {
   // IDs (always use public/tokenized IDs for external tools)
   publicUserId?: string;
-  publicTwinId?: string;
-  publicChatId?: string;
   
   // Source tracking
   // Keep this list aligned with real app sources used across controllers.
   source?:
     | 'landing'
     | 'referral'
-    | 'public_profile'
-    | 'dashboard'
-    | 'discover'
-    | 'direct'
-    | 'public_chat'
-    | 'enhanced_chat'
-    | 'private_chat_send';
+    | 'direct';
   
   // Context
   wv?: string; // view/page identifier
@@ -65,14 +57,6 @@ export class EventLogger {
       let enhancedMeta: StandardEventMeta = { ...meta };
       if (userId) {
         enhancedMeta.publicUserId = tokenizeId(userId, 'user');
-      }
-      
-      // Tokenize other IDs if present in meta
-      if (meta?.publicTwinId && !meta.publicTwinId.startsWith('twin_')) {
-        enhancedMeta.publicTwinId = tokenizeId(meta.publicTwinId, 'twin');
-      }
-      if (meta?.publicChatId && !meta.publicChatId.startsWith('chat_')) {
-        enhancedMeta.publicChatId = tokenizeId(meta.publicChatId, 'chat');
       }
       
       await db.query(`
@@ -139,57 +123,6 @@ export class EventLogger {
     });
   }
 
-  /**
-   * Log twin creation event
-   */
-  static async logTwinCreated(userId: string, twinId: string, meta?: { samplesCount?: number }): Promise<void> {
-    return this.log(userId, EVENT_TYPES.TWIN_CREATED, {
-      publicTwinId: twinId, // Will be tokenized automatically
-      ...meta
-    });
-  }
-
-  /**
-   * Log chat started event
-   */
-  static async logChatStarted(
-    userId: string,
-    chatId: string,
-    twinId?: string,
-    meta?: { source?: StandardEventMeta['source'] }
-  ): Promise<void> {
-    return this.log(userId, EVENT_TYPES.CHAT_STARTED, {
-      publicChatId: chatId, // Will be tokenized automatically
-      publicTwinId: twinId, // Will be tokenized automatically
-      source: meta?.source,
-      ...meta
-    });
-  }
-
-  /**
-   * Log message approved event
-   */
-  static async logMessageApproved(userId: string, chatId: string, meta?: { messageLength?: number }): Promise<void> {
-    return this.log(userId, EVENT_TYPES.MESSAGE_APPROVED, {
-      publicChatId: chatId,
-      ...meta
-    });
-  }
-
-  /**
-   * Log profile shared event
-   */
-  static async logProfileShared(
-    userId: string,
-    twinId: string,
-    meta?: { shareMethod?: string; shareUrl?: string }
-  ): Promise<void> {
-    return this.log(userId, EVENT_TYPES.TWIN_SHARED, {
-      twinId, //Internal ID for DB queries
-      publicTwinId: tokenizeId(twinId, 'twin'),
-      ...meta
-    });
-  }
 
   /**
    * Log invite sent event

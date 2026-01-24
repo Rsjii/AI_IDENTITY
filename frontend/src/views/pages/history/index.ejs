@@ -1,0 +1,112 @@
+<%- include('../../shared/layout', { title, user, csrfToken, body: `
+    <div class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">History</h1>
+          <p class="text-sm text-gray-600 dark:text-gray-300">Your recent Mirror runs + confirmations.</p>
+        </div>
+    
+        <div class="flex gap-2">
+          <button data-range="today" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">Today</button>
+          <button data-range="7d" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">7 Days</button>
+          <button data-range="30d" class="range-btn px-4 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10 text-sm">30 Days</button>
+        </div>
+      </div>
+    
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">Runs</div>
+          <div id="m-runs" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tokens</div>
+          <div id="m-tokens" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">✅ Yes</div>
+          <div id="m-yes" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/20 dark:border-white/10">
+          <div class="text-xs text-gray-500 dark:text-gray-400">❌ No</div>
+          <div id="m-no" class="text-2xl font-bold text-gray-900 dark:text-white">—</div>
+        </div>
+      </div>
+    
+      <div class="overflow-hidden rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-gray-600 dark:text-gray-300">
+              <tr>
+                <th class="p-4">Time</th>
+                <th class="p-4">Context</th>
+                <th class="p-4">Decision</th>
+                <th class="p-4">Tokens</th>
+              </tr>
+            </thead>
+            <tbody id="rows" class="divide-y divide-white/10">
+              <tr><td class="p-4 text-gray-600 dark:text-gray-300" colspan="4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      let RANGE = '7d';
+    
+      function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+    
+      async function loadOverview() {
+        const res = await fetch('/api/history/overview?range=' + encodeURIComponent(RANGE));
+        const j = await res.json();
+        const d = j.data || {};
+        document.getElementById('m-runs').textContent = d.runs ?? 0;
+        document.getElementById('m-tokens').textContent = d.tokens ?? 0;
+        document.getElementById('m-yes').textContent = d.yes ?? 0;
+        document.getElementById('m-no').textContent = d.no ?? 0;
+      }
+    
+      async function loadRuns() {
+        const res = await fetch('/api/history/runs?range=' + encodeURIComponent(RANGE) + '&limit=50&offset=0');
+        const j = await res.json();
+        const rows = (j.rows || []);
+        const tbody = document.getElementById('rows');
+    
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td class="p-4 text-gray-600 dark:text-gray-300" colspan="4">No history in this range.</td></tr>';
+          return;
+        }
+    
+        tbody.innerHTML = rows.map(r => {
+          const when = window.TimeUtils ? TimeUtils.formatRelativeTime(r.createdAt) : new Date(r.createdAt).toLocaleString();
+          const whenFull = window.TimeUtils ? TimeUtils.formatLocalDateTime(r.createdAt) : new Date(r.createdAt).toLocaleString();
+          const decision = r.confirmEvent === 'confirm_yes' ? '✅ Confirmed' : (r.confirmEvent === 'confirm_no' ? '❌ Rejected' : '—');
+          const tokens = (Number(r.tokensIn||0) + Number(r.tokensOut||0));
+          return (
+            '<tr class="text-gray-900 dark:text-white">' +
+              '<td class="p-4 whitespace-nowrap" title="'+esc(whenFull)+'">'+esc(when)+'</td>' +
+              '<td class="p-4">'+esc(r.context)+'</td>' +
+              '<td class="p-4">'+esc(decision)+'</td>' +
+              '<td class="p-4">'+esc(tokens)+'</td>' +
+            '</tr>'
+          );
+        }).join('');
+      }
+    
+      function setRange(r) {
+        RANGE = r;
+        document.querySelectorAll('.range-btn').forEach(b => {
+          b.classList.toggle('bg-gradient-to-r', b.dataset.range === RANGE);
+          b.classList.toggle('from-indigo-500', b.dataset.range === RANGE);
+          b.classList.toggle('to-blue-600', b.dataset.range === RANGE);
+          b.classList.toggle('text-white', b.dataset.range === RANGE);
+        });
+        loadOverview();
+        loadRuns();
+      }
+    
+      document.querySelectorAll('.range-btn').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
+      setRange('7d');
+    </script>
+    ` }) %>
+

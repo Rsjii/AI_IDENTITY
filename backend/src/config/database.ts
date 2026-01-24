@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "lastHandleChangeAt" TIMESTAMPTZ NULL,
     "profileCompleted" BOOLEAN NOT NULL DEFAULT false,
     "profileImage" TEXT,
+    "timeZone" TEXT,
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
@@ -88,8 +89,8 @@ CREATE TABLE IF NOT EXISTS "identities" (
     "userId" TEXT NOT NULL UNIQUE,
     "activeVersionId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active' CHECK ("status" IN ('active', 'paused')),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "identities_pkey" PRIMARY KEY ("id")
 );
 
@@ -101,7 +102,7 @@ CREATE TABLE IF NOT EXISTS "identity_versions" (
     "status" TEXT NOT NULL DEFAULT 'draft' CHECK ("status" IN ('draft', 'active', 'archived')),
     "identityJson" JSONB NOT NULL,
     "createdFromVersionId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "identity_versions_pkey" PRIMARY KEY ("id")
 );
 
@@ -116,7 +117,7 @@ CREATE TABLE IF NOT EXISTS "mirror_runs" (
     "model" TEXT,
     "tokensIn" INTEGER,
     "tokensOut" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "mirror_runs_pkey" PRIMARY KEY ("id")
 );
 
@@ -127,7 +128,7 @@ CREATE TABLE IF NOT EXISTS "trust_events" (
     "identityVersionId" TEXT NOT NULL,
     "event" TEXT NOT NULL CHECK ("event" IN ('confirm_yes', 'confirm_no', 'edit_rule', 'regenerate')),
     "note" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "trust_events_pkey" PRIMARY KEY ("id")
 );
 
@@ -259,7 +260,8 @@ export const userQueries = {
     dob: string | null,
     phone: string,
     bio: string,
-    profileImage?: string | null
+    profileImage?: string | null,
+    timeZone?: string | null
   ) => {
     let dobString: string | null = null;
     if (dob !== null && dob !== undefined) {
@@ -287,10 +289,11 @@ export const userQueries = {
          phone = $4,
          bio = $5,
          "profileImage" = $6,
+         "timeZone" = COALESCE($7, "timeZone"),
          "profileCompleted" = true
-       WHERE email = $7
+       WHERE email = $8
        RETURNING *`,
-      [name, handle, dobValue, phone, bio, profileImageValue, email]
+      [name, handle, dobValue, phone, bio, profileImageValue, timeZone || null, email]
     );
     
     return result.rows[0];
@@ -395,14 +398,14 @@ export const identityVersionQueries = {
     );
     return result.rows[0];
   },
-
+  
   findById: async (versionId: string) => {
     const result = await db.query(
       'SELECT * FROM "identity_versions" WHERE id = $1',
       [versionId]
-    );
-    return result.rows[0] || null;
-  },
+      );
+      return result.rows[0] || null;
+    },
 
   findByIdentityId: async (identityId: string, status?: string) => {
     let query = 'SELECT * FROM "identity_versions" WHERE "identityId" = $1';
@@ -450,7 +453,7 @@ export const mirrorRunQueries = {
       [id, identityVersionId, context, incomingMessage, outputReply, rulesApplied ? JSON.stringify(rulesApplied) : null, model, tokensIn, tokensOut]
     );
     return result.rows[0];
-  },
+  },  
 
   findById: async (runId: string) => {
     const result = await db.query(
@@ -458,7 +461,22 @@ export const mirrorRunQueries = {
       [runId]
     );
     return result.rows[0] || null;
-  }
+  },
+
+  sumTokensForUserSince: async (userId: string, since: Date) => {
+    const result = await db.query(
+      `
+      SELECT COALESCE(SUM(COALESCE(mr."tokensIn", 0) + COALESCE(mr."tokensOut", 0)), 0) AS tokens
+      FROM "mirror_runs" mr
+      JOIN "identity_versions" iv ON iv.id = mr."identityVersionId"
+      JOIN "identities" i ON i.id = iv."identityId"
+      WHERE i."userId" = $1
+        AND mr."createdAt" >= $2
+      `,
+      [userId, since]
+    );
+    return Number(result.rows[0]?.tokens || 0);
+  },
 };
 
 export const trustEventQueries = {
