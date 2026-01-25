@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileQuestion, Home, ArrowLeft, Search } from 'lucide-react';
 
@@ -31,12 +31,17 @@ export function NotFoundPage() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button asChild variant="default" size="lg" className="shadow-md">
-                  <Link to="/" className="flex items-center gap-2">
-                    <Home className="h-4 w-4" />
-                    Go Home
-                  </Link>
-                </Button>
+                <Link
+                  to="/"
+                  className={buttonVariants({
+                    variant: "default",
+                    size: "lg",
+                    className: "shadow-md flex items-center gap-2",
+                  })}
+                >
+                  <Home className="h-4 w-4" />
+                  Go Home
+                </Link>
                 <Button 
                   variant="outline" 
                   size="lg" 
@@ -58,18 +63,18 @@ export function NotFoundPage() {
                   <span className="text-sm font-medium">Quick Links</span>
                 </div>
                 <div className="flex flex-wrap gap-3 justify-center">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/mirror">Mirror</Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/history">History</Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/identity/edit">Identity</Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to="/account">Account</Link>
-                  </Button>
+                  <Link to="/mirror" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    Mirror
+                  </Link>
+                  <Link to="/history" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    History
+                  </Link>
+                  <Link to="/identity/edit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    Identity
+                  </Link>
+                  <Link to="/account" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    Account
+                  </Link>
                 </div>
               </div>
             </CardContent>

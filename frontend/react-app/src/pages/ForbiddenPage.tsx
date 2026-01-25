@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldOff, Home, ArrowLeft } from 'lucide-react';
 
@@ -31,12 +31,17 @@ export function ForbiddenPage() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button asChild variant="default" size="lg" className="shadow-md">
-                  <Link to="/" className="flex items-center gap-2">
-                    <Home className="h-4 w-4" />
-                    Go Home
-                  </Link>
-                </Button>
+                <Link
+                  to="/"
+                  className={buttonVariants({
+                    variant: "default",
+                    size: "lg",
+                    className: "shadow-md flex items-center gap-2",
+                  })}
+                >
+                  <Home className="h-4 w-4" />
+                  Go Home
+                </Link>
                 <Button 
                   variant="outline" 
                   size="lg" 
