@@ -1,6 +1,7 @@
 async function getStored() {
   const { apiBase, token } = await chrome.storage.local.get(["apiBase", "token"]);
-  return { apiBase: apiBase || "http://localhost:3000", token: token || "" };
+  // ✅ CHANGE: Default to production URL (update with your actual domain)
+  return { apiBase: apiBase || "https://api.yourdomain.com", token: token || "" };
 }
 
 async function setStored(apiBase, token) {
@@ -17,15 +18,82 @@ document.addEventListener("DOMContentLoaded", async () => {
   apiBaseEl.value = stored.apiBase;
   tokenEl.value = stored.token;
 
+  // ✅ NEW: Check connection status on load
+  async function checkConnectionStatus() {
+    const statusDiv = document.getElementById("connection-status");
+    const statusInfo = document.getElementById("status-info");
+    const disconnectBtn = document.getElementById("disconnect-btn");
+    
+    if (!stored.token) {
+      if (statusDiv) statusDiv.style.display = "none";
+      return;
+    }
+    
+    if (statusDiv) statusDiv.style.display = "block";
+    if (statusInfo) {
+      statusInfo.textContent = "Checking connection...";
+      statusInfo.className = "small";
+    }
+    
+    try {
+      const res = await fetch(`${stored.apiBase}/api/ext/identity/active`, {
+        headers: { Authorization: `Bearer ${stored.token}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      
+      if (res.ok && json.identity) {
+        if (statusInfo) {
+          statusInfo.textContent = `✓ Connected: ${json.identity.displayName || 'Identity'}`;
+          statusInfo.className = "small ok";
+        }
+        if (disconnectBtn) disconnectBtn.style.display = "block";
+      } else if (res.ok) {
+        if (statusInfo) {
+          statusInfo.textContent = "✓ Connected (no identity found)";
+          statusInfo.className = "small ok";
+        }
+        if (disconnectBtn) disconnectBtn.style.display = "block";
+      } else {
+        if (statusInfo) {
+          statusInfo.textContent = "✗ Token invalid or expired";
+          statusInfo.className = "small err";
+        }
+        if (disconnectBtn) disconnectBtn.style.display = "none";
+      }
+    } catch (e) {
+      if (statusInfo) {
+        statusInfo.textContent = `✗ Connection failed: ${e.message || 'Unknown error'}`;
+        statusInfo.className = "small err";
+      }
+      if (disconnectBtn) disconnectBtn.style.display = "none";
+    }
+  }
+  
+  // ✅ Disconnect button handler
+  const disconnectBtn = document.getElementById("disconnect-btn");
+  if (disconnectBtn) {
+    disconnectBtn.addEventListener("click", async () => {
+      if (confirm("Disconnect and clear token?")) {
+        await chrome.storage.local.remove(["token"]);
+        tokenEl.value = "";
+        checkConnectionStatus();
+      }
+    });
+  }
+  
+  // ✅ Check status on load
+  checkConnectionStatus();
+
   document.getElementById("save").addEventListener("click", async () => {
     const base = apiBaseEl.value.trim();
     const token = tokenEl.value.trim();
 
-    // Validate API base URL (allow localhost for dev, or your production domain)
+    // ✅ CHANGE: Update allowed patterns to include production domain
     const allowedPatterns = [
-      /^http:\/\/localhost:\d+$/,
-      /^https:\/\/yourdomain\.com$/,
-      /^https:\/\/.*\.yourdomain\.com$/  // Allow subdomains
+      /^http:\/\/localhost:\d+$/,                    // Localhost for dev
+      /^https:\/\/api\.yourdomain\.com$/,            // Production API
+      /^https:\/\/.*\.yourdomain\.com$/,             // Subdomains
+      /^https:\/\/yourdomain\.com$/,                 // Root domain
     ];
 
     const isValid = allowedPatterns.some(pattern => pattern.test(base));

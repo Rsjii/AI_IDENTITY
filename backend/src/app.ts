@@ -71,14 +71,12 @@ app.use(extractJWTFromCookie);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// === EXTENSION CORS (Gmail content-script calls) ===
-// Allow Gmail origin for /api/ext/* endpoints in local MVP.
-// This is needed because content scripts run in Gmail page context (https://mail.google.com)
-// and make fetch requests to localhost backend, triggering CORS preflight.
+// === EXTENSION CORS (Gmail content-script + Chrome extension) ===
+// Allow Gmail origin (content script) and Chrome extension origins
 app.use('/api/ext', (req, res, next) => {
   const origin = String(req.headers.origin || '');
 
-  // Gmail origin (page) can trigger CORS from content-script fetch
+  // ✅ Gmail origin (content script runs in Gmail page context)
   if (origin === 'https://mail.google.com') {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
@@ -86,8 +84,18 @@ app.use('/api/ext', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'false');
   }
+  
+  // ✅ Chrome extension origin (popup/background scripts)
+  // Format: chrome-extension://[extension-id]
+  if (origin.startsWith('chrome-extension://')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
+  }
 
-  // Handle preflight OPTIONS request
+  // ✅ Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }

@@ -81,24 +81,56 @@ function findToolbarNear(box) {
 
 async function getConfig() {
   const { apiBase, token } = await chrome.storage.local.get(["apiBase", "token"]);
-  return { apiBase: apiBase || "http://localhost:3000", token: token || "" };
+  // ✅ CHANGE: Default to production URL (update with your actual domain)
+  return { apiBase: apiBase || "https://api.yourdomain.com", token: token || "" };
 }
 
 async function callMirror(context, incomingMessage) {
   const { apiBase, token } = await getConfig();
   if (!token) throw new Error("No token set. Open extension popup and paste token.");
 
-  const res = await fetch(`${apiBase}/api/ext/mirror`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({ context, incomingMessage })
-  });
+  let res;
+  try {
+    res = await fetch(`${apiBase}/api/ext/mirror`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ context, incomingMessage }),
+      // ✅ ADD: Timeout handling
+      signal: AbortSignal.timeout(30000) // 30 second timeout
+    });
+  } catch (fetchError) {
+    // ✅ Network/timeout errors
+    if (fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError') {
+      throw new Error("Request timed out. Please check your connection and try again.");
+    }
+    if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
+    throw fetchError;
+  }
 
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  
+  if (!res.ok) {
+    // ✅ Specific error messages
+    if (res.status === 401) {
+      throw new Error("Token expired or invalid. Please update your token in extension popup.");
+    }
+    if (res.status === 404) {
+      throw new Error("Identity not found. Please create your identity on the website first.");
+    }
+    if (res.status === 429) {
+      throw new Error("Daily quota exceeded. Try again tomorrow or upgrade your plan.");
+    }
+    if (res.status === 500 || res.status === 502 || res.status === 503) {
+      throw new Error("Server error. Please try again in a few moments.");
+    }
+    throw new Error(json.error || `HTTP ${res.status}: ${json.message || 'Unknown error'}`);
+  }
+  
   return json;
 }
 
@@ -295,36 +327,65 @@ function ensureButton() {
     btn.textContent = "Loading…";
     btn.disabled = true;
 
-    try {
-      const incoming = extractThreadText(3);
-      if (!incoming || !incoming.trim()) {
-        alert("Couldn't extract the thread. Please open an email thread and try again.");
+    let retries = 0;
+    const maxRetries = 2;
+
+    while (retries <= maxRetries) {
+      try {
+        const incoming = extractThreadText(3);
+        if (!incoming || !incoming.trim()) {
+          alert("Couldn't extract the thread. Please open an email thread and try again.");
+          btn.textContent = oldText;
+          btn.disabled = false;
+          return;
+        }
+
+        log("Calling mirror API... (attempt " + (retries + 1) + ")");
+        const result = await callMirror("email", incoming.trim());
+        log("Mirror response:", result);
+
+        openModal({
+          decision: result.decision,
+          decisionReason: result.decisionReason,
+          reply: result.reply,
+          mirrorRunId: result.mirrorRunId,
+          validatorStatus: result.validatorStatus,
+          validatorViolations: result.validatorViolations || [],
+          onInsert: (text) => {
+            insertTextIntoCompose(box, text);
+            document.getElementById("im-modal-backdrop")?.remove();
+          },
+          onClose: () => document.getElementById("im-modal-backdrop")?.remove()
+        });
+        
+        // ✅ Success - break retry loop
+        btn.textContent = oldText;
+        btn.disabled = false;
         return;
+        
+      } catch (e) {
+        log("Error (attempt " + (retries + 1) + "):", e);
+        
+        // ✅ Don't retry for certain errors
+        const isNonRetryable = 
+          e.message.includes("Token expired") ||
+          e.message.includes("Identity not found") ||
+          e.message.includes("quota exceeded") ||
+          e.message.includes("Couldn't extract");
+        
+        if (isNonRetryable || retries >= maxRetries) {
+          // ✅ Show user-friendly error
+          const errorMsg = e.message || String(e);
+          alert(`Error: ${errorMsg}`);
+          btn.textContent = oldText;
+          btn.disabled = false;
+          return;
+        }
+        
+        // ✅ Retry with exponential backoff
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // 1s, 2s delay
       }
-
-      log("Calling mirror API...");
-      const result = await callMirror("email", incoming.trim());
-      log("Mirror response:", result);
-
-      openModal({
-        decision: result.decision,
-        decisionReason: result.decisionReason,
-        reply: result.reply,
-        mirrorRunId: result.mirrorRunId,
-        validatorStatus: result.validatorStatus,
-        validatorViolations: result.validatorViolations || [],
-        onInsert: (text) => {
-          insertTextIntoCompose(box, text);
-          document.getElementById("im-modal-backdrop")?.remove();
-        },
-        onClose: () => document.getElementById("im-modal-backdrop")?.remove()
-      });
-    } catch (e) {
-      log("Error:", e);
-      alert(e.message || String(e));
-    } finally {
-      btn.textContent = oldText;
-      btn.disabled = false;
     }
   };
 
