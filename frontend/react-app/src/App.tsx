@@ -19,6 +19,8 @@ import { ForgotPasswordResetPage } from './pages/ForgotPasswordResetPage';
 import { AccountPage } from './pages/AccountPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { ForbiddenPage } from './pages/ForbiddenPage';
 
 
 
@@ -63,8 +65,10 @@ function App() {
 
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
+              <Route path="/404" element={<NotFoundPage />} />
+              <Route path="/403" element={<ForbiddenPage />} />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>

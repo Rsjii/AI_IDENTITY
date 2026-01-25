@@ -79,10 +79,11 @@ export async function apiFetch<T = any>(
       error: `HTTP ${response.status}: ${response.statusText}`,
     }));
 
-    const apiError = new Error(errorData.error || 'Request failed') as Error & ApiError;
+    const apiError = new Error(errorData.error || 'Request failed') as Error & ApiError & { status: number };
     apiError.errorCode = errorData.errorCode;
     apiError.details = errorData.details;
     apiError.redirect = errorData.redirect;
+    (apiError as any).status = response.status; // Add status for 404 checks
     throw apiError;
   }
 

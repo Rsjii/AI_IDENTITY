@@ -49,54 +49,6 @@ const completeProfileSchema = z.object({
     .min(1, 'Name is required')
     .min(3, 'Name must be at least 3 characters')
     .max(50, 'Name is too long'),
-  handle: z.string()
-    .min(1, 'Username is required')
-    .min(3, 'Username must be at least 3 characters')
-    .max(20, 'Username must be at most 20 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
-    dob: z.string()
-    .min(1, 'Date of birth is required')
-    // 1) Valid date format
-    .refine((val) => {
-      const date = new Date(val);
-      return !isNaN(date.getTime());
-    }, {
-      message: 'Date of birth must be a valid date'
-    })
-    // 2) Not in future
-    .refine((val) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dobDate = new Date(val);
-      dobDate.setHours(0, 0, 0, 0);
-      return dobDate <= today;
-    }, {
-      message: 'Date of birth cannot be in the future'
-    })
-    // 3) Minimum age 13 years
-    .refine((val) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dobDate = new Date(val);
-      dobDate.setHours(0, 0, 0, 0);
-      const minAge = new Date(today);
-      minAge.setFullYear(today.getFullYear() - 13);
-      return dobDate <= minAge;
-    }, {
-      message: 'You must be at least 13 years old'
-    })
-    // 4) Maximum age 150 years
-    .refine((val) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dobDate = new Date(val);
-      dobDate.setHours(0, 0, 0, 0);
-      const maxAge = new Date(today);
-      maxAge.setFullYear(today.getFullYear() - 150);
-      return dobDate >= maxAge;
-    }, {
-      message: 'Date of birth is too far in the past (maximum 150 years)'
-    }),    
   phone: z.string()
     .optional()
     .refine((value) => {
@@ -131,7 +83,6 @@ const completeProfileSchema = z.object({
       
       return true;
     }, 'Phone number must be in format: +[country code] [10 digits] (e.g. +91 1234567890 or +1 1234567890)'),
-  bio: z.string().max(300, 'Bio must be at most 300 characters').nullable().optional(),
   profileImage: z.string().nullable().optional(),
   timeZone: z.string().optional(),
 });
@@ -418,16 +369,16 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
 
 export const completeProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, name, handle, dob, phone, bio, profileImage, timeZone } = completeProfileSchema.parse(req.body);
+    const { email, name, phone, profileImage, timeZone } = completeProfileSchema.parse(req.body);
     
-    // Update user profile (provide defaults for optional fields)
+    // Update user profile (minimal fields only)
     await userQueries.updateProfile(
       email.toLowerCase(), 
       name, 
-      handle || '', 
-      dob || null, 
+      '', // handle - not used
+      null, // dob - not used
       phone || '', 
-      bio || '', 
+      '', // bio - not used
       profileImage || null,
       timeZone || null
     );

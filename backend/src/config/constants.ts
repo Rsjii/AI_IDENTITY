@@ -70,6 +70,9 @@ export const DB_POOL_CONFIG = {
   createTimeoutMillis: 10000,
   retryDelayMs: 1000,
   retryAttempts: 3,
+  // ✅ Additional Supabase-specific settings
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 } as const;
 
 // Additional query limits

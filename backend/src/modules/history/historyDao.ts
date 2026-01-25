@@ -60,6 +60,10 @@ export async function listMirrorRunsForUser(userId: string, since: Date, limit =
       mr."tokensIn",
       mr."tokensOut",
       mr."createdAt",
+      mr."platform",
+      mr."decisionAction",
+      mr."decisionReason",
+      mr."validatorStatus",
       te.event AS "confirmEvent",
       te.note AS "confirmNote",
       te."createdAt" AS "confirmAt"

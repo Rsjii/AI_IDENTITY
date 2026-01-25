@@ -115,7 +115,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     });    
 
     // ✅ FIX: Parse from req.body (multer will parse multipart/form-data)
-    const { name, handle, dob, phone, bio, profileImage, timeZone } = updateProfileSchema.parse(req.body);
+    const { name, phone, profileImage, timeZone } = updateProfileSchema.parse(req.body);
 
     // Get current user data
     const currentUser = await userQueries.findByEmail(req.user.email);
@@ -123,73 +123,33 @@ export const updateProfile = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const now = new Date();
-    const HANDLE_COOLDOWN_DAYS = 45;
-
-    // Check if handle is already taken (if provided and different from current)
-    if (handle && handle !== currentUser.handle) {
-
-      // ✅ 1) Rate limit: disallow if changed in last 45 days
-  if (currentUser.lastHandleChangeAt) {
-    const last = new Date(currentUser.lastHandleChangeAt);
-    const diffMs = now.getTime() - last.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    if (diffDays < HANDLE_COOLDOWN_DAYS) {
-      const remaining = Math.ceil(HANDLE_COOLDOWN_DAYS - diffDays);
-      return res.status(400).json({
-        error: `You can change your username again in ${remaining} day(s).`
-      });
-    }
-  }
-      const handleCheck = await db.query('SELECT id FROM "User" WHERE handle = $1 AND id != $2', [handle, req.user.userId]);
-      
-      if (handleCheck.rows.length > 0) {
-        return res.status(400).json({ error: 'Handle already taken' });
-      }
-    }
-
-    // Prepare values for update
+    // Prepare values for update (only name, phone, timezone, profileImage)
     const finalName = name !== undefined ? name : currentUser.name || '';
-    const finalHandle = handle !== undefined ? handle : currentUser.handle || '';
-    const finalDob = dob !== undefined ? dob : currentUser.dob || '';
     const finalPhone = phone !== undefined ? phone : currentUser.phone || '';
-    const finalBio = bio !== undefined ? bio : currentUser.bio || '';
     // ✅ FIX: Use uploaded file path if file was uploaded, otherwise use provided profileImage or current
     const finalProfileImage = profileImagePath !== undefined 
       ? profileImagePath 
       : (profileImage !== undefined ? profileImage : currentUser.profileImage || '');
 
-    // Update user profile using raw SQL
+    // Update user profile using raw SQL (handle/bio/dob not used)
     const updatedUser = await userQueries.updateProfile(
       req.user.email,
       finalName,
-      finalHandle,
-      finalDob,
+      '', // handle - not used
+      null, // dob - not used
       finalPhone,
-      finalBio,
+      '', // bio - not used
       finalProfileImage,
       timeZone
     );
-
-    // ✅ If handle changed, store timestamp
-if (finalHandle !== currentUser.handle) {
-  await db.query(
-    'UPDATE "User" SET "lastHandleChangeAt" = NOW() WHERE id = $1',
-    [currentUser.id]
-  );
-}
 
     return res.json({
       success: true,
       user: {
         name: updatedUser.name,
-        handle: updatedUser.handle,
-        dob: updatedUser.dob,
         phone: updatedUser.phone,
-        bio: updatedUser.bio,
         profileImage: updatedUser.profileImage,
       },
-      handle: updatedUser.handle,
     });
   } catch (error) {
     logger.error('Update profile error:', error);

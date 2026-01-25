@@ -92,10 +92,36 @@ export async function getUserDetail(userId: string) {
     [userId]
   );
 
+  // Get all identity versions for this user
+  const identityVersions = await db.query(
+    `
+    SELECT iv.id, iv.version, iv.status, iv."createdAt", iv."identityJson"
+    FROM "identity_versions" iv
+    JOIN "identities" i ON i.id = iv."identityId"
+    WHERE i."userId" = $1
+    ORDER BY iv."createdAt" DESC
+    `,
+    [userId]
+  );
+
+  // Get extension tokens for this user
+  const extensionTokens = await db.query(
+    `
+    SELECT id, label, scopes, "createdAt", "lastUsedAt", "revokedAt"
+    FROM "extension_tokens"
+    WHERE "userId" = $1
+    ORDER BY "createdAt" DESC
+    `,
+    [userId]
+  );
+
   const runs = await db.query(
     `
     SELECT
-      mr.id, mr.context, mr."incomingMessage", mr."outputReply", mr.model, mr."tokensIn", mr."tokensOut", mr."createdAt",
+      mr.id, mr.context, mr."incomingMessage", mr."outputReply", mr.model, 
+      mr."tokensIn", mr."tokensOut", mr."createdAt",
+      mr."platform", mr."decisionAction", mr."decisionReason", 
+      mr."validatorStatus", mr."validatorViolations", mr."latencyMs",
       te.event AS "confirmEvent", te.note AS "confirmNote", te."createdAt" AS "confirmAt"
     FROM "mirror_runs" mr
     JOIN "identity_versions" iv ON iv.id = mr."identityVersionId"
@@ -122,6 +148,8 @@ export async function getUserDetail(userId: string) {
   return {
     user: user.rows[0] || null,
     identity: identity.rows[0] || null,
+    identityVersions: identityVersions.rows,
+    extensionTokens: extensionTokens.rows,
     runs: runs.rows,
     events: events.rows,
   };

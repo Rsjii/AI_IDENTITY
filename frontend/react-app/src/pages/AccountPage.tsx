@@ -13,9 +13,6 @@ export function AccountPage() {
   const { state, refresh } = useAuth();
 
   const [name, setName] = useState('');
-  const [handle, setHandle] = useState('');
-  const [bio, setBio] = useState('');
-  const [dob, setDob] = useState('');
   const [phone, setPhone] = useState('');
   const [timeZone, setTimeZone] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
@@ -34,9 +31,6 @@ export function AccountPage() {
   useEffect(() => {
     if (state.status === 'authenticated') {
       setName(state.user.name || '');
-      setHandle(state.user.handle || '');
-      setBio(state.user.bio || '');
-      setDob((state.user.dob as any) || '');
       setPhone(state.user.phone || '');
       setTimeZone((state.user as any).timeZone || '');
       loadTokens();
@@ -98,10 +92,7 @@ export function AccountPage() {
         method: 'POST',
         body: JSON.stringify({
           name,
-          handle,
-          bio,
-          dob,
-          phone,
+          phone: phone || undefined,
           timeZone,
         }),
       });
@@ -172,36 +163,13 @@ export function AccountPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Username</label>
-              <Input
-                value={handle}
-                onChange={(e) =>
-                  setHandle(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20)
-                  )
-                }
-              />
-              <p className="text-xs text-muted-foreground">3–20 chars, a-z 0-9 _ - (backend enforced).</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">DOB</label>
-                <Input value={dob} onChange={(e) => setDob(e.target.value)} placeholder="YYYY-MM-DD" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone</label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Bio</label>
-              <Textarea value={bio} onChange={(e) => setBio(e.target.value)} />
+              <label className="text-sm font-medium">Phone (optional)</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
+              <p className="text-xs text-muted-foreground">Format: +[country code] [10 digits]</p>
             </div>
 
             <div className="space-y-2">

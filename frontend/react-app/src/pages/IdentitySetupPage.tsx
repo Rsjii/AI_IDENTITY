@@ -25,30 +25,85 @@ export function IdentitySetupPage() {
 
   // Core identity
   const [displayName, setDisplayName] = useState('');
-  const [primaryUse, setPrimaryUse] = useState('founder');
+  const [primaryUse, setPrimaryUse] = useState('');
 
   // Defaults
-  const [formality, setFormality] = useState('casual');
-  const [directness, setDirectness] = useState('direct');
-  const [emoji, setEmoji] = useState('minimal');
-  const [length, setLength] = useState('short');
+  const [formality, setFormality] = useState('');
+  const [directness, setDirectness] = useState('');
+  const [emoji, setEmoji] = useState('');
+  const [length, setLength] = useState('');
 
   // Hard rules
-  const [alwaysText, setAlwaysText] = useState('Be honest\nKeep it concise\nAsk clarifying questions if needed');
-  const [neverText, setNeverText] = useState('Never lie\nNever overpromise\nNever use excessive emojis');
+  const [alwaysText, setAlwaysText] = useState('');
+  const [neverText, setNeverText] = useState('');
+  const [alwaysPreset, setAlwaysPreset] = useState('');
+  const [neverPreset, setNeverPreset] = useState('');
 
   // Boundaries
-  const [noTopicsText, setNoTopicsText] = useState('Personal finances\nHealth details\nFamily matters');
-  const [noCommitmentsText, setNoCommitmentsText] = useState('Meeting times without checking calendar\nDeadlines without confirming capacity');
+  const [noTopicsText, setNoTopicsText] = useState('');
+  const [noCommitmentsText, setNoCommitmentsText] = useState('');
+  const [topicsPreset, setTopicsPreset] = useState('');
+  const [commitmentsPreset, setCommitmentsPreset] = useState('');
 
   // Decision policy
-  const [ignoreIfText, setIgnoreIfText] = useState('Spam\nPromotional emails\nAutomated messages');
-  const [deferIfText, setDeferIfText] = useState('Complex technical questions\nLegal matters\nFinancial decisions');
+  const [ignoreIfText, setIgnoreIfText] = useState('');
+  const [deferIfText, setDeferIfText] = useState('');
+  const [ignorePreset, setIgnorePreset] = useState('');
+  const [deferPreset, setDeferPreset] = useState('');
 
   // Style anchors
-  const [signaturePhrasesText, setSignaturePhrasesText] = useState('Thanks\nGot it\nLet me check');
-  const [greeting, setGreeting] = useState('Hi');
-  const [closing, setClosing] = useState('Best');
+  const [signaturePhrasesText, setSignaturePhrasesText] = useState('');
+  const [greeting, setGreeting] = useState('');
+  const [closing, setClosing] = useState('');
+
+  // Preset definitions
+  const alwaysPresets: Record<string, string> = {
+    founder: 'Be direct and honest\nKeep replies concise\nAsk clarifying questions before committing',
+    sales: 'Be friendly and professional\nAlways follow up\nNever overpromise timelines',
+    support: 'Be empathetic and helpful\nProvide clear next steps\nNever dismiss concerns',
+    personal: 'Be warm and authentic\nKeep it casual\nAsk about their day',
+    other: '',
+  };
+
+  const neverPresets: Record<string, string> = {
+    founder: 'Never lie or overpromise\nNever agree to meetings without checking calendar\nNever use excessive emojis',
+    sales: 'Never sound desperate\nNever make false claims\nNever ignore objections',
+    support: 'Never blame the user\nNever use technical jargon unnecessarily\nNever close tickets prematurely',
+    personal: 'Never be too formal\nNever ignore personal questions\nNever share sensitive info',
+    other: '',
+  };
+
+  const topicsPresets: Record<string, string> = {
+    founder: 'Personal finances\nHealth details\nFamily matters',
+    sales: 'Internal company politics\nPricing negotiations without approval\nCompetitor comparisons',
+    support: 'Personal information\nPayment details\nAccount passwords',
+    personal: 'Work-related stress\nFinancial problems\nRelationship issues',
+    other: '',
+  };
+
+  const commitmentsPresets: Record<string, string> = {
+    founder: 'Meeting times without checking calendar\nDeadlines without confirming capacity\nPartnerships without legal review',
+    sales: 'Discounts without approval\nDelivery dates without checking inventory\nCustom features without engineering',
+    support: 'Refunds without authorization\nFeature requests without roadmap\nEscalations without manager approval',
+    personal: 'Social events without checking schedule\nFinancial commitments\nLong-term plans',
+    other: '',
+  };
+
+  const ignorePresets: Record<string, string> = {
+    founder: 'Spam\nPromotional emails\nAutomated messages\nCold sales pitches',
+    sales: 'Spam\nCompetitor marketing\nUnqualified leads\nAutomated newsletters',
+    support: 'Spam\nPhishing attempts\nAutomated system alerts\nDuplicate tickets',
+    personal: 'Spam\nPromotional emails\nAutomated messages\nUnwanted newsletters',
+    other: '',
+  };
+
+  const deferPresets: Record<string, string> = {
+    founder: 'Complex technical questions\nLegal matters\nFinancial decisions\nPartnership proposals',
+    sales: 'Technical implementation details\nPricing over budget\nCustom integrations\nContract negotiations',
+    support: 'Billing disputes\nAccount security issues\nFeature requests\nBug reports requiring engineering',
+    personal: 'Complex life decisions\nFinancial advice\nMedical questions\nLegal matters',
+    other: '',
+  };
 
   // If identity already exists, send to edit
   useEffect(() => {
@@ -197,12 +252,54 @@ export function IdentitySetupPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Always do</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Always do</label>
+                  <select
+                    value={alwaysPreset}
+                    onChange={(e) => {
+                      setAlwaysPreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setAlwaysText(alwaysPresets[e.target.value] || '');
+                      } else {
+                        setAlwaysText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={alwaysText} onChange={(e) => setAlwaysText(e.target.value)} placeholder="Be honest&#10;Keep it concise&#10;Ask clarifying questions if needed" />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Never do</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Never do</label>
+                  <select
+                    value={neverPreset}
+                    onChange={(e) => {
+                      setNeverPreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setNeverText(neverPresets[e.target.value] || '');
+                      } else {
+                        setNeverText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={neverText} onChange={(e) => setNeverText(e.target.value)} placeholder="Never lie&#10;Never overpromise&#10;Never use excessive emojis" />
               </div>
             </CardContent>
@@ -216,12 +313,54 @@ export function IdentitySetupPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Avoid these topics</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Avoid these topics</label>
+                  <select
+                    value={topicsPreset}
+                    onChange={(e) => {
+                      setTopicsPreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setNoTopicsText(topicsPresets[e.target.value] || '');
+                      } else {
+                        setNoTopicsText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={noTopicsText} onChange={(e) => setNoTopicsText(e.target.value)} placeholder="Personal finances&#10;Health details&#10;Family matters" />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Never commit to</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Never commit to</label>
+                  <select
+                    value={commitmentsPreset}
+                    onChange={(e) => {
+                      setCommitmentsPreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setNoCommitmentsText(commitmentsPresets[e.target.value] || '');
+                      } else {
+                        setNoCommitmentsText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={noCommitmentsText} onChange={(e) => setNoCommitmentsText(e.target.value)} placeholder="Meeting times without checking calendar&#10;Deadlines without confirming capacity" />
               </div>
             </CardContent>
@@ -235,12 +374,54 @@ export function IdentitySetupPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ignore if message contains</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Ignore if message contains</label>
+                  <select
+                    value={ignorePreset}
+                    onChange={(e) => {
+                      setIgnorePreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setIgnoreIfText(ignorePresets[e.target.value] || '');
+                      } else {
+                        setIgnoreIfText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={ignoreIfText} onChange={(e) => setIgnoreIfText(e.target.value)} placeholder="Spam&#10;Promotional emails&#10;Automated messages" />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Defer if message contains</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Defer if message contains</label>
+                  <select
+                    value={deferPreset}
+                    onChange={(e) => {
+                      setDeferPreset(e.target.value);
+                      if (e.target.value && e.target.value !== 'other') {
+                        setDeferIfText(deferPresets[e.target.value] || '');
+                      } else {
+                        setDeferIfText('');
+                      }
+                    }}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="">Choose preset...</option>
+                    <option value="founder">Founder</option>
+                    <option value="sales">Sales</option>
+                    <option value="support">Support</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other (custom)</option>
+                  </select>
+                </div>
                 <Textarea value={deferIfText} onChange={(e) => setDeferIfText(e.target.value)} placeholder="Complex technical questions&#10;Legal matters&#10;Financial decisions" />
               </div>
             </CardContent>
