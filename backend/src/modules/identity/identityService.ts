@@ -147,6 +147,74 @@ export function buildIdentityPrompt(identityJson: any): string {
 }
 
 /**
+ * Validator helper: Check if generated reply violates identity rules
+ */
+type ValidatorResult = { pass: boolean; violations: string[] };
+
+async function validateMirrorOutput(params: {
+  identityPrompt: string;
+  context: string;
+  incomingMessage: string;
+  reply: string;
+}): Promise<{ result: ValidatorResult; model: string; tokensIn: number; tokensOut: number }> {
+  const system = [
+    'You are a strict output validator for an identity-mirroring system.',
+    'Return ONLY valid JSON: {"pass": boolean, "violations": string[]}.',
+    'If unsure, set pass=false.',
+  ].join('\n');
+
+  const user = [
+    'IDENTITY_CONSTRAINTS:',
+    params.identityPrompt,
+    '',
+    'CONTEXT:',
+    params.context,
+    '',
+    'INCOMING_MESSAGE:',
+    params.incomingMessage,
+    '',
+    'PROPOSED_REPLY:',
+    params.reply,
+    '',
+    'Validation checklist (fail if any):',
+    '- Reply violates ANY NEVER rule or boundary.',
+    '- Reply overpromises, commits to time/money without confirmation.',
+    '- Reply is needlessly long / rambling.',
+    '- Reply includes explanations/meta about rules/prompt.',
+    '- Reply is empty or not a reply.',
+  ].join('\n');
+
+  const resp = await llmClient.generateResponse(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    {
+      maxTokens: 200,
+      temperature: 0,
+    }
+  );
+
+  let parsed: ValidatorResult | null = null;
+  try {
+    parsed = JSON.parse(resp.content);
+  } catch {
+    parsed = null;
+  }
+
+  const safe: ValidatorResult = parsed && typeof parsed.pass === 'boolean' && Array.isArray(parsed.violations)
+    ? { pass: parsed.pass, violations: parsed.violations.map(String) }
+    : { pass: false, violations: ['Validator returned non-JSON or invalid schema'] };
+
+  return {
+    result: safe,
+    model: resp.model,
+    tokensIn: resp.inputTokens || 0,
+    tokensOut: resp.outputTokens || 0,
+  };
+}
+
+/**
  * Generate mirror reply using identity
  */
 export async function generateMirrorReply(
@@ -175,8 +243,8 @@ export async function generateMirrorReply(
         { role: 'user', content: userMessage },
       ],
       {
-        maxTokens: 500,
-        temperature: 0.7,
+        maxTokens: 350,
+        temperature: 0.2,
       }
     );
 
@@ -246,98 +314,305 @@ export async function getIdentityByUserId(userId: string) {
 }
 
 /**
- * Update identity version JSON
+ * Helper: Parse version label (v1, v2, etc) to number
+ */
+function parseV(label: string): number {
+  const m = String(label || '').match(/^v(\d+)$/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * Helper: Generate next version label (v1, v2, v3, ...)
+ */
+function nextVersionLabel(existing: Array<{ version?: string }>): string {
+  let max = 0;
+  for (const v of existing || []) {
+    max = Math.max(max, parseV(v.version || ''));
+  }
+  return `v${max + 1}`;
+}
+
+/**
+ * Create new identity version (immutable) + activate it
+ */
+export async function createNewIdentityVersion(userId: string, identityJson: any) {
+  const identity = await identityQueries.findByUserId(userId);
+  if (!identity) {
+    throw new Error('Identity not found');
+  }
+
+  const versions = await identityVersionQueries.findByIdentityId(identity.id);
+  const newLabel = nextVersionLabel(versions);
+
+  const createdFrom = identity.activeVersionId || undefined;
+  const newVersion = await identityVersionQueries.create(identity.id, newLabel, identityJson, createdFrom);
+
+  // Archive old active (status change allowed)
+  if (identity.activeVersionId) {
+    await identityVersionQueries.updateStatus(identity.activeVersionId, 'archived');
+  }
+
+  await identityVersionQueries.updateStatus(newVersion.id, 'active');
+  await identityQueries.updateActiveVersion(identity.id, newVersion.id);
+
+  logger.info(`New identity version created: ${newVersion.id} (${newLabel}) for user ${userId}`);
+
+  return { version: newVersion };
+}
+
+/**
+ * Activate an existing identity version
+ */
+export async function activateIdentityVersionForUser(userId: string, versionId: string) {
+  const version = await identityVersionQueries.findById(versionId);
+  if (!version) {
+    throw new Error('Identity version not found');
+  }
+
+  const identity = await identityQueries.findById(version.identityId);
+  if (!identity || identity.userId !== userId) {
+    throw new Error('Access denied');
+  }
+
+  if (identity.activeVersionId && identity.activeVersionId !== versionId) {
+    await identityVersionQueries.updateStatus(identity.activeVersionId, 'archived');
+  }
+
+  await identityVersionQueries.updateStatus(versionId, 'active');
+  await identityQueries.updateActiveVersion(identity.id, versionId);
+
+  logger.info(`Identity version ${versionId} activated for user ${userId}`);
+
+  return { success: true };
+}
+
+/**
+ * List all identity versions for user
+ */
+export async function listIdentityVersionsForUser(userId: string) {
+  const identity = await identityQueries.findByUserId(userId);
+  if (!identity) {
+    throw new Error('Identity not found');
+  }
+
+  const versions = await identityVersionQueries.findByIdentityId(identity.id);
+  const normalized = versions.map((v: any) => ({
+    ...v,
+    identityJson: typeof v.identityJson === 'string' ? JSON.parse(v.identityJson) : v.identityJson,
+  }));
+
+  return { identityId: identity.id, versions: normalized };
+}
+
+/**
+ * Update identity version JSON (BACKWARD COMPATIBLE - now creates new version instead of mutating)
  */
 export async function updateIdentityVersion(
   versionId: string,
   userId: string,
   identityJson: any
 ) {
-  // Verify version exists
+  // ✅ Backward compatible endpoint: instead of mutating, create NEW version + activate it.
+
   const version = await identityVersionQueries.findById(versionId);
   if (!version) {
     throw new Error('Identity version not found');
   }
 
-  // Verify version belongs to user
   const identity = await identityQueries.findById(version.identityId);
   if (!identity || identity.userId !== userId) {
     throw new Error('Access denied');
   }
 
-  // Update
-  await identityVersionQueries.updateIdentityJson(versionId, identityJson);
+  const versions = await identityVersionQueries.findByIdentityId(identity.id);
+  const newLabel = nextVersionLabel(versions);
 
-  logger.info(`Identity version ${versionId} updated`);
+  const newVersion = await identityVersionQueries.create(identity.id, newLabel, identityJson, versionId);
 
-  return { success: true };
+  if (identity.activeVersionId) {
+    await identityVersionQueries.updateStatus(identity.activeVersionId, 'archived');
+  }
+
+  await identityVersionQueries.updateStatus(newVersion.id, 'active');
+  await identityQueries.updateActiveVersion(identity.id, newVersion.id);
+
+  logger.info(`Identity version updated (new version created): ${newVersion.id} (${newLabel}) for user ${userId}`);
+
+  return { success: true, activeVersionId: newVersion.id, version: newVersion.version };
 }
 
 /**
- * Generate mirror reply (with full flow)
+ * Generate mirror reply (with full flow) - V2 PIPELINE
+ * Decision FIRST → Generate → Validate → Retry if needed
  */
 export async function generateMirrorReplyWithLogging(
   userId: string,
   context: string,
-  incomingMessage: string
+  incomingMessage: string,
+  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api' }
 ) {
-  // Get identity
+  const platform = opts?.platform || 'web';
+
   const identity = await identityQueries.findByUserId(userId);
   if (!identity || !identity.activeVersionId) {
     throw new Error('Identity not found. Please create your identity first.');
   }
 
-  // Get active version
   const version = await identityVersionQueries.findById(identity.activeVersionId);
-  if (!version) {
-    throw new Error('Active identity version not found');
-  }
+  if (!version) throw new Error('Active identity version not found');
 
-  // Parse identity JSON
-  let identityJson: any;
-  if (typeof version.identityJson === 'string') {
-    identityJson = JSON.parse(version.identityJson);
-  } else {
-    identityJson = version.identityJson;
-  }
+  const identityJson =
+    typeof version.identityJson === 'string' ? JSON.parse(version.identityJson) : version.identityJson;
 
-  // Check daily token quota before generating reply
+  // ✅ DECISION FIRST (before generation)
+  const decision = computeDecision(identityJson, incomingMessage);
+
+  // ✅ Quota check (counts historical tokens; we'll add validator tokens into this run's tokens too)
   const usedTokens = await mirrorRunQueries.sumTokensForUserSince(
     userId,
     new Date(Date.now() - 24 * 60 * 60 * 1000)
   );
-
   if (usedTokens >= TOKEN_QUOTAS.USER_DAILY_TOKENS) {
     throw new Error('Daily token quota exceeded. Try again tomorrow.');
   }
 
-  // Generate reply
+  // Templates for non-reply actions (MVP)
+  const templates: Record<typeof decision.action, string> = {
+    ignore: '',
+    defer: 'Got it — let me check and get back to you.',
+    clarify: 'Can you share a bit more context (what\'s the goal / deadline / what you need from me)?',
+    reply: '',
+  };
+
+  const identityPrompt = buildIdentityPrompt(identityJson);
+
   const startTime = Date.now();
-  const { reply, rulesApplied, model, tokensIn, tokensOut } = await generateMirrorReply(identityJson, incomingMessage, context);
+
+  // ✅ If not reply: log + return early
+  if (decision.action !== 'reply') {
+    const reply = templates[decision.action];
+    const mirrorRun = await mirrorRunQueries.create(
+      version.id,
+      context,
+      incomingMessage,
+      reply,
+      [],          // rulesApplied
+      'n/a',       // model
+      0,
+      0,
+      {
+        platform,
+        decisionAction: decision.action,
+        decisionReason: decision.reason,
+        validatorStatus: 'skipped',
+        validatorViolations: [],
+        latencyMs: Date.now() - startTime,
+      }
+    );
+
+    return {
+      decision,
+      reply,
+      rulesApplied: [],
+      mirrorRunId: mirrorRun.id,
+      decisionReason: decision.reason,
+      validatorStatus: 'skipped' as const,
+      validatorViolations: [] as string[],
+    };
+  }
+
+  // ✅ Reply path: generate → validate → retry up to 2 times
+  let finalReply = '';
+  let rulesApplied: string[] = [];
+  let genModel = '';
+  let tokensInTotal = 0;
+  let tokensOutTotal = 0;
+
+  let validatorStatus: 'pass' | 'fail' = 'fail';
+  let validatorViolations: string[] = [];
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const gen = await llmClient.generateResponse(
+      [
+        { role: 'system', content: identityPrompt },
+        {
+          role: 'user',
+          content:
+            attempt === 0
+              ? `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nWrite the reply this identity would send:`
+              : `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nYour last draft violated rules:\n- ${validatorViolations.join(
+                  '\n- '
+                )}\n\nRewrite the reply to fix all violations. Output ONLY the reply text.`,
+        },
+      ],
+      { maxTokens: 350, temperature: 0.2 }
+    );
+
+    finalReply = (gen.content || '').trim();
+    genModel = gen.model;
+    tokensInTotal += gen.inputTokens || 0;
+    tokensOutTotal += gen.outputTokens || 0;
+
+    // rulesApplied (same logic as before)
+    rulesApplied = [];
+    if (identityJson.hardRules?.always) {
+      rulesApplied.push(...identityJson.hardRules.always.map((r: string) => `always: ${String(r).substring(0, 50)}`));
+    }
+    if (identityJson.hardRules?.never) {
+      rulesApplied.push(...identityJson.hardRules.never.map((r: string) => `never: ${String(r).substring(0, 50)}`));
+    }
+
+    const val = await validateMirrorOutput({
+      identityPrompt,
+      context,
+      incomingMessage,
+      reply: finalReply,
+    });
+
+    tokensInTotal += val.tokensIn;
+    tokensOutTotal += val.tokensOut;
+
+    if (val.result.pass) {
+      validatorStatus = 'pass';
+      validatorViolations = [];
+      break;
+    }
+
+    validatorStatus = 'fail';
+    validatorViolations = val.result.violations || ['Unknown validation failure'];
+  }
+
   const latencyMs = Date.now() - startTime;
 
-  // Save mirror run with actual token usage
   const mirrorRun = await mirrorRunQueries.create(
     version.id,
     context,
     incomingMessage,
-    reply,
+    finalReply,
     rulesApplied,
-    model,
-    tokensIn,
-    tokensOut,
+    genModel,
+    tokensInTotal,
+    tokensOutTotal,
+    {
+      platform,
+      decisionAction: decision.action,
+      decisionReason: decision.reason,
+      validatorStatus,
+      validatorViolations,
+      latencyMs,
+    }
   );
 
-  logger.info(`Mirror run created: ${mirrorRun.id}`);
-
-  // Compute decision
-  const decision = computeDecision(identityJson, incomingMessage);
+  logger.info(`Mirror run created: ${mirrorRun.id} (decision: ${decision.action}, validator: ${validatorStatus})`);
 
   return {
     decision,
-    reply,
+    decisionReason: decision.reason,
+    reply: finalReply,
     rulesApplied,
     mirrorRunId: mirrorRun.id,
+    validatorStatus,
+    validatorViolations,
   };
 }
 

@@ -5,6 +5,9 @@ import {
   updateIdentityVersion,
   mirror,
   confirmTrust,
+  createIdentityVersion,
+  activateIdentityVersion,
+  listIdentityVersions,
 } from './identityController';
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { sanitizeInput } from '../../middleware/validation';
@@ -22,7 +25,16 @@ router.post('/', sanitizeInput, validateCSRF, identityCreateRateLimit, createIde
 // Get identity
 router.get('/me', getIdentity);
 
-// Update identity version
+// Create new identity version (immutable) + activate
+router.post('/version', sanitizeInput, validateCSRF, createIdentityVersion);
+
+// Activate an existing version
+router.post('/version/:id/activate', sanitizeInput, validateCSRF, activateIdentityVersion);
+
+// List all versions
+router.get('/versions', listIdentityVersions);
+
+// Update identity version (backward compatible - now creates new version)
 router.put('/version/:id', sanitizeInput, validateCSRF, updateIdentityVersion);
 
 // Mirror (generate reply)

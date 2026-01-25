@@ -25,6 +25,8 @@ import identityRoutes from './modules/identity/identityRoutes';
 import profileRoutes from './modules/profile/profileRoutes';
 import adminRoutes from './modules/admin/adminRoutes';
 import historyRoutes from './modules/history/historyRoutes';
+import extensionRoutes from './modules/extension/extensionRoutes';
+import extRoutes from './modules/extension/extRoutes';
 
 // Page routes
 import pageRoutes from './routes';
@@ -68,6 +70,30 @@ app.use(extractJWTFromCookie);
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// === EXTENSION CORS (Gmail content-script calls) ===
+// Allow Gmail origin for /api/ext/* endpoints in local MVP.
+// This is needed because content scripts run in Gmail page context (https://mail.google.com)
+// and make fetch requests to localhost backend, triggering CORS preflight.
+app.use('/api/ext', (req, res, next) => {
+  const origin = String(req.headers.origin || '');
+
+  // Gmail origin (page) can trigger CORS from content-script fetch
+  if (origin === 'https://mail.google.com') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
+  }
+
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  return next();
+});
 
 app.set('trust proxy', 1);
 
@@ -337,6 +363,8 @@ app.use('/api/identity', identityRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/extension', extensionRoutes);
+app.use('/api/ext', extRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

@@ -189,6 +189,38 @@ ALTER TABLE "Invite" ADD CONSTRAINT "Invite_acceptedBy_fkey"
 ALTER TABLE "Event" DROP CONSTRAINT IF EXISTS "Event_userId_fkey";
 ALTER TABLE "Event" ADD CONSTRAINT "Event_userId_fkey" 
     FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- ========== PHASE 1: MIRROR RUNS UPGRADE (infra-grade audit columns) ==========
+
+-- ✅ Mirror runs: add infra-grade audit columns (safe, idempotent)
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "platform" TEXT;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "decisionAction" TEXT;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "decisionReason" TEXT;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "validatorStatus" TEXT;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "validatorViolations" JSONB;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "latencyMs" INTEGER;
+
+-- ✅ Extension tokens (Phase 3, but safe to create now)
+CREATE TABLE IF NOT EXISTS "extension_tokens" (
+  "id" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "tokenHash" TEXT NOT NULL UNIQUE,
+  "label" TEXT,
+  "scopes" JSONB NOT NULL DEFAULT '["mirror:write","identity:read"]'::jsonb,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "lastUsedAt" TIMESTAMPTZ,
+  "revokedAt" TIMESTAMPTZ,
+  CONSTRAINT "extension_tokens_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "idx_extension_tokens_userId" ON "extension_tokens"("userId");
+CREATE INDEX IF NOT EXISTS "idx_extension_tokens_tokenHash_active"
+  ON "extension_tokens"("tokenHash")
+  WHERE "revokedAt" IS NULL;
+
+ALTER TABLE "extension_tokens" DROP CONSTRAINT IF EXISTS "extension_tokens_userId_fkey";
+ALTER TABLE "extension_tokens" ADD CONSTRAINT "extension_tokens_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {
@@ -447,13 +479,47 @@ export const mirrorRunQueries = {
     rulesApplied?: any,
     model?: string,
     tokensIn?: number,
-    tokensOut?: number
+    tokensOut?: number,
+    meta?: {
+      platform?: 'web' | 'gmail' | 'linkedin' | 'api';
+      decisionAction?: 'reply' | 'ignore' | 'defer' | 'clarify';
+      decisionReason?: string;
+      validatorStatus?: 'pass' | 'fail' | 'skipped';
+      validatorViolations?: string[];
+      latencyMs?: number;
+    }
   ) => {
     const id = `mirror_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const result = await db.query(
-      'INSERT INTO "mirror_runs" (id, "identityVersionId", context, "incomingMessage", "outputReply", "rulesApplied", model, "tokensIn", "tokensOut") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [id, identityVersionId, context, incomingMessage, outputReply, rulesApplied ? JSON.stringify(rulesApplied) : null, model, tokensIn, tokensOut]
+      `
+      INSERT INTO "mirror_runs"
+        (id, "identityVersionId", context, "incomingMessage", "outputReply", "rulesApplied",
+         model, "tokensIn", "tokensOut",
+         "platform", "decisionAction", "decisionReason", "validatorStatus", "validatorViolations", "latencyMs")
+      VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      RETURNING *
+      `,
+      [
+        id,
+        identityVersionId,
+        context,
+        incomingMessage,
+        outputReply,
+        rulesApplied ? JSON.stringify(rulesApplied) : null,
+        model || null,
+        tokensIn ?? null,
+        tokensOut ?? null,
+        meta?.platform || 'web',
+        meta?.decisionAction || null,
+        meta?.decisionReason || null,
+        meta?.validatorStatus || null,
+        meta?.validatorViolations ? JSON.stringify(meta.validatorViolations) : null,
+        meta?.latencyMs ?? null,
+      ]
     );
+
     return result.rows[0];
   },  
 
@@ -495,6 +561,81 @@ export const trustEventQueries = {
     );
     return result.rows[0];
   }
+};
+
+export const extensionTokenQueries = {
+  create: async (userId: string, tokenHash: string, label?: string, scopes?: string[]) => {
+    const id = `exttok_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.query(
+      `
+      INSERT INTO "extension_tokens" (id, "userId", "tokenHash", "label", "scopes")
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+      [id, userId, tokenHash, label || null, JSON.stringify(scopes || ['mirror:write', 'identity:read'])]
+    );
+    return result.rows[0];
+  },
+
+  listForUser: async (userId: string) => {
+    const result = await db.query(
+      `
+      SELECT id, "label", "scopes", "createdAt", "lastUsedAt", "revokedAt"
+      FROM "extension_tokens"
+      WHERE "userId" = $1
+      ORDER BY "createdAt" DESC
+      `,
+      [userId]
+    );
+    return result.rows;
+  },
+
+  findActiveByIdForUser: async (userId: string, tokenId: string) => {
+    const result = await db.query(
+      `
+      SELECT *
+      FROM "extension_tokens"
+      WHERE "userId" = $1 AND id = $2 AND "revokedAt" IS NULL
+      `,
+      [userId, tokenId]
+    );
+    return result.rows[0] || null;
+  },
+
+  // We can't search by hash because we're using bcrypt (salted).
+  // So we verify by checking all active tokens for user and bcrypt.compare.
+  listActiveForUser: async (userId: string) => {
+    const result = await db.query(
+      `
+      SELECT id, "userId", "tokenHash", "label", "scopes", "createdAt", "lastUsedAt"
+      FROM "extension_tokens"
+      WHERE "userId" = $1 AND "revokedAt" IS NULL
+      ORDER BY "createdAt" DESC
+      `,
+      [userId]
+    );
+    return result.rows;
+  },
+
+  updateLastUsedAt: async (tokenId: string) => {
+    await db.query(
+      `UPDATE "extension_tokens" SET "lastUsedAt" = CURRENT_TIMESTAMP WHERE id = $1`,
+      [tokenId]
+    );
+  },
+
+  revoke: async (userId: string, tokenId: string) => {
+    const result = await db.query(
+      `
+      UPDATE "extension_tokens"
+      SET "revokedAt" = CURRENT_TIMESTAMP
+      WHERE "userId" = $1 AND id = $2 AND "revokedAt" IS NULL
+      RETURNING id, "revokedAt"
+      `,
+      [userId, tokenId]
+    );
+    return result.rows[0] || null;
+  },
 };
 
 // Export db for direct use

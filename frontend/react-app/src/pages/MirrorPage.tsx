@@ -15,6 +15,7 @@ export function MirrorPage() {
   const [reply, setReply] = useState('');
   const [mirrorRunId, setMirrorRunId] = useState<string>('');
   const [decision, setDecision] = useState<string>('');
+  const [decisionReason, setDecisionReason] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [trustLoading, setTrustLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +32,7 @@ export function MirrorPage() {
       });
 
       setDecision(result?.decision || '');
+      setDecisionReason(result?.decisionReason || '');
       setReply(result?.reply || '');
       setMirrorRunId(result?.mirrorRunId || '');
     } catch (err: any) {
@@ -125,7 +127,11 @@ export function MirrorPage() {
         <Card className="glass">
           <CardHeader>
             <CardTitle>Reply</CardTitle>
-            <CardDescription>{decision ? `Decision: ${decision}` : 'Your mirror reply will appear here.'}</CardDescription>
+            <CardDescription>
+              {decision
+                ? `Decision: ${decision}${decisionReason ? ` — ${decisionReason}` : ''}`
+                : 'Your mirror reply will appear here.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea className="min-h-[160px]" value={reply} readOnly />

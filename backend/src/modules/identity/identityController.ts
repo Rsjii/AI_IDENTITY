@@ -10,6 +10,9 @@ import {
   updateIdentityVersion as updateIdentityVersionService,
   generateMirrorReplyWithLogging,
   logTrustEvent,
+  createNewIdentityVersion,
+  activateIdentityVersionForUser,
+  listIdentityVersionsForUser,
 } from './identityService';
 
 // Schemas
@@ -38,6 +41,10 @@ const trustConfirmSchema = z.object({
   mirrorRunId: z.string(),
   event: z.enum(['confirm_yes', 'confirm_no', 'edit_rule', 'regenerate']),
   note: z.string().optional(),
+});
+
+const createVersionSchema = z.object({
+  identityJson: z.object({}).passthrough(),
 });
 
 /**
@@ -150,12 +157,14 @@ export const updateIdentityVersion = async (req: AuthenticatedRequest, res: Resp
     const versionId = req.params.id;
     const { identityJson } = updateIdentitySchema.parse(req.body);
 
-    // Update using service
-    await updateIdentityVersionService(versionId, req.user.id, identityJson);
+    // Update using service (now creates new version instead of mutating)
+    const result = await updateIdentityVersionService(versionId, req.user.id, identityJson);
 
     res.json({
       success: true,
-      message: 'Identity updated successfully',
+      message: 'Identity updated successfully (new version created)',
+      activeVersionId: result.activeVersionId,
+      version: result.version,
     });
   } catch (error: any) {
     logger.error('Update identity version error:', error);
@@ -188,6 +197,122 @@ export const updateIdentityVersion = async (req: AuthenticatedRequest, res: Resp
 };
 
 /**
+ * POST /api/identity/version
+ * Create NEW version (immutable) + activate
+ */
+export const createIdentityVersion = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        errorCode: ErrorCodes.UNAUTHORIZED,
+      });
+    }
+
+    const { identityJson } = createVersionSchema.parse(req.body);
+    const result = await createNewIdentityVersion(req.user.id, identityJson);
+
+    return res.json({
+      success: true,
+      activeVersionId: result.version.id,
+      version: result.version.version,
+    });
+  } catch (error: any) {
+    logger.error('Create identity version error:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        errorCode: ErrorCodes.VALIDATION_ERROR,
+        details: error.errors,
+      });
+    }
+
+    if (error.message === 'Identity not found') {
+      return res.status(404).json({
+        error: error.message,
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    handleErrorWithResponse(error, res, 'Failed to create identity version.');
+  }
+};
+
+/**
+ * POST /api/identity/version/:id/activate
+ * Activate an older version
+ */
+export const activateIdentityVersion = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        errorCode: ErrorCodes.UNAUTHORIZED,
+      });
+    }
+
+    const versionId = req.params.id;
+    await activateIdentityVersionForUser(req.user.id, versionId);
+
+    return res.json({
+      success: true,
+      activeVersionId: versionId,
+    });
+  } catch (error: any) {
+    logger.error('Activate identity version error:', error);
+
+    if (error.message === 'Identity version not found') {
+      return res.status(404).json({
+        error: error.message,
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    if (error.message === 'Access denied') {
+      return res.status(403).json({
+        error: error.message,
+        errorCode: ErrorCodes.FORBIDDEN,
+      });
+    }
+
+    handleErrorWithResponse(error, res, 'Failed to activate identity version.');
+  }
+};
+
+/**
+ * GET /api/identity/versions
+ * List all versions for current identity
+ */
+export const listIdentityVersions = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        errorCode: ErrorCodes.UNAUTHORIZED,
+      });
+    }
+
+    const result = await listIdentityVersionsForUser(req.user.id);
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error: any) {
+    logger.error('List identity versions error:', error);
+
+    if (error.message === 'Identity not found') {
+      return res.status(404).json({
+        error: error.message,
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+
+    handleErrorWithResponse(error, res, 'Failed to list identity versions.');
+  }
+};
+
+/**
  * POST /api/mirror
  * Generate mirror reply
  */
@@ -211,10 +336,13 @@ export const mirror = async (req: AuthenticatedRequest, res: Response, next: Nex
 
     res.json({
       success: true,
-      decision: result.decision,
+      decision: result.decision?.action || '',
+      decisionReason: result.decisionReason || result.decision?.reason || '',
       reply: result.reply,
       rulesApplied: result.rulesApplied,
       mirrorRunId: result.mirrorRunId,
+      validatorStatus: result.validatorStatus || undefined,
+      validatorViolations: result.validatorViolations || [],
     });
   } catch (error: any) {
     logger.error('Mirror error:', error);

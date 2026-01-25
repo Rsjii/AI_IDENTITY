@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Identity Mirror (Gmail)",
+  "version": "0.1.0",
+  "description": "Generate replies in your identity voice inside Gmail.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "http://localhost:3000/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content/gmail-inject.js"],
+      "css": ["styles/modal.css"]
+    }
+  ]
+}

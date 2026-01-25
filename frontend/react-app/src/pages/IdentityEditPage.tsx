@@ -42,10 +42,16 @@ export function IdentityEditPage() {
     setError('');
     try {
       const parsed = JSON.parse(identityJsonText);
-      await apiFetch(`/api/identity/version/${versionId}`, {
-        method: 'PUT',
+
+      const res = await apiFetch<any>('/api/identity/version', {
+        method: 'POST',
         body: JSON.stringify({ identityJson: parsed }),
       });
+
+      // Update local versionId to new active version
+      if (res?.activeVersionId) {
+        setVersionId(res.activeVersionId);
+      }
     } catch (err: any) {
       setError(err.message || 'Save failed (invalid JSON?).');
     } finally {

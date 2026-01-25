@@ -99,9 +99,7 @@ export class LLMClient {
     const supportedModels = [
       // Tier 1: Highest limits (14.4K req/day, 500K tokens/day each)
       'llama-3.1-8b-instant',                    // ✅ PRIMARY: Best balance of speed + quality
-      'meta-llama/llama-guard-4-12b',            // ✅ Backup 1: 14.4K req/day, 500K tokens/day
-      'meta-llama/llama-prompt-guard-2-86m',      // ✅ Backup 2: 14.4K req/day, 500K tokens/day
-      'meta-llama/llama-prompt-guard-2-22m',     // ✅ Backup 3: 14.4K req/day, 500K tokens/day
+          // ✅ Backup 3: 14.4K req/day, 500K tokens/day
       
       // Tier 2: Good limits (7K req/day, 500K tokens/day)
       'llama-2-7b',                              // ✅ 7K req/day, 500K tokens/day

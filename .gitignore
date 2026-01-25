@@ -1,0 +1,48 @@
+# dependencies
+node_modules/
+**/node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# build output
+dist/
+**/dist/
+backend/dist/
+frontend/dist/
+*.map
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# uploads (optional if you don't want in git)
+public/uploads/
+backend/public/uploads/
+uploads/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+
