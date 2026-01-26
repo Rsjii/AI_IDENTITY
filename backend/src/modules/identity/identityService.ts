@@ -7,12 +7,18 @@ import {
   trustEventQueries,
 } from '../../config/database';
 import { TOKEN_QUOTAS } from '../../config/constants';
+import { IdentityJson } from '../../types/identity';
 
 /**
  * Compute decision (reply/ignore/defer/clarify) from identity + message
  */
-export function computeDecision(identityJson: any, incomingMessage: string): { action: 'reply' | 'ignore' | 'defer' | 'clarify'; reason: string } {
+export function computeDecision(identityJson: IdentityJson, incomingMessage: string): { action: 'reply' | 'ignore' | 'defer' | 'clarify' | 'escalate'; reason: string } {
   const text = (incomingMessage || '').toLowerCase().trim();
+
+  // Check auto-reply setting (if disabled, defer)
+  if (identityJson?.settings?.autoReply === false) {
+    return { action: 'defer', reason: 'Auto-reply disabled in settings' };
+  }
 
   // Check ignore policy
   if (identityJson?.decisionPolicy?.ignoreIf && Array.isArray(identityJson.decisionPolicy.ignoreIf)) {
@@ -34,6 +40,16 @@ export function computeDecision(identityJson: any, incomingMessage: string): { a
     }
   }
 
+  // Check escalation keywords (from boundaries.escalateIf)
+  if (identityJson?.boundaries?.escalateIf && Array.isArray(identityJson.boundaries.escalateIf)) {
+    const shouldEscalate = identityJson.boundaries.escalateIf.some((condition: string) => 
+      text.includes(String(condition).toLowerCase())
+    );
+    if (shouldEscalate) {
+      return { action: 'escalate', reason: `Matches escalation rule: ${identityJson.boundaries.escalateIf.find(c => text.includes(c.toLowerCase()))}` };
+    }
+  }
+
   // Check if message is too short
   if (text.length < 8) {
     return { action: 'clarify', reason: 'Message is too short; ask for context.' };
@@ -47,7 +63,7 @@ export function computeDecision(identityJson: any, incomingMessage: string): { a
  * Build system prompt from identity JSON
  * This is the core of the identity engine
  */
-export function buildIdentityPrompt(identityJson: any): string {
+export function buildIdentityPrompt(identityJson: IdentityJson): string {
   const {
     displayName = 'User',
     primaryUse = 'founder',
@@ -156,7 +172,24 @@ async function validateMirrorOutput(params: {
   context: string;
   incomingMessage: string;
   reply: string;
+  identityJson?: IdentityJson;
 }): Promise<{ result: ValidatorResult; model: string; tokensIn: number; tokensOut: number }> {
+  // Check maxLines limit (pre-LLM validation for efficiency)
+  if (params.identityJson?.style?.maxLines && typeof params.identityJson.style.maxLines === 'number') {
+    const maxLines = params.identityJson.style.maxLines;
+    if (maxLines > 0) {
+      const replyLines = params.reply.split('\n').filter(l => l.trim().length > 0).length;
+      if (replyLines > maxLines) {
+        return {
+          result: { pass: false, violations: [`Reply has ${replyLines} lines, max allowed: ${maxLines}`] },
+          model: 'validation',
+          tokensIn: 0,
+          tokensOut: 0,
+        };
+      }
+    }
+  }
+
   const system = [
     'You are a strict output validator for an identity-mirroring system.',
     'Return ONLY valid JSON: {"pass": boolean, "violations": string[]}.',
@@ -218,7 +251,7 @@ async function validateMirrorOutput(params: {
  * Generate mirror reply using identity
  */
 export async function generateMirrorReply(
-  identityJson: any,
+  identityJson: IdentityJson,
   incomingMessage: string,
   context: string
 ): Promise<{ reply: string; rulesApplied: string[]; model: string; tokensIn: number; tokensOut: number }> {
@@ -264,7 +297,7 @@ export async function generateMirrorReply(
 /**
  * Create identity + v1 version
  */
-export async function createIdentity(userId: string, identityJson: any) {
+export async function createIdentity(userId: string, identityJson: IdentityJson) {
   // Check if identity already exists
   const existing = await identityQueries.findByUserId(userId);
   if (existing) {
@@ -335,7 +368,7 @@ function nextVersionLabel(existing: Array<{ version?: string }>): string {
 /**
  * Create new identity version (immutable) + activate it
  */
-export async function createNewIdentityVersion(userId: string, identityJson: any) {
+export async function createNewIdentityVersion(userId: string, identityJson: IdentityJson) {
   const identity = await identityQueries.findByUserId(userId);
   if (!identity) {
     throw new Error('Identity not found');
@@ -410,7 +443,7 @@ export async function listIdentityVersionsForUser(userId: string) {
 export async function updateIdentityVersion(
   versionId: string,
   userId: string,
-  identityJson: any
+  identityJson: IdentityJson
 ) {
   // ✅ Backward compatible endpoint: instead of mutating, create NEW version + activate it.
 
@@ -481,6 +514,7 @@ export async function generateMirrorReplyWithLogging(
     ignore: '',
     defer: 'Got it — let me check and get back to you.',
     clarify: 'Can you share a bit more context (what\'s the goal / deadline / what you need from me)?',
+    escalate: 'This requires attention. Let me review and respond appropriately.',
     reply: '',
   };
 
@@ -567,6 +601,7 @@ export async function generateMirrorReplyWithLogging(
       context,
       incomingMessage,
       reply: finalReply,
+      identityJson,
     });
 
     tokensInTotal += val.tokensIn;

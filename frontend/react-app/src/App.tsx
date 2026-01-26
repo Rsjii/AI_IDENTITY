@@ -17,6 +17,7 @@ import { AdminPage } from './pages/AdminPage';
 import { AdminUserPage } from './pages/AdminUserPage';
 import { ForgotPasswordResetPage } from './pages/ForgotPasswordResetPage';
 import { AccountPage } from './pages/AccountPage';
+import { PricingPage } from './pages/PricingPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -62,6 +63,7 @@ function App() {
               <Route path="/admin/users/:userId" element={<AdminUserPage />} />
               <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
 
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />

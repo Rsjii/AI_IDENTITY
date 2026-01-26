@@ -32,6 +32,7 @@ export function IdentitySetupPage() {
   const [directness, setDirectness] = useState('');
   const [emoji, setEmoji] = useState('');
   const [length, setLength] = useState('');
+  const [maxLines, setMaxLines] = useState<number | ''>('');
 
   // Hard rules
   const [alwaysText, setAlwaysText] = useState('');
@@ -55,6 +56,10 @@ export function IdentitySetupPage() {
   const [signaturePhrasesText, setSignaturePhrasesText] = useState('');
   const [greeting, setGreeting] = useState('');
   const [closing, setClosing] = useState('');
+
+  // Settings
+  const [autoReply, setAutoReply] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Preset definitions
   const alwaysPresets: Record<string, string> = {
@@ -161,11 +166,22 @@ export function IdentitySetupPage() {
               greeting,
               closing,
             },
+            style: {
+              formality: formality || undefined,
+              directness: directness || undefined,
+              length: length || undefined,
+              emoji: emoji || undefined,
+              maxLines: maxLines && typeof maxLines === 'number' ? maxLines : undefined,
+            },
+            settings: {
+              autoReply: autoReply,
+            },
           },
         }),
       });
 
-      navigate('/mirror');
+      // Show tutorial overlay after successful creation
+      setShowTutorial(true);
     } catch (err: any) {
       setError(err.message || 'Failed to create identity.');
     } finally {
@@ -239,6 +255,18 @@ export function IdentitySetupPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Reply length</label>
                   <Input value={length} onChange={(e) => setLength(e.target.value)} placeholder="short, medium, detailed" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Max reply lines (optional)</label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max="10"
+                    value={maxLines} 
+                    onChange={(e) => setMaxLines(e.target.value ? parseInt(e.target.value) : '')} 
+                    placeholder="e.g., 3" 
+                  />
+                  <p className="text-xs text-muted-foreground">Maximum number of lines in replies (1-10)</p>
                 </div>
               </div>
             </CardContent>
@@ -452,6 +480,30 @@ export function IdentitySetupPage() {
             </CardContent>
           </Card>
 
+          {/* Settings */}
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Settings</CardTitle>
+              <CardDescription>Control how your identity behaves</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Auto-reply suggestions</label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable automatic reply suggestions. If disabled, system will defer to manual review.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoReply}
+                  onChange={(e) => setAutoReply(e.target.checked)}
+                  className="h-4 w-4"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {error ? (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -470,6 +522,40 @@ export function IdentitySetupPage() {
             )}
           </Button>
         </form>
+
+        {/* Tutorial Overlay */}
+        {showTutorial && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card className="glass max-w-md w-full">
+              <CardHeader>
+                <CardTitle>🎉 Identity Created!</CardTitle>
+                <CardDescription>Let's try it out</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Your identity is ready. Try mirroring a message to see how you would reply.
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    className="flex-1" 
+                    onClick={() => {
+                      setShowTutorial(false);
+                      navigate('/mirror');
+                    }}
+                  >
+                    Try it now
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowTutorial(false)}
+                  >
+                    Skip
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );

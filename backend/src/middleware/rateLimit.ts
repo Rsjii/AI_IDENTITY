@@ -4,6 +4,7 @@ import { EVENT_TYPES } from '../config/constants';
 import { PostgreSQLRateLimitStore } from '../config/rateLimitStore';
 import { EventLogger } from '../services/eventLogger';
 import { logger } from '../config/logger';
+import { db } from '../config/database';
 
 /**
  * Rate Limiting Configuration
@@ -78,6 +79,28 @@ function logRateLimitViolation(
     }
   } catch (error) {
     // Silent fail - don't break rate limiting if event logging fails
+  }
+}
+
+/**
+ * Get user subscription tier from database
+ * Returns: 'free' | 'pro' | 'teams' | null
+ */
+async function getUserSubscriptionTier(userId: string): Promise<'free' | 'pro' | 'teams' | null> {
+  try {
+    const r = await db.query(
+      `SELECT "tier","status" FROM "subscriptions"
+       WHERE "userId"=$1 AND "status"='active'
+       ORDER BY "createdAt" DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (r.rows[0]?.tier) return r.rows[0].tier;
+    return 'free';
+  } catch (e) {
+    logger.error({ err: e }, 'Failed to read subscription tier; defaulting to free');
+    return 'free';
   }
 }
 
@@ -254,23 +277,33 @@ export const trustConfirmRateLimit = rateLimit({
   },
 });
 
-// Daily mirror rate limiter
+// Daily mirror rate limiter (with subscription tier support)
 export const mirrorDailyRateLimit = rateLimit({
   store: createRateLimitStore((RATE_LIMITS as any).mirrorDaily.windowMs),
   windowMs: (RATE_LIMITS as any).mirrorDaily.windowMs,
-  max: (RATE_LIMITS as any).mirrorDaily.max,
+  max: async (req: any) => {
+    // Check subscription tier
+    if (req.user?.id) {
+      const tier = await getUserSubscriptionTier(req.user.id);
+      if (tier === 'pro' || tier === 'teams') {
+        return 1000000; // Unlimited (very high limit)
+      }
+    }
+    return 10; // Free tier: 10 mirrors/month
+  },
   keyGenerator: (req) => rlKey('mirrorDaily', getUserOrIp(req)),
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: true,
   handler: (req, res) => {
     const key = rlKey('mirrorDaily', getUserOrIp(req));
-    logRateLimitViolation(req, 'mirrorDaily', key, (RATE_LIMITS as any).mirrorDaily.max, (RATE_LIMITS as any).mirrorDaily.windowMs);
+    logRateLimitViolation(req, 'mirrorDaily', key, 10, (RATE_LIMITS as any).mirrorDaily.windowMs);
     return res.status(429).json({
       success: false,
-      error: 'Daily mirror limit exceeded. Try again tomorrow.',
+      error: 'Free tier limit: 10 mirrors/month. Upgrade to Pro for unlimited.',
       errorCode: 'RATE_LIMIT_EXCEEDED',
       retryAfter: formatRetryAfter((RATE_LIMITS as any).mirrorDaily.windowMs),
+      upgradeUrl: '/pricing',
     });
   },
 });

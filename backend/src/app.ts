@@ -27,6 +27,7 @@ import adminRoutes from './modules/admin/adminRoutes';
 import historyRoutes from './modules/history/historyRoutes';
 import extensionRoutes from './modules/extension/extensionRoutes';
 import extRoutes from './modules/extension/extRoutes';
+import paymentRoutes from './modules/payment/paymentRoutes';
 
 // Page routes
 import pageRoutes from './routes';
@@ -385,6 +386,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/extension', extensionRoutes);
 app.use('/api/ext', extRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

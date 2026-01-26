@@ -23,4 +23,5 @@ export const generateId = {
   like: () => `like_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   follow: () => `follow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   invite: () => `invite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  subscription: () => `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 };

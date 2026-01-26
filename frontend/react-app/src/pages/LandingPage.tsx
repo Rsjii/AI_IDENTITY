@@ -22,12 +22,12 @@ export function LandingPage() {
               </div>
 
               <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-                Build an AI twin that replies
-                <span className="text-primary"> exactly like you</span>.
+                Reply without second-guessing
+                <span className="text-primary"> your tone</span>.
               </h1>
 
               <p className="text-base md:text-lg text-muted-foreground max-w-prose">
-                Create your identity rules, style anchors, and voice. Then mirror messages with speed, clarity, and your vibe.
+                Maintain consistent communication across Gmail, LinkedIn, and Slack with your personal identity mirror.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -43,7 +43,7 @@ export function LandingPage() {
                 ) : (
                   <>
                     <Button size="lg" onClick={() => window.location.href = '/auth'}>
-                      Get started
+                      Create Your Identity
                     </Button>
                     <Button size="lg" variant="outline" onClick={() => window.location.href = '/auth'}>
                       I already have an account
@@ -90,6 +90,35 @@ export function LandingPage() {
                   <span className="text-primary">Selflyx</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Problem/Solution Section */}
+        <section className="mt-12 space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold">Every message carries reputation risk</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Generic AI doesn't sound like you. Inconsistent tone damages relationships.
+            </p>
+          </div>
+
+          {/* Solution Section */}
+          <div className="grid md:grid-cols-3 gap-4 mt-8">
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <div className="text-2xl font-bold mb-2">1</div>
+              <div className="text-base font-semibold mb-1">Define your rules once</div>
+              <div className="text-sm text-muted-foreground">Set communication boundaries and style</div>
+            </div>
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <div className="text-2xl font-bold mb-2">2</div>
+              <div className="text-base font-semibold mb-1">See how YOU would reply</div>
+              <div className="text-sm text-muted-foreground">Before you send, check against your identity</div>
+            </div>
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <div className="text-2xl font-bold mb-2">3</div>
+              <div className="text-base font-semibold mb-1">Consistent across platforms</div>
+              <div className="text-sm text-muted-foreground">Same voice on Gmail, LinkedIn, Slack</div>
             </div>
           </div>
         </section>

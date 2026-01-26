@@ -5,6 +5,7 @@ import { db } from './config/db';
 import { initializeDatabase } from './config/database';
 import { initializePostHog, shutdownPostHog } from './services/posthogService';
 import { validateEnv } from './config/envValidation';
+import { initializeRazorpay } from './services/razorpayService';
 
 // ✅ NEW: Global process error handlers (MUST be before startServer)
 process.on('uncaughtException', (error: Error) => {
@@ -82,6 +83,9 @@ async function startServer() {
     
     // Initialize PostHog
     initializePostHog();
+
+    // Initialize Razorpay (if payments enabled)
+    initializeRazorpay();
 
     // Test database connection
     let dbConnected = false;

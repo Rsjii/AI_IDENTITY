@@ -90,8 +90,8 @@ const prodLimits = {
   } as LimitConfig,
 
   mirrorDaily: {
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    max: 200, // 200 mirror requests per day per user
+    windowMs: 30 * 24 * 60 * 60 * 1000, // 30 days (monthly limit)
+    max: 200, // Max value (actual limit is 10 for free tier, overridden in middleware)
   } as LimitConfig,
 
   inviteCreation: {
@@ -185,7 +185,7 @@ const devLimits: typeof prodLimits = {
   },
 
   mirrorDaily: {
-    windowMs: 24 * 60 * 60 * 1000,
+    windowMs: 30 * 24 * 60 * 60 * 1000, // 30 days (monthly limit)
     max: 100000, // Very high for testing
   },
 

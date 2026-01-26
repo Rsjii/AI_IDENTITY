@@ -126,6 +126,11 @@ export const EVENT_TYPES = {
   
   // User Account Management
   ACCOUNT_DELETED: 'account_deleted',
+  
+  // Payments
+  PAYMENT_ORDER_CREATED: 'payment_order_created',
+  SUBSCRIPTION_CREATED: 'subscription_created',
+  SUBSCRIPTION_CANCELLED: 'subscription_cancelled',
 } as const;
 
 // Token Quotas - Daily limits for LLM usage

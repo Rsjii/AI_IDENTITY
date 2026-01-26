@@ -221,6 +221,39 @@ CREATE INDEX IF NOT EXISTS "idx_extension_tokens_tokenHash_active"
 ALTER TABLE "extension_tokens" DROP CONSTRAINT IF EXISTS "extension_tokens_userId_fkey";
 ALTER TABLE "extension_tokens" ADD CONSTRAINT "extension_tokens_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== SUBSCRIPTIONS (Payments) ==========
+
+CREATE TABLE IF NOT EXISTS "subscriptions" (
+  "id" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "tier" TEXT NOT NULL CHECK ("tier" IN ('free', 'pro', 'teams')),
+  "status" TEXT NOT NULL DEFAULT 'active' CHECK ("status" IN ('active', 'cancelled', 'expired', 'past_due')),
+  "razorpayOrderId" TEXT,
+  "razorpayPaymentId" TEXT,
+  "amount" INTEGER NOT NULL, -- paise (₹999 => 99900)
+  "currency" TEXT NOT NULL DEFAULT 'INR',
+  "billingCycle" TEXT NOT NULL DEFAULT 'monthly',
+  "currentPeriodStart" TIMESTAMPTZ,
+  "currentPeriodEnd" TIMESTAMPTZ,
+  "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
+  "cancelledAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_userId_active_idx"
+  ON "subscriptions"("userId")
+  WHERE "status" = 'active';
+
+CREATE INDEX IF NOT EXISTS "idx_subscriptions_userId" ON "subscriptions"("userId");
+CREATE INDEX IF NOT EXISTS "idx_subscriptions_razorpayOrderId" ON "subscriptions"("razorpayOrderId");
+CREATE INDEX IF NOT EXISTS "idx_subscriptions_razorpayPaymentId" ON "subscriptions"("razorpayPaymentId");
+
+ALTER TABLE "subscriptions" DROP CONSTRAINT IF EXISTS "subscriptions_userId_fkey";
+ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {

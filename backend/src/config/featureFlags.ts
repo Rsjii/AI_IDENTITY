@@ -14,6 +14,7 @@ export interface FeatureFlags {
   ENABLE_RATE_LIMITING: boolean;
   ENABLE_CONTENT_FILTERING: boolean;
   ENABLE_EMAIL_NOTIFICATIONS: boolean;
+  ENABLE_PAYMENTS: boolean; // ✅ Payment integration flag
   DEBUG_MODE: boolean;
 }
 
@@ -41,6 +42,9 @@ export function getFeatureFlags(): FeatureFlags {
     
     // Notifications
     ENABLE_EMAIL_NOTIFICATIONS: process.env.ENABLE_EMAIL_NOTIFICATIONS !== 'false',
+    
+    // Payments (disabled by default, enable with ENABLE_PAYMENTS=true)
+    ENABLE_PAYMENTS: process.env.ENABLE_PAYMENTS === 'true' || isDev,
     
     // Debug mode
     DEBUG_MODE: isDev || process.env.DEBUG_MODE === 'true',

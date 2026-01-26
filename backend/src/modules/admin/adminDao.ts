@@ -30,6 +30,25 @@ export async function adminOverview(range: RangeKey) {
     [since]
   );
 
+  // Get events statistics
+  const events = await db.query(
+    `
+    SELECT
+      type,
+      COUNT(*)::int AS count
+    FROM "Event"
+    WHERE "createdAt" >= $1
+    GROUP BY type
+    ORDER BY count DESC
+    `,
+    [since]
+  );
+
+  const eventsByType: Record<string, number> = {};
+  events.rows.forEach((row: any) => {
+    eventsByType[row.type] = row.count;
+  });
+
   return {
     range,
     since,
@@ -39,6 +58,7 @@ export async function adminOverview(range: RangeKey) {
     tokens: runs.rows[0]?.tokens || 0,
     trustYes: trust.rows[0]?.yes || 0,
     trustNo: trust.rows[0]?.no || 0,
+    eventsByType,
   };
 }
 

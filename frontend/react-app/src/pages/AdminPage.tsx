@@ -168,6 +168,29 @@ export function AdminPage() {
           </CardContent>
         </Card>
 
+        {/* Events Analytics */}
+        {overview?.eventsByType && Object.keys(overview.eventsByType).length > 0 && (
+          <Card className="glass border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Events Analytics
+              </CardTitle>
+              <CardDescription>System events tracked for selected period</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {Object.entries(overview.eventsByType).map(([type, count]: [string, any]) => (
+                  <div key={type} className="rounded-lg border bg-card/60 p-3">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">{type.replace(/_/g, ' ')}</div>
+                    <div className="text-2xl font-bold">{count}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="glass border-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, ThumbsDown, ThumbsUp, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, ThumbsDown, ThumbsUp, RefreshCw, Zap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 type MirrorContext = 'linkedin_dm' | 'email' | 'sales' | 'intro' | 'support' | 'personal';
@@ -31,8 +31,19 @@ export function MirrorPage() {
         body: JSON.stringify({ context, incomingMessage }),
       });
 
-      setDecision(result?.decision || '');
-      setDecisionReason(result?.decisionReason || '');
+      // Handle decision - could be object {action, reason} or separate fields
+      if (result?.decision) {
+        if (typeof result.decision === 'object' && result.decision.action) {
+          setDecision(result.decision.action);
+          setDecisionReason(result.decision.reason || '');
+        } else {
+          setDecision(result.decision);
+          setDecisionReason(result?.decisionReason || '');
+        }
+      } else {
+        setDecision('');
+        setDecisionReason('');
+      }
       setReply(result?.reply || '');
       setMirrorRunId(result?.mirrorRunId || '');
     } catch (err: any) {
@@ -124,13 +135,32 @@ export function MirrorPage() {
           </CardContent>
         </Card>
 
+        {/* Decision Preview */}
+        {decision && (
+          <Card className="glass border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Decision Preview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">I would:</span>
+                <span className="text-lg font-bold text-primary">{decision.toUpperCase()}</span>
+              </div>
+              {decisionReason && (
+                <p className="text-sm text-muted-foreground">Reason: {decisionReason}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="glass">
           <CardHeader>
-            <CardTitle>Reply</CardTitle>
+            <CardTitle>Suggested Reply</CardTitle>
             <CardDescription>
-              {decision
-                ? `Decision: ${decision}${decisionReason ? ` — ${decisionReason}` : ''}`
-                : 'Your mirror reply will appear here.'}
+              {reply ? 'Review the reply below' : 'Your mirror reply will appear here.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -138,7 +168,7 @@ export function MirrorPage() {
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => trust('confirm_yes')} disabled={!mirrorRunId || trustLoading}>
-                <ThumbsUp className="h-4 w-4 mr-2" /> This is me
+                <ThumbsUp className="h-4 w-4 mr-2" /> Yes, this is me
               </Button>
               <Button variant="outline" onClick={() => trust('confirm_no')} disabled={!mirrorRunId || trustLoading}>
                 <ThumbsDown className="h-4 w-4 mr-2" /> Not me
