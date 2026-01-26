@@ -46,3 +46,9 @@ coverage/
 *.tmp
 *.temp
 
+#mds
+docs/extras
+
+#script
+backend/scripts/
+

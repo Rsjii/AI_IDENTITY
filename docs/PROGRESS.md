@@ -1,17 +1,17 @@
-# 📈 PROGRESS TRACKING - Phase 1 Implementation
+# 📈 Progress Tracking - Phase 1 Implementation
 
 **Last Updated:** 2026-01-26
 **Session:** Phase 1 Week 1 - Voice Cloning + S3 + Widget MVP
 
 ---
 
-## 🔑 CHANGE ID SYSTEM
+## 🔑 Change ID System
 
 **Format:** `#A1`, `#A2`, etc.
 
 **Meaning:**
 - `#A1` = Change ID A1 (first change in this session)
-- When you see `#A1` in CURRENT_STATE.md or IMPLEMENTATION_ROADMAP.md, it means "see PROGRESS.md for details"
+- When you see `#A1` in CURRENT_STATE.md or IMPLEMENTATION_ROADMAP.md, it means "see progress.md for details"
 - Each change ID has detailed description below
 
 **Status:**
@@ -21,7 +21,7 @@
 
 ---
 
-## 📋 CHANGE LOG
+## 📋 Change Log
 
 ### #A1 - Add AWS S3 SDK Dependencies ✅
 **File:** `backend/package.json`
@@ -299,14 +299,111 @@
 
 ---
 
-## 📊 SUMMARY
+### #A17 - Widget CORS Support ✅
+**File:** `backend/src/app.ts`
+**Change:** Added CORS middleware for `/api/widget` routes
+- Allows ANY origin (`*`)
+- No credentials (public endpoint)
+- Handles OPTIONS preflight requests
+**Why:** External websites need to call `/api/widget/chat` from their domains
+**Status:** ✅ Complete
 
-**Total Changes:** 16 (#A1-#A16)
-**Completed:** 16 ✅
+---
+
+### #A18 - Widget Rate Limiting ✅
+**Files:**
+- `backend/src/config/rateLimitConfig.ts`
+- `backend/src/middleware/rateLimit.ts`
+- `backend/src/modules/widget/widgetRoutes.ts`
+
+**Change:**
+1. Added `widgetChat` rate limit config (10 req/min in prod, 200 in dev)
+2. Created `widgetChatRateLimit` middleware
+3. Applied rate limit to `POST /api/widget/chat`
+4. Updated global rate limiter skip list to exclude `/api/widget`
+**Why:** Prevent abuse of public widget endpoint
+**Status:** ✅ Complete
+
+---
+
+### #A19 - Add publicId to /api/auth/me ✅
+**File:** `backend/src/modules/auth/authController.ts`
+**Change:**
+- Added `tokenizeId` import
+- Added `publicId: tokenizeId(user.id, 'user')` to `/me` response
+**Why:** Frontend needs tokenized user ID for widget embed code (safer than raw ID)
+**Status:** ✅ Complete
+
+---
+
+### #A20 - Frontend AuthContext publicId Support ✅
+**File:** `frontend/react-app/src/contexts/AuthContext.tsx`
+**Change:** Added `publicId?: string` to `MeUser` type
+**Why:** TypeScript support for tokenized user ID
+**Status:** ✅ Complete
+
+---
+
+### #A21 - Integrations Page (Widget Settings UI) ✅
+**Files:**
+- `frontend/react-app/src/pages/Integrations.tsx` (NEW)
+- `frontend/react-app/src/App.tsx` (UPDATED)
+- `frontend/react-app/src/components/Navbar.tsx` (UPDATED)
+
+**Change:**
+1. **IntegrationsPage.tsx:**
+   - Widget customization UI (color, position, title, avatar)
+   - Fetches embed code from `/api/widget/code/:creatorId`
+   - Customizes snippet with data attributes
+   - Copy to clipboard button
+   - Placeholder cards for Instagram/WhatsApp (coming soon)
+
+2. **App.tsx:** Added `/integrations` route
+3. **Navbar.tsx:** Added "Integrations" link
+**Why:** Users need UI to customize and copy widget embed code
+**Status:** ✅ Complete
+
+---
+
+### #A22 - Widget Customization Runtime ✅
+**Files:**
+- `frontend/src/public/embed.js` (UPDATED)
+- `frontend/src/public/embed.css` (UPDATED)
+
+**Change:**
+1. **embed.js:**
+   - Reads `data-color`, `data-position`, `data-title`, `data-avatar-url` attributes
+   - Applies color to button
+   - Positions button/panel based on `data-position`
+   - Shows avatar in header if provided
+   - Sets custom title
+
+2. **embed.css:**
+   - Added avatar styling (`#selflyx-widget-avatar`)
+**Why:** Users want to customize widget appearance per website
+**Status:** ✅ Complete
+
+---
+
+### #A23 - Fix Docs References ✅
+**Files:**
+- `docs/1_CURRENT_STATE.md`
+- `docs/3_IMPLEMENTATION_ROADMAP.md`
+
+**Change:** Replaced `PROGRESS.md` references with `progress.md`
+**Why:** File was renamed to lowercase
+**Status:** ✅ Complete
+
+---
+
+## 📊 Summary
+
+**Total Changes:** 23 (#A1-#A23)
+**Completed:** 23 ✅
 **In Progress:** 0
 **Blocked:** 0
 
-**Files Created:** 8
+**Files Created:** 10
 - `backend/src/services/s3Service.ts`
 - `backend/src/modules/identity/voiceMirrorController.ts`
 - `backend/src/modules/widget/widgetRoutes.ts`
@@ -315,9 +412,10 @@
 - `frontend/src/public/embed.css`
 - `frontend/react-app/src/pages/VoiceSetupPage.tsx`
 - `frontend/react-app/src/pages/VoiceManagePage.tsx`
-- `PROGRESS.md`
+- `frontend/react-app/src/pages/Integrations.tsx`
+- `progress.md`
 
-**Files Modified:** 12
+**Files Modified:** 15
 - `backend/package.json`
 - `backend/env.example`
 - `backend/src/modules/voice/voiceRoutes.ts`
@@ -326,21 +424,26 @@
 - `backend/src/modules/identity/identityRoutes.ts`
 - `backend/src/config/database.ts`
 - `backend/src/app.ts`
+- `backend/src/config/rateLimitConfig.ts`
+- `backend/src/middleware/rateLimit.ts`
+- `backend/src/modules/auth/authController.ts`
 - `frontend/react-app/src/App.tsx`
 - `frontend/react-app/src/pages/MirrorPage.tsx`
 - `frontend/react-app/src/components/Navbar.tsx`
+- `frontend/react-app/src/contexts/AuthContext.tsx`
 - `docs/1_CURRENT_STATE.md`
 - `docs/3_IMPLEMENTATION_ROADMAP.md`
 
 ---
 
-## 🎯 WHAT'S READY TO TEST
+## 🎯 What's Ready to Test
 
 **After adding credentials:**
 1. ✅ Voice upload UI (`/voice/setup`)
 2. ✅ Voice management (`/voice/manage`)
 3. ✅ Voice replies in Mirror page (`/mirror` with voice toggle)
 4. ✅ Website embed widget (`/api/widget/chat`, `/api/widget/code/:creatorId`)
+5. ✅ Widget customization UI (`/integrations`)
 
 **Required Setup:**
 1. Run `npm install` in `backend/` (for #A1)
@@ -351,21 +454,22 @@
 
 ---
 
-## 🚀 NEXT STEPS (Phase 1 Week 2-4)
+## 🚀 Next Steps (Phase 1 Week 2-4)
 
 **Week 2:** Instagram DM Integration
 - Backend tables ready (#A9)
-- Need: Instagram Graph API setup + webhook handler
+- Need: Instagram Graph API setup + webhook handler + OAuth flow
 
 **Week 3:** WhatsApp Integration
 - Backend tables ready (#A9)
-- Need: Twilio setup + webhook handler
+- Need: Twilio setup + webhook handler + message sending
 
-**Week 4:** Widget Polish
+**Week 4:** Widget Polish ✅ **COMPLETE**
 - Backend + static files done (#A10, #A11)
-- Need: Widget settings page (customization UI)
+- Customization UI done (#A21, #A22)
+- Rate limiting done (#A18)
+- CORS done (#A17)
 
 ---
 
-**End of Session:** All Phase 1 Week 1 tasks complete. Ready for testing once credentials are added.
-
+**End of Session:** All Phase 1 non-integration tasks complete. Ready for testing once credentials are added. Instagram/WhatsApp integration code intentionally left for next phase.
