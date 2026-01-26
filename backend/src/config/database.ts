@@ -254,6 +254,28 @@ CREATE INDEX IF NOT EXISTS "idx_subscriptions_razorpayPaymentId" ON "subscriptio
 ALTER TABLE "subscriptions" DROP CONSTRAINT IF EXISTS "subscriptions_userId_fkey";
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== VOICE CLONING ==========
+
+CREATE TABLE IF NOT EXISTS "voice_clones" (
+  "id" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "voiceId" TEXT, -- ElevenLabs voice_id or provider-specific ID
+  "label" TEXT, -- e.g., "Professional", "Casual", "Energetic"
+  "sampleAudioUrl" TEXT, -- S3/Cloudinary URL of uploaded sample
+  "provider" TEXT NOT NULL DEFAULT 'elevenlabs' CHECK ("provider" IN ('elevenlabs', 'playht', 'coqui')),
+  "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending', 'training', 'ready', 'failed')),
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "voice_clones_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "idx_voice_clones_userId" ON "voice_clones"("userId");
+CREATE INDEX IF NOT EXISTS "idx_voice_clones_status" ON "voice_clones"("userId", "status");
+
+ALTER TABLE "voice_clones" DROP CONSTRAINT IF EXISTS "voice_clones_userId_fkey";
+ALTER TABLE "voice_clones" ADD CONSTRAINT "voice_clones_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {
@@ -669,6 +691,64 @@ export const extensionTokenQueries = {
     );
     return result.rows[0] || null;
   },
+};
+
+// ========== VOICE CLONE QUERIES ==========
+export const voiceCloneQueries = {
+  create: async (userId: string, label?: string, provider: 'elevenlabs' | 'playht' | 'coqui' = 'elevenlabs') => {
+    const id = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date();
+    const result = await db.query(
+      `INSERT INTO "voice_clones" (id, "userId", label, provider, status, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [id, userId, label || null, provider, 'pending', now, now]
+    );
+    return result.rows[0];
+  },
+
+  findByUserId: async (userId: string) => {
+    const result = await db.query(
+      `SELECT * FROM "voice_clones" WHERE "userId" = $1 ORDER BY "createdAt" DESC`,
+      [userId]
+    );
+    return result.rows;
+  },
+
+  findById: async (voiceId: string) => {
+    const result = await db.query(
+      `SELECT * FROM "voice_clones" WHERE id = $1`,
+      [voiceId]
+    );
+    return result.rows[0] || null;
+  },
+
+  updateStatus: async (id: string, status: 'pending' | 'training' | 'ready' | 'failed') => {
+    const result = await db.query(
+      `UPDATE "voice_clones" SET status = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [status, id]
+    );
+    return result.rows[0];
+  },
+
+  updateVoiceId: async (id: string, voiceId: string, sampleAudioUrl?: string) => {
+    const result = await db.query(
+      `UPDATE "voice_clones"
+       SET "voiceId" = $1, "sampleAudioUrl" = COALESCE($2, "sampleAudioUrl"), "updatedAt" = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [voiceId, sampleAudioUrl || null, id]
+    );
+    return result.rows[0];
+  },
+
+  delete: async (userId: string, voiceId: string) => {
+    const result = await db.query(
+      `DELETE FROM "voice_clones" WHERE id = $1 AND "userId" = $2 RETURNING *`,
+      [voiceId, userId]
+    );
+    return result.rows[0] || null;
+  }
 };
 
 // Export db for direct use
