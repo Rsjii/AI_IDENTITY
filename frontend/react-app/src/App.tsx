@@ -25,6 +25,13 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
+import { OnboardingQuizPage } from './pages/OnboardingQuizPage';
+import { OnboardingContentPage } from './pages/OnboardingContentPage';
+import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
+import { OnboardingDeployPage } from './pages/OnboardingDeployPage';
+import { PublicChatPage } from './pages/PublicChatPage';
+import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 
 
 
@@ -75,6 +82,15 @@ function App() {
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/404" element={<NotFoundPage />} />
               <Route path="/403" element={<ForbiddenPage />} />
+
+              <Route path="/onboarding/quiz" element={<ProtectedRoute><OnboardingQuizPage /></ProtectedRoute>} />
+              <Route path="/onboarding/content" element={<ProtectedRoute><OnboardingContentPage /></ProtectedRoute>} />
+              <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
+              <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
+              <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
+              <Route path="/chat/:slug" element={<PublicChatPage />} />
 
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>

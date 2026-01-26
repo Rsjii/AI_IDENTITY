@@ -32,6 +32,11 @@ import voiceRoutes from './modules/voice/voiceRoutes';
 import widgetRoutes from './modules/widget/widgetRoutes';
 import instagramRoutes from './modules/instagram/instagramRoutes';
 import whatsappRoutes from './modules/whatsapp/whatsappRoutes';
+import stripeRoutes from './modules/billing/stripeRoutes';
+import contentRoutes from './modules/content/contentRoutes';
+import publicRoutes from './modules/public/publicRoutes';
+import creatorRoutes from './modules/creator/creatorRoutes';
+
 
 // Page routes
 import pageRoutes from './routes';
@@ -71,6 +76,9 @@ if (isProd) {
 
 app.use(cookieParser());
 app.use(extractJWTFromCookie);
+
+// Stripe webhook needs raw body BEFORE json parser (only for that route)
+app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json' }));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -431,6 +439,10 @@ app.use('/api/voice', voiceRoutes);
 app.use('/api/widget', widgetRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/billing/stripe', stripeRoutes);
+app.use('/api/content', contentRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/creator', creatorRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

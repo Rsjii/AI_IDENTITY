@@ -31,9 +31,36 @@ export function IntegrationsPage() {
   // Widget Analytics
   const [analytics, setAnalytics] = useState<{ total: number; today: number; thisWeek: number } | null>(null);
 
+  // Pricing state
+  const [premiumCents, setPremiumCents] = useState(500); // $5
+  const [vipCents, setVipCents] = useState(5000); // $50
+  const [pricingSaving, setPricingSaving] = useState(false);
+
   const creatorId = useMemo(() => {
     return (user as any)?.publicId || user?.id || '';
   }, [user]);
+
+  const publicSlug = (user as any)?.publicSlug || user?.handle || '';
+  const standaloneLink = publicSlug ? `${window.location.origin}/chat/${publicSlug}` : '';
+
+  const savePricing = async () => {
+    setPricingSaving(true);
+    try {
+      await apiFetch('/api/creator/pricing', {
+        method: 'POST',
+        body: JSON.stringify({
+          free: { enabled: true },
+          premium: { enabled: true, amountCents: premiumCents },
+          vip: { enabled: true, amountCents: vipCents },
+        }),
+      });
+      alert('Saved pricing');
+    } catch (e: any) {
+      alert(e.message || 'Failed to save pricing');
+    } finally {
+      setPricingSaving(false);
+    }
+  };
 
   // Load widget code
   useEffect(() => {
@@ -145,6 +172,40 @@ export function IntegrationsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
           <p className="text-muted-foreground mt-1">Connect platforms + generate website widget embed code.</p>
         </div>
+
+        {/* Standalone Link + Pricing */}
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle>Standalone Link + Pricing</CardTitle>
+            <CardDescription>Your public chat page + pay-per-chat pricing.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <div className="text-sm font-medium mb-1">Standalone link</div>
+              <div className="flex gap-2">
+                <Input value={standaloneLink} readOnly />
+                <Button variant="outline" onClick={() => navigator.clipboard.writeText(standaloneLink)} disabled={!standaloneLink}>
+                  Copy
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-sm font-medium mb-1">Premium ($) amount</div>
+                <Input value={String(Math.round(premiumCents / 100))} onChange={(e) => setPremiumCents(Math.max(50, Number(e.target.value || 0) * 100))} />
+              </div>
+              <div>
+                <div className="text-sm font-medium mb-1">VIP ($) amount</div>
+                <Input value={String(Math.round(vipCents / 100))} onChange={(e) => setVipCents(Math.max(50, Number(e.target.value || 0) * 100))} />
+              </div>
+            </div>
+
+            <Button onClick={savePricing} disabled={pricingSaving}>
+              {pricingSaving ? 'Saving…' : 'Save Pricing'}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Widget Analytics */}
         {analytics && (

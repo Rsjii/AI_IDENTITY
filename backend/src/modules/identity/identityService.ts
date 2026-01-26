@@ -5,6 +5,8 @@ import {
   identityVersionQueries,
   mirrorRunQueries,
   trustEventQueries,
+  chatSessionQueries,
+  chatMessageQueries,
 } from '../../config/database';
 import { TOKEN_QUOTAS } from '../../config/constants';
 import { IdentityJson } from '../../types/identity';
@@ -482,7 +484,7 @@ export async function generateMirrorReplyWithLogging(
   userId: string,
   context: string,
   incomingMessage: string,
-  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api' }
+  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api'; sessionId?: string; visitorId?: string }
 ) {
   const platform = opts?.platform || 'web';
 
@@ -522,6 +524,22 @@ export async function generateMirrorReplyWithLogging(
 
   const startTime = Date.now();
 
+  // Helper: ensure session
+  const ensureSession = async (): Promise<string | null> => {
+    if (opts?.sessionId) return opts.sessionId;
+    // create a session only if visitorId present or platform is public/api
+    if (!opts?.visitorId && platform === 'web') return null;
+    const s = await chatSessionQueries.create({ creatorId: userId, visitorId: opts?.visitorId || null, platform });
+    return s.id;
+  };
+
+  const sessionId = await ensureSession();
+
+  // Always save user message when session exists
+  if (sessionId) {
+    await chatMessageQueries.add({ sessionId, role: 'user', content: incomingMessage });
+  }
+
   // ✅ If not reply: log + return early
   if (decision.action !== 'reply') {
     const reply = templates[decision.action];
@@ -544,6 +562,10 @@ export async function generateMirrorReplyWithLogging(
       }
     );
 
+    if (sessionId && reply) {
+      await chatMessageQueries.add({ sessionId, role: 'assistant', content: reply });
+    }
+
     return {
       decision,
       reply,
@@ -552,6 +574,7 @@ export async function generateMirrorReplyWithLogging(
       decisionReason: decision.reason,
       validatorStatus: 'skipped' as const,
       validatorViolations: [] as string[],
+      sessionId,
     };
   }
 
@@ -640,6 +663,11 @@ export async function generateMirrorReplyWithLogging(
 
   logger.info(`Mirror run created: ${mirrorRun.id} (decision: ${decision.action}, validator: ${validatorStatus})`);
 
+  // after final mirrorRun created:
+  if (sessionId && finalReply) {
+    await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
+  }
+
   return {
     decision,
     decisionReason: decision.reason,
@@ -648,6 +676,7 @@ export async function generateMirrorReplyWithLogging(
     mirrorRunId: mirrorRun.id,
     validatorStatus,
     validatorViolations,
+    sessionId,
   };
 }
 

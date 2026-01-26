@@ -10,19 +10,26 @@ const chatSchema = z.object({
   creatorId: z.string().min(1), // tokenized preferred
   message: z.string().min(1),
   voiceEnabled: z.boolean().optional().default(false),
+  visitorId: z.string().optional(), // For chat history tracking
 });
 
 export async function widgetChat(req: Request, res: Response) {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
 
-  const { creatorId, message, voiceEnabled } = parsed.data;
+  const { creatorId, message, voiceEnabled, visitorId } = parsed.data;
 
   // Accept tokenized id (v2....) OR raw id (dev)
   const detok = detokenizeId(creatorId, { endpoint: '/api/widget/chat' });
   const creatorUserId = detok?.id || creatorId;
 
-  const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, { platform: 'api' });
+  // Generate visitorId if not provided (for chat history tracking)
+  const finalVisitorId = visitorId || `widget_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, { 
+    platform: 'api',
+    visitorId: finalVisitorId,
+  });
 
   await widgetChatLogQueries.create(creatorUserId, null, message, result.reply || '');
 

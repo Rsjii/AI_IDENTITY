@@ -212,12 +212,15 @@ async function processIncomingMessage(event: any) {
     const userId = integration.userId;
     const accessToken = integration.accessToken;
 
-    // Generate AI reply
+    // Generate AI reply (use senderId as visitorId for chat history)
     const result = await generateMirrorReplyWithLogging(
       userId,
       'instagram',
       messageText,
-      { platform: 'instagram', senderId }
+      { 
+        platform: 'instagram',
+        visitorId: senderId, // Use senderId as visitorId for chat history tracking
+      }
     );
 
     if (result.decision === 'reply' && result.reply) {

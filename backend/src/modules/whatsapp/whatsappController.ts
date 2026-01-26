@@ -152,12 +152,15 @@ export async function handleWebhook(req: Request, res: Response) {
 
     const userId = integration.userId;
 
-    // Generate AI reply
+    // Generate AI reply (use fromNumber as visitorId for chat history)
     const result = await generateMirrorReplyWithLogging(
       userId,
       'whatsapp',
       messageBody,
-      { platform: 'whatsapp', fromNumber, messageSid }
+      { 
+        platform: 'whatsapp',
+        visitorId: fromNumber, // Use phone number as visitorId for chat history tracking
+      }
     );
 
     if (result.decision === 'reply' && result.reply) {

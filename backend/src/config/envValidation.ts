@@ -59,6 +59,12 @@ export function validateEnv(): void {
     logger.error(error);
     throw new Error(error);
   }
+
+  // Stripe warnings in explicit prod
+  if (isExplicitlyProd) {
+    if (!process.env['STRIPE_SECRET_KEY']) logger.warn('⚠️ STRIPE_SECRET_KEY not set (Stripe billing disabled).');
+    if (!process.env['STRIPE_WEBHOOK_SECRET']) logger.warn('⚠️ STRIPE_WEBHOOK_SECRET not set (Stripe webhook will fail).');
+  }
   
   logger.info('✅ Environment variables validated');
 }

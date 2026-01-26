@@ -42,7 +42,7 @@ export function SignupProfilePage() {
           }),
         }
       );
-      if (result.redirect) navigate(result.redirect);
+      navigate('/onboarding/quiz');      
     } catch (err: any) {
       setError(err.message || 'Profile save failed.');
     } finally {

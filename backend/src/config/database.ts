@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS "User" (
     "profileCompleted" BOOLEAN NOT NULL DEFAULT false,
     "profileImage" TEXT,
     "timeZone" TEXT,
+    "trialEndsAt" TIMESTAMPTZ,
+    "planTier" TEXT NOT NULL DEFAULT 'free' CHECK ("planTier" IN ('free','starter','growth','scale')),
+    "onboardingStep" TEXT NOT NULL DEFAULT 'quiz' CHECK ("onboardingStep" IN ('quiz','content','voice','plan','deploy','done')),
+    "publicSlug" TEXT UNIQUE,
+    "creatorTitle" TEXT,
+    "creatorTags" JSONB,
+    "priceConfig" JSONB,
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
@@ -312,6 +319,107 @@ CREATE INDEX IF NOT EXISTS "idx_widget_chat_logs_createdAt" ON "widget_chat_logs
 ALTER TABLE "widget_chat_logs" DROP CONSTRAINT IF EXISTS "widget_chat_logs_userId_fkey";
 ALTER TABLE "widget_chat_logs" ADD CONSTRAINT "widget_chat_logs_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== KNOWLEDGE BASE (Content Upload) ==========
+CREATE TABLE IF NOT EXISTS "knowledge_sources" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "type" TEXT NOT NULL CHECK ("type" IN ('paste','file','youtube','url')),
+  "title" TEXT,
+  "originalUrl" TEXT,
+  "storageUrl" TEXT,
+  "rawText" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'processed' CHECK ("status" IN ('pending','processing','processed','failed')),
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "knowledge_chunks" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "sourceId" TEXT NOT NULL,
+  "chunkIndex" INTEGER NOT NULL,
+  "content" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_knowledge_sources_userId" ON "knowledge_sources"("userId");
+CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_userId" ON "knowledge_chunks"("userId");
+CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_sourceId" ON "knowledge_chunks"("sourceId");
+
+ALTER TABLE "knowledge_sources" DROP CONSTRAINT IF EXISTS "knowledge_sources_userId_fkey";
+ALTER TABLE "knowledge_sources" ADD CONSTRAINT "knowledge_sources_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "knowledge_chunks" DROP CONSTRAINT IF EXISTS "knowledge_chunks_userId_fkey";
+ALTER TABLE "knowledge_chunks" ADD CONSTRAINT "knowledge_chunks_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "knowledge_chunks" DROP CONSTRAINT IF EXISTS "knowledge_chunks_sourceId_fkey";
+ALTER TABLE "knowledge_chunks" ADD CONSTRAINT "knowledge_chunks_sourceId_fkey"
+  FOREIGN KEY ("sourceId") REFERENCES "knowledge_sources"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== CHAT HISTORY ==========
+CREATE TABLE IF NOT EXISTS "chat_sessions" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "visitorId" TEXT,
+  "userId" TEXT,
+  "platform" TEXT NOT NULL DEFAULT 'web',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "chat_messages" (
+  "id" TEXT PRIMARY KEY,
+  "sessionId" TEXT NOT NULL,
+  "role" TEXT NOT NULL CHECK ("role" IN ('user','assistant')),
+  "content" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_creatorId_createdAt" ON "chat_sessions"("creatorId","createdAt");
+CREATE INDEX IF NOT EXISTS "idx_chat_messages_sessionId_createdAt" ON "chat_messages"("sessionId","createdAt");
+
+ALTER TABLE "chat_sessions" DROP CONSTRAINT IF EXISTS "chat_sessions_creatorId_fkey";
+ALTER TABLE "chat_sessions" ADD CONSTRAINT "chat_sessions_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "chat_messages" DROP CONSTRAINT IF EXISTS "chat_messages_sessionId_fkey";
+ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_sessionId_fkey"
+  FOREIGN KEY ("sessionId") REFERENCES "chat_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== STRIPE ==========
+CREATE TABLE IF NOT EXISTS "stripe_customers" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL UNIQUE,
+  "stripeCustomerId" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_stripe_customers_userId" ON "stripe_customers"("userId");
+
+ALTER TABLE "stripe_customers" DROP CONSTRAINT IF EXISTS "stripe_customers_userId_fkey";
+ALTER TABLE "stripe_customers" ADD CONSTRAINT "stripe_customers_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE IF NOT EXISTS "stripe_payments" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "payerUserId" TEXT,
+  "payerVisitorId" TEXT,
+  "sessionId" TEXT,
+  "amount" INTEGER NOT NULL,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "status" TEXT NOT NULL DEFAULT 'created' CHECK ("status" IN ('created','succeeded','failed','refunded')),
+  "stripePaymentIntentId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_creatorId_createdAt" ON "stripe_payments"("creatorId","createdAt");
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_sessionId" ON "stripe_payments"("sessionId");
+
+ALTER TABLE "stripe_payments" DROP CONSTRAINT IF EXISTS "stripe_payments_creatorId_fkey";
+ALTER TABLE "stripe_payments" ADD CONSTRAINT "stripe_payments_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {
@@ -338,7 +446,7 @@ export const userQueries = {
 
   findByEmail: async (email: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone" FROM "User" WHERE email = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig" FROM "User" WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -346,7 +454,7 @@ export const userQueries = {
 
   findById: async (id: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage" FROM "User" WHERE id = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig" FROM "User" WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -439,7 +547,37 @@ export const userQueries = {
       [googleId, googleEmail || null, googleEmailVerified || false, new Date(), email]
     );
     return result.rows[0];
-  }
+  },
+
+  findBySlugOrHandle: async (slugOrHandle: string) => {
+    const r = await db.query(
+      `SELECT * FROM "User"
+       WHERE "publicSlug"=$1 OR handle=$1
+       LIMIT 1`,
+      [slugOrHandle]
+    );
+    return r.rows[0] || null;
+  },
+
+  updatePricing: async (userId: string, priceConfig: any) => {
+    const r = await db.query(
+      `UPDATE "User" SET "priceConfig"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`,
+      [JSON.stringify(priceConfig), userId]
+    );
+    return r.rows[0];
+  },
+
+  startTrial: async (userId: string, days = 7) => {
+    const r = await db.query(
+      `UPDATE "User"
+       SET "trialEndsAt" = (now() + ($1 || ' days')::interval),
+           "updatedAt"=CURRENT_TIMESTAMP
+       WHERE id=$2
+       RETURNING *`,
+      [String(days), userId]
+    );
+    return r.rows[0];
+  },
 };
 
 // ========== OTP QUERIES ==========
@@ -829,6 +967,96 @@ export const widgetChatLogQueries = {
       [id, userId, visitorId, message, reply]
     );
     return r.rows[0];
+  },
+};
+
+// ========== KNOWLEDGE BASE QUERIES ==========
+export const knowledgeSourceQueries = {
+  create: async (params: { userId: string; type: string; title?: string; originalUrl?: string; storageUrl?: string; rawText?: string }) => {
+    const id = `ks_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "knowledge_sources" (id,"userId","type","title","originalUrl","storageUrl","rawText","status")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'processed')
+       RETURNING *`,
+      [id, params.userId, params.type, params.title || null, params.originalUrl || null, params.storageUrl || null, params.rawText || null]
+    );
+    return r.rows[0];
+  },
+  listByUserId: async (userId: string) => {
+    const r = await db.query(`SELECT * FROM "knowledge_sources" WHERE "userId"=$1 ORDER BY "createdAt" DESC`, [userId]);
+    return r.rows;
+  },
+  deleteByIdForUser: async (userId: string, id: string) => {
+    await db.query(`DELETE FROM "knowledge_sources" WHERE "userId"=$1 AND id=$2`, [userId, id]);
+  },
+};
+
+export const knowledgeChunkQueries = {
+  replaceForSource: async (userId: string, sourceId: string, chunks: string[]) => {
+    await db.query(`DELETE FROM "knowledge_chunks" WHERE "userId"=$1 AND "sourceId"=$2`, [userId, sourceId]);
+    for (let i = 0; i < chunks.length; i++) {
+      const id = `kc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}_${i}`;
+      await db.query(
+        `INSERT INTO "knowledge_chunks" (id,"userId","sourceId","chunkIndex","content") VALUES ($1,$2,$3,$4,$5)`,
+        [id, userId, sourceId, i, chunks[i]]
+      );
+    }
+  },
+};
+
+// ========== CHAT HISTORY QUERIES ==========
+export const chatSessionQueries = {
+  create: async (params: { creatorId: string; visitorId?: string | null; userId?: string | null; platform?: string }) => {
+    const id = `cs_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "chat_sessions" (id,"creatorId","visitorId","userId","platform")
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING *`,
+      [id, params.creatorId, params.visitorId || null, params.userId || null, params.platform || 'web']
+    );
+    return r.rows[0];
+  },
+  findById: async (id: string) => {
+    const r = await db.query(`SELECT * FROM "chat_sessions" WHERE id=$1`, [id]);
+    return r.rows[0] || null;
+  },
+};
+
+export const chatMessageQueries = {
+  add: async (params: { sessionId: string; role: 'user' | 'assistant'; content: string }) => {
+    const id = `cm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "chat_messages" (id,"sessionId","role","content") VALUES ($1,$2,$3,$4) RETURNING *`,
+      [id, params.sessionId, params.role, params.content]
+    );
+    return r.rows[0];
+  },
+  listForSession: async (sessionId: string) => {
+    const r = await db.query(`SELECT * FROM "chat_messages" WHERE "sessionId"=$1 ORDER BY "createdAt" ASC`, [sessionId]);
+    return r.rows;
+  },
+};
+
+// ========== STRIPE PAYMENT QUERIES ==========
+export const stripePaymentQueries = {
+  create: async (params: { creatorId: string; payerUserId?: string | null; payerVisitorId?: string | null; sessionId?: string | null; amount: number; currency?: string; status?: string; stripePaymentIntentId?: string | null }) => {
+    const id = `sp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "stripe_payments" (id,"creatorId","payerUserId","payerVisitorId","sessionId","amount","currency","status","stripePaymentIntentId")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [id, params.creatorId, params.payerUserId || null, params.payerVisitorId || null, params.sessionId || null, params.amount, params.currency || 'USD', params.status || 'created', params.stripePaymentIntentId || null]
+    );
+    return r.rows[0];
+  },
+  sumForCreatorSince: async (creatorId: string, sinceIso: string) => {
+    const r = await db.query(
+      `SELECT COALESCE(SUM(amount),0)::int AS total
+       FROM "stripe_payments"
+       WHERE "creatorId"=$1 AND "status"='succeeded' AND "createdAt">=$2::timestamptz`,
+      [creatorId, sinceIso]
+    );
+    return r.rows[0]?.total || 0;
   },
 };
 
