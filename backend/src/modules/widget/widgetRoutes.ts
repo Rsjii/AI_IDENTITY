@@ -1,12 +1,16 @@
 import { Router } from 'express';
-import { widgetChat, widgetCode } from './widgetController';
+import { widgetChat, widgetCode, getWidgetAnalytics } from './widgetController';
 import { widgetChatRateLimit } from '../../middleware/rateLimit';
+import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 
 const router = Router();
 
-// Public
+// Public endpoints
 router.post('/chat', widgetChatRateLimit, widgetChat);
 router.get('/code/:creatorId', widgetCode);
+
+// Authenticated endpoint for analytics
+router.get('/analytics', requireJWTFromCookie, getWidgetAnalytics);
 
 export default router;
 

@@ -30,6 +30,8 @@ import extRoutes from './modules/extension/extRoutes';
 import paymentRoutes from './modules/payment/paymentRoutes';
 import voiceRoutes from './modules/voice/voiceRoutes';
 import widgetRoutes from './modules/widget/widgetRoutes';
+import instagramRoutes from './modules/instagram/instagramRoutes';
+import whatsappRoutes from './modules/whatsapp/whatsappRoutes';
 
 // Page routes
 import pageRoutes from './routes';
@@ -114,6 +116,28 @@ app.use('/api/widget', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Credentials', 'false');
 
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  return next();
+});
+
+// === INSTAGRAM WEBHOOK CORS (public for Meta webhooks) ===
+app.use('/api/instagram/webhook', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Hub-Signature-256');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  return next();
+});
+
+// === WHATSAPP WEBHOOK CORS (public for Twilio webhooks) ===
+app.use('/api/whatsapp/webhook', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Twilio-Signature');
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
@@ -405,6 +429,8 @@ app.use('/api/ext', extRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/widget', widgetRoutes);
+app.use('/api/instagram', instagramRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

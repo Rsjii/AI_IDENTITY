@@ -472,4 +472,180 @@
 
 ---
 
-**End of Session:** All Phase 1 non-integration tasks complete. Ready for testing once credentials are added. Instagram/WhatsApp integration code intentionally left for next phase.
+---
+
+### #A24 - WhatsApp Controller & Routes ✅
+**Files:**
+- `backend/src/modules/whatsapp/whatsappController.ts` (NEW)
+- `backend/src/modules/whatsapp/whatsappRoutes.ts` (NEW)
+
+**Change:**
+1. **whatsappController.ts:**
+   - `connectWhatsApp()` - Register phone number for WhatsApp replies
+   - `getWhatsAppStatus()` - Check connection status
+   - `disconnectWhatsApp()` - Disconnect integration
+   - `handleWebhook()` - Process incoming Twilio webhooks, generate AI replies, send voice/text messages
+
+2. **whatsappRoutes.ts:**
+   - `POST /api/whatsapp/connect` (authenticated)
+   - `GET /api/whatsapp/status` (authenticated)
+   - `POST /api/whatsapp/disconnect` (authenticated)
+   - `POST /api/whatsapp/webhook` (public, for Twilio)
+
+**Why:** Complete WhatsApp integration for Phase 1 Week 3
+**Status:** ✅ Complete
+**Dependencies:** Requires `whatsappService.ts` (#A2 env vars)
+
+---
+
+### #A25 - Instagram/WhatsApp Routes in app.ts ✅
+**File:** `backend/src/app.ts`
+**Change:**
+1. Added imports: `instagramRoutes`, `whatsappRoutes`
+2. Added CORS middleware for `/api/instagram/webhook` (Meta webhooks)
+3. Added CORS middleware for `/api/whatsapp/webhook` (Twilio webhooks)
+4. Mounted routes: `app.use('/api/instagram', instagramRoutes)` and `app.use('/api/whatsapp', whatsappRoutes)`
+
+**Why:** Routes need to be registered and webhooks need CORS for external services
+**Status:** ✅ Complete
+
+---
+
+### #A26 - Widget Voice Support ✅
+**File:** `backend/src/modules/widget/widgetController.ts`
+**Change:**
+1. Updated `chatSchema` to include optional `voiceEnabled` boolean
+2. Modified `widgetChat()` to:
+   - Check if `voiceEnabled` is true
+   - Get user's default voice clone
+   - Generate voice audio via `generateVoiceAudio()`
+   - Return `audioUrl` in response
+
+**Why:** Users want voice replies in website widget
+**Status:** ✅ Complete
+**Dependencies:** Requires voice clone setup
+
+---
+
+### #A27 - Widget Analytics Endpoint ✅
+**File:** `backend/src/modules/widget/widgetController.ts`
+**Change:**
+- Added `getWidgetAnalytics()` function:
+  - Returns total chats, today's chats, this week's chats
+  - Returns daily breakdown (last 7 days)
+  - Queries `widget_chat_logs` table
+
+**File:** `backend/src/modules/widget/widgetRoutes.ts`
+**Change:**
+- Added route: `GET /api/widget/analytics` (authenticated)
+
+**Why:** Creators need to track widget usage
+**Status:** ✅ Complete
+
+---
+
+### #A28 - Widget Embed.js Voice Support ✅
+**File:** `frontend/src/public/embed.js`
+**Change:**
+1. Reads `data-voice-enabled` attribute
+2. Sends `voiceEnabled: true` in chat request if enabled
+3. Displays audio player when `audioUrl` is returned
+4. Auto-plays audio for voice replies
+5. Updated widget structure with better HTML/CSS classes
+
+**File:** `frontend/src/public/embed.css`
+**Change:**
+- Updated CSS for new widget structure
+- Added audio player styling
+- Improved mobile responsiveness
+
+**Why:** Users want voice playback in embedded widget
+**Status:** ✅ Complete
+
+---
+
+### #A29 - Integrations Page Full Implementation ✅
+**File:** `frontend/react-app/src/pages/Integrations.tsx`
+**Change:**
+1. **Widget Analytics:**
+   - Fetches analytics from `/api/widget/analytics`
+   - Displays total, today, this week stats
+
+2. **Widget Voice Toggle:**
+   - Added checkbox for `voiceEnabled`
+   - Includes in embed code as `data-voice-enabled="true"`
+
+3. **Instagram Integration:**
+   - Real OAuth flow (redirects to Meta)
+   - Status check and display
+   - Connect/disconnect buttons
+
+4. **WhatsApp Integration:**
+   - Phone number input
+   - Connect/disconnect functionality
+   - Status display
+
+**Why:** Users need UI to manage all integrations
+**Status:** ✅ Complete
+
+---
+
+## 📊 Updated Summary
+
+**Total Changes:** 29 (#A1-#A29)
+**Completed:** 29 ✅
+**In Progress:** 0
+**Blocked:** 0
+
+**Files Created:** 12
+- All previous files +
+- `backend/src/modules/whatsapp/whatsappController.ts` (#A24)
+- `backend/src/modules/whatsapp/whatsappRoutes.ts` (#A24)
+
+**Files Modified:** 19
+- All previous files +
+- `backend/src/app.ts` (#A25)
+- `backend/src/modules/widget/widgetController.ts` (#A26, #A27)
+- `backend/src/modules/widget/widgetRoutes.ts` (#A27)
+- `frontend/src/public/embed.js` (#A28)
+- `frontend/src/public/embed.css` (#A28)
+- `frontend/react-app/src/pages/Integrations.tsx` (#A29)
+
+---
+
+## 🎯 What's Ready to Test
+
+**After adding credentials:**
+1. ✅ Voice upload UI (`/voice/setup`)
+2. ✅ Voice management (`/voice/manage`)
+3. ✅ Voice replies in Mirror page (`/mirror` with voice toggle)
+4. ✅ Website embed widget (`/api/widget/chat`, `/api/widget/code/:creatorId`)
+5. ✅ Widget customization UI (`/integrations`)
+6. ✅ Widget voice support (optional)
+7. ✅ Widget analytics (`/api/widget/analytics`)
+8. ✅ Instagram DM integration (OAuth + webhook)
+9. ✅ WhatsApp integration (phone registration + webhook)
+
+**Required Setup:**
+1. Run `npm install` in `backend/` (for #A1)
+2. Add to `backend/.env`:
+   - `ELEVENLABS_API_KEY` (sign up at elevenlabs.io)
+   - `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (or R2 equivalent)
+   - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` (for WhatsApp)
+   - `META_APP_ID`, `META_APP_SECRET`, `META_VERIFY_TOKEN` (for Instagram)
+3. Add to `frontend/react-app/.env`:
+   - `VITE_META_APP_ID` (for Instagram OAuth)
+4. Restart backend server
+
+---
+
+## 🚀 Phase 1 Status
+
+**Week 1:** ✅ Voice Cloning MVP - **COMPLETE**
+**Week 2:** ✅ Instagram DM Integration - **COMPLETE** (#A24, #A25, #A29)
+**Week 3:** ✅ WhatsApp Integration - **COMPLETE** (#A24, #A25, #A29)
+**Week 4:** ✅ Widget Polish - **COMPLETE** (#A26, #A27, #A28, #A29)
+
+**Phase 1 Overall: 100% COMPLETE** 🎉
+
+**End of Session:** All Phase 1 tasks complete. Instagram/WhatsApp integration fully implemented. Ready for testing once credentials are added.
