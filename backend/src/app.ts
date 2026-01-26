@@ -29,6 +29,7 @@ import extensionRoutes from './modules/extension/extensionRoutes';
 import extRoutes from './modules/extension/extRoutes';
 import paymentRoutes from './modules/payment/paymentRoutes';
 import voiceRoutes from './modules/voice/voiceRoutes';
+import widgetRoutes from './modules/widget/widgetRoutes';
 
 // Page routes
 import pageRoutes from './routes';
@@ -102,6 +103,20 @@ app.use('/api/ext', (req, res, next) => {
     return res.status(204).end();
   }
 
+  return next();
+});
+
+// === WIDGET CORS (public embed on external websites) ===
+app.use('/api/widget', (req, res, next) => {
+  // Public endpoint: allow ANY origin, but NO credentials
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
   return next();
 });
 
@@ -389,6 +404,7 @@ app.use('/api/extension', extensionRoutes);
 app.use('/api/ext', extRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/voice', voiceRoutes);
+app.use('/api/widget', widgetRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

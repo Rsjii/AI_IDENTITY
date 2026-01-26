@@ -144,7 +144,8 @@ export const globalRateLimit = rateLimit({
     
     // ✅ Skip routes with specific rate limiters
     const hasSpecificLimiter = path.startsWith('/api/auth') ||
-           path.startsWith('/api/identity');
+           path.startsWith('/api/identity') ||
+           path.startsWith('/api/widget');
     
     return isStatic || hasSpecificLimiter;
   },
@@ -328,6 +329,26 @@ export const apiRateLimit = rateLimit({
       error: 'API rate limit exceeded. Please slow down your requests.',
       errorCode: 'RATE_LIMIT_EXCEEDED',
       retryAfter: formatRetryAfter(RATE_LIMITS.api.windowMs)
+    });
+  },
+});
+
+// Widget chat rate limiter (public endpoint, per IP)
+export const widgetChatRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).widgetChat.windowMs),
+  windowMs: (RATE_LIMITS as any).widgetChat.windowMs,
+  max: (RATE_LIMITS as any).widgetChat.max,
+  keyGenerator: (req: any) => rlKey('widgetChat', req.ip || req.socket?.remoteAddress || 'unknown'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    const key = rlKey('widgetChat', req.ip || req.socket?.remoteAddress || 'unknown');
+    logRateLimitViolation(req, 'widgetChat', key, (RATE_LIMITS as any).widgetChat.max, (RATE_LIMITS as any).widgetChat.windowMs);
+    return res.status(429).json({
+      success: false,
+      error: 'Widget rate limit exceeded. Please try again in a minute.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).widgetChat.windowMs),
     });
   },
 });

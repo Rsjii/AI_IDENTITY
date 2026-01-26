@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { jwtAuth } from '../../middleware/jwtAuth';
+import { requireJWTFromCookie } from '../../middleware/jwtCookie';
+import { validateCSRF } from '../../middleware/csrf';
 import * as voiceController from './voiceController';
 
 const router = Router();
@@ -12,7 +13,7 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedMimes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/x-m4a', 'audio/mp4'];
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
@@ -22,25 +23,23 @@ const upload = multer({
   },
 });
 
-// All routes require authentication
-router.use(jwtAuth);
+// Cookie-auth (same as /api/identity)
+router.use(requireJWTFromCookie);
 
-// POST /api/voice/upload - Upload audio sample and create voice clone
-router.post('/upload', upload.single('audio'), voiceController.uploadVoiceSample);
+// Upload sample (CSRF)
+router.post('/upload', validateCSRF, upload.single('audio'), voiceController.uploadVoiceSample);
 
-// POST /api/voice/train - Train voice model (if async)
-router.post('/train/:voiceId', voiceController.trainVoice);
+// Train (CSRF)
+router.post('/train/:voiceId', validateCSRF, voiceController.trainVoice);
 
-// GET /api/voice/list - List all voice clones for user
+// List / get (no CSRF needed)
 router.get('/list', voiceController.listVoiceClones);
-
-// GET /api/voice/:voiceId - Get specific voice clone
 router.get('/:voiceId', voiceController.getVoiceClone);
 
-// DELETE /api/voice/:voiceId - Delete voice clone
-router.delete('/:voiceId', voiceController.deleteVoiceClone);
+// Delete (CSRF)
+router.delete('/:voiceId', validateCSRF, voiceController.deleteVoiceClone);
 
-// POST /api/voice/generate - Generate voice from text (TTS)
-router.post('/generate', voiceController.generateVoice);
+// Generate TTS (CSRF)
+router.post('/generate', validateCSRF, voiceController.generateVoice);
 
 export default router;

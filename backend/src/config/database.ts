@@ -276,6 +276,42 @@ CREATE INDEX IF NOT EXISTS "idx_voice_clones_status" ON "voice_clones"("userId",
 ALTER TABLE "voice_clones" DROP CONSTRAINT IF EXISTS "voice_clones_userId_fkey";
 ALTER TABLE "voice_clones" ADD CONSTRAINT "voice_clones_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== PLATFORM INTEGRATIONS (Phase 1: Instagram/WhatsApp) ==========
+CREATE TABLE IF NOT EXISTS "platform_integrations" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "platform" TEXT NOT NULL, -- 'instagram' | 'whatsapp'
+  "accessToken" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'active' CHECK ("status" IN ('active','paused','disconnected')),
+  "config" JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_platform_integrations_userId" ON "platform_integrations"("userId");
+CREATE INDEX IF NOT EXISTS "idx_platform_integrations_platform" ON "platform_integrations"("platform");
+
+ALTER TABLE "platform_integrations" DROP CONSTRAINT IF EXISTS "platform_integrations_userId_fkey";
+ALTER TABLE "platform_integrations" ADD CONSTRAINT "platform_integrations_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== WIDGET CHAT LOGS (Phase 1: Website embed analytics) ==========
+CREATE TABLE IF NOT EXISTS "widget_chat_logs" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL, -- creator
+  "visitorId" TEXT,
+  "message" TEXT NOT NULL,
+  "reply" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_widget_chat_logs_userId" ON "widget_chat_logs"("userId");
+CREATE INDEX IF NOT EXISTS "idx_widget_chat_logs_createdAt" ON "widget_chat_logs"("createdAt");
+
+ALTER TABLE "widget_chat_logs" DROP CONSTRAINT IF EXISTS "widget_chat_logs_userId_fkey";
+ALTER TABLE "widget_chat_logs" ADD CONSTRAINT "widget_chat_logs_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {
@@ -749,6 +785,51 @@ export const voiceCloneQueries = {
     );
     return result.rows[0] || null;
   }
+};
+
+// ========== PLATFORM INTEGRATION QUERIES ==========
+export const platformIntegrationQueries = {
+  upsert: async (userId: string, platform: string, accessToken: string | null, config: any) => {
+    const id = `pi_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "platform_integrations"(id,"userId",platform,"accessToken",status,config,"createdAt","updatedAt")
+       VALUES ($1,$2,$3,$4,'active',$5,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       RETURNING *`,
+      [id, userId, platform, accessToken, config ? JSON.stringify(config) : null]
+    );
+    return r.rows[0];
+  },
+
+  listByUserId: async (userId: string) => {
+    const r = await db.query(`SELECT * FROM "platform_integrations" WHERE "userId"=$1 ORDER BY "createdAt" DESC`, [userId]);
+    return r.rows;
+  },
+
+  findByPlatformAndConfigField: async (platform: string, field: string, value: string) => {
+    // field example: toNumber
+    const r = await db.query(
+      `SELECT * FROM "platform_integrations"
+       WHERE platform=$1 AND (config->>$2) = $3 AND status='active'
+       ORDER BY "createdAt" DESC
+       LIMIT 1`,
+      [platform, field, value]
+    );
+    return r.rows[0] || null;
+  },
+};
+
+// ========== WIDGET CHAT LOG QUERIES ==========
+export const widgetChatLogQueries = {
+  create: async (userId: string, visitorId: string | null, message: string, reply: string) => {
+    const id = `wlog_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "widget_chat_logs"(id,"userId","visitorId","message","reply","createdAt")
+       VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+       RETURNING *`,
+      [id, userId, visitorId, message, reply]
+    );
+    return r.rows[0];
+  },
 };
 
 // Export db for direct use

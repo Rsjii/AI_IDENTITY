@@ -9,6 +9,7 @@ import {
   activateIdentityVersion,
   listIdentityVersions,
 } from './identityController';
+import { mirrorVoice } from './voiceMirrorController';
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { sanitizeInput } from '../../middleware/validation';
 import { validateCSRF } from '../../middleware/csrf';
@@ -39,6 +40,9 @@ router.put('/version/:id', sanitizeInput, validateCSRF, updateIdentityVersion);
 
 // Mirror (generate reply)
 router.post('/mirror', sanitizeInput, validateCSRF, draftGenerationRateLimit, mirrorDailyRateLimit, mirror);
+
+// Mirror with voice (generate reply + audio)
+router.post('/mirror-voice', sanitizeInput, validateCSRF, draftGenerationRateLimit, mirrorDailyRateLimit, mirrorVoice);
 
 // Trust confirmation
 router.post('/trust/confirm', sanitizeInput, validateCSRF, trustConfirmRateLimit, confirmTrust);

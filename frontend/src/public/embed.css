@@ -1,0 +1,12 @@
+#selflyx-widget-btn{position:fixed;right:18px;bottom:18px;z-index:999999;background:#2563eb;color:#fff;border:0;border-radius:999px;padding:12px 14px;font-weight:600;cursor:pointer;box-shadow:0 10px 25px rgba(0,0,0,.18)}
+#selflyx-widget-panel{position:fixed;right:18px;bottom:70px;z-index:999999;width:360px;max-width:calc(100vw - 36px);height:420px;background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 18px 45px rgba(0,0,0,.22);display:none;overflow:hidden;font-family:ui-sans-serif,system-ui}
+#selflyx-widget-head{padding:10px 12px;border-bottom:1px solid #e5e7eb;font-weight:700}
+#selflyx-widget-body{padding:10px 12px;height:320px;overflow:auto;font-size:14px}
+#selflyx-widget-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #e5e7eb}
+#selflyx-widget-input input{flex:1;border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+#selflyx-widget-input button{background:#111827;color:#fff;border:0;border-radius:10px;padding:10px 12px;cursor:pointer}
+.selflyx-msg{margin:8px 0;white-space:pre-wrap}
+.selflyx-me{color:#111827}
+.selflyx-ai{color:#2563eb}
+#selflyx-widget-avatar{width:22px;height:22px;border-radius:999px;object-fit:cover;margin-right:8px;vertical-align:middle}
+

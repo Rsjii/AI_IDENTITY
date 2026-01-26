@@ -1,5 +1,6 @@
 import { logger } from '../../config/logger';
 import { voiceCloneQueries } from '../../config/database';
+import { uploadPublicBuffer } from '../../services/s3Service';
 
 // ========== ELEVENLABS INTEGRATION ==========
 
@@ -100,39 +101,25 @@ async function deleteElevenLabsVoice(elevenlabsVoiceId: string): Promise<void> {
  * Upload audio file and create voice clone
  */
 export async function uploadAndCreateVoice(userId: string, file: Express.Multer.File, label?: string) {
-  try {
-    // Create voice clone record in DB (status: pending)
-    const voiceClone = await voiceCloneQueries.create(userId, label || file.originalname, 'elevenlabs');
+  const voiceClone = await voiceCloneQueries.create(userId, label || file.originalname, 'elevenlabs');
+  await voiceCloneQueries.updateStatus(voiceClone.id, 'training');
 
-    logger.info(`[Voice Service] Created voice clone record: ${voiceClone.id}`);
+  // 1) Upload sample to S3/R2 (public URL)
+  const sampleUpload = await uploadPublicBuffer({
+    keyPrefix: `voices/${userId}/${voiceClone.id}/samples`,
+    contentType: file.mimetype || 'audio/mpeg',
+    body: file.buffer,
+    ext: (file.originalname.split('.').pop() || 'mp3').toLowerCase(),
+  });
 
-    // Update status to training
-    await voiceCloneQueries.updateStatus(voiceClone.id, 'training');
+  // 2) Create ElevenLabs voice
+  const elevenlabsVoiceId = await createElevenLabsVoice(file.buffer, file.originalname, label || `Voice ${Date.now()}`);
 
-    // Upload to ElevenLabs and get voice_id
-    const elevenlabsVoiceId = await createElevenLabsVoice(
-      file.buffer,
-      file.originalname,
-      label || `Voice ${Date.now()}`
-    );
+  // 3) Save voiceId + sampleAudioUrl
+  await voiceCloneQueries.updateVoiceId(voiceClone.id, elevenlabsVoiceId, sampleUpload.url);
+  await voiceCloneQueries.updateStatus(voiceClone.id, 'ready');
 
-    logger.info(`[Voice Service] ElevenLabs voice created: ${elevenlabsVoiceId}`);
-
-    // TODO: Upload audio to S3/Cloudinary for storage
-    // For now, we'll just store the ElevenLabs voice_id
-    const sampleAudioUrl = null; // Replace with S3 URL when implemented
-
-    // Update voice clone with ElevenLabs voice_id and mark as ready
-    await voiceCloneQueries.updateVoiceId(voiceClone.id, elevenlabsVoiceId, sampleAudioUrl);
-    await voiceCloneQueries.updateStatus(voiceClone.id, 'ready');
-
-    const updatedVoice = await voiceCloneQueries.findById(voiceClone.id);
-
-    return updatedVoice;
-  } catch (error: any) {
-    logger.error('[Voice Service] Error in uploadAndCreateVoice:', error);
-    throw error;
-  }
+  return await voiceCloneQueries.findById(voiceClone.id);
 }
 
 /**
@@ -197,30 +184,23 @@ export async function deleteVoice(userId: string, voiceId: string) {
 /**
  * Generate voice audio from text
  */
-export async function generateVoiceAudio(userId: string, voiceId: string, text: string): Promise<string> {
-  const voice = await voiceCloneQueries.findById(voiceId);
+export async function generateVoiceAudio(userId: string, voiceCloneId: string, text: string): Promise<string> {
+  const voice = await voiceCloneQueries.findById(voiceCloneId);
+  if (!voice || voice.userId !== userId) throw new Error('Voice clone not found');
+  if (voice.status !== 'ready') throw new Error('Voice clone is not ready yet');
+  if (!voice.voiceId) throw new Error('Voice clone has no provider voice ID');
 
-  if (!voice || voice.userId !== userId) {
-    throw new Error('Voice clone not found');
-  }
+  const ab = await generateElevenLabsSpeech(voice.voiceId, text);
+  const buf = Buffer.from(ab);
 
-  if (voice.status !== 'ready') {
-    throw new Error('Voice clone is not ready yet');
-  }
+  // Upload generated audio to S3/R2 and return a public URL
+  const out = await uploadPublicBuffer({
+    keyPrefix: `voices/${userId}/${voiceCloneId}/tts`,
+    contentType: 'audio/mpeg',
+    body: buf,
+    ext: 'mp3',
+  });
 
-  if (!voice.voiceId) {
-    throw new Error('Voice clone has no provider voice ID');
-  }
-
-  // Generate speech using ElevenLabs
-  const audioBuffer = await generateElevenLabsSpeech(voice.voiceId, text);
-
-  // TODO: Upload to S3/Cloudinary and return URL
-  // For now, return base64 data URL
-  const base64Audio = Buffer.from(audioBuffer).toString('base64');
-  const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
-
-  logger.info(`[Voice Service] Generated ${audioBuffer.byteLength} bytes of audio`);
-
-  return dataUrl;
+  logger.info(`[Voice Service] Generated ${buf.byteLength} bytes of audio → ${out.url}`);
+  return out.url;
 }

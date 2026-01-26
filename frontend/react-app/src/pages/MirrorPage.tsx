@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,17 +19,37 @@ export function MirrorPage() {
   const [loading, setLoading] = useState(false);
   const [trustLoading, setTrustLoading] = useState(false);
   const [error, setError] = useState('');
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voices, setVoices] = useState<any[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
+  const [audioUrl, setAudioUrl] = useState<string>('');
+
+  // Load voices once
+  useEffect(() => {
+    apiFetch<{ success: true; voices: any[] }>('/api/voice/list')
+      .then(r => {
+        setVoices(r.voices || []);
+        if (!selectedVoiceId && r.voices?.[0]?.id) setSelectedVoiceId(r.voices[0].id);
+      })
+      .catch(() => {});
+  }, []);
 
   const onMirror = async () => {
     setLoading(true);
     setError('');
     setReply('');
     setMirrorRunId('');
+    setAudioUrl('');
     try {
-      const result = await apiFetch<any>('/api/identity/mirror', {
-        method: 'POST',
-        body: JSON.stringify({ context, incomingMessage }),
-      });
+      const result = voiceEnabled && selectedVoiceId
+        ? await apiFetch<any>('/api/identity/mirror-voice', {
+            method: 'POST',
+            body: JSON.stringify({ context, incomingMessage, voiceId: selectedVoiceId }),
+          })
+        : await apiFetch<any>('/api/identity/mirror', {
+            method: 'POST',
+            body: JSON.stringify({ context, incomingMessage }),
+          });
 
       // Handle decision - could be object {action, reason} or separate fields
       if (result?.decision) {
@@ -46,6 +66,7 @@ export function MirrorPage() {
       }
       setReply(result?.reply || '');
       setMirrorRunId(result?.mirrorRunId || '');
+      setAudioUrl(result?.audioUrl || '');
     } catch (err: any) {
       const code = err?.errorCode;
       if (code === 'LLM_AUTH_FAILED') {
@@ -122,7 +143,28 @@ export function MirrorPage() {
               placeholder="Paste message here…"
             />
 
-            <Button className="w-full" onClick={onMirror} disabled={loading || !incomingMessage.trim()}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="text-sm flex items-center gap-2">
+                <input type="checkbox" checked={voiceEnabled} onChange={(e) => setVoiceEnabled(e.target.checked)} />
+                Voice reply
+              </label>
+
+              {voiceEnabled ? (
+                <select
+                  className="border rounded-md px-2 py-1 bg-background text-sm"
+                  value={selectedVoiceId}
+                  onChange={(e) => setSelectedVoiceId(e.target.value)}
+                >
+                  {voices.length === 0 ? (
+                    <option value="">No voices available</option>
+                  ) : (
+                    voices.map(v => <option key={v.id} value={v.id}>{v.label || v.id}</option>)
+                  )}
+                </select>
+              ) : null}
+            </div>
+
+            <Button className="w-full" onClick={onMirror} disabled={loading || !incomingMessage.trim() || (voiceEnabled && !selectedVoiceId)}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -165,6 +207,13 @@ export function MirrorPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea className="min-h-[160px]" value={reply} readOnly />
+
+            {audioUrl ? (
+              <div className="mt-3">
+                <div className="text-sm font-medium mb-2">Voice Audio</div>
+                <audio controls autoPlay src={audioUrl} className="w-full" />
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => trust('confirm_yes')} disabled={!mirrorRunId || trustLoading}>

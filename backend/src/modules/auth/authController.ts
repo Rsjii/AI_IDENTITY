@@ -12,6 +12,7 @@ import { logEvent } from '../../services/eventLogger';
 import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES, ADMIN_EMAILS } from '../../config/constants';
 import { identifyPostHogUser } from '../../services/posthogService';
+import { tokenizeId } from '../../utils/idTokenization';
 
 const emailService = new EmailService();
 
@@ -1233,6 +1234,7 @@ export const me = async (req: Request, res: Response) => {
     success: true,
     user: {
       id: user.id,
+      publicId: tokenizeId(user.id, 'user'),
       email: user.email,
       handle: user.handle,
       name: user.name,

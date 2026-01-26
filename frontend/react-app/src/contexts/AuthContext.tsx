@@ -3,6 +3,7 @@ import { apiFetch } from '@/lib/api';
 
 export type MeUser = {
   id: string;
+  publicId?: string;
   email: string;
   handle?: string;
   name?: string;

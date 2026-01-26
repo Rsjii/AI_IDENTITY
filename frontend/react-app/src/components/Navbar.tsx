@@ -35,6 +35,12 @@ export function Navbar() {
                   <Link to="/identity/edit" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Identity
                   </Link>
+                  <Link to="/voice/setup" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Voice
+                  </Link>
+                  <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Integrations
+                  </Link>
                 </>
               ) : null}
 

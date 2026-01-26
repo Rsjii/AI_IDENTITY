@@ -109,6 +109,11 @@ const prodLimits = {
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
     max: 5, // 5 submissions per day per IP (prevents abuse)
   } as LimitConfig,
+
+  widgetChat: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 10, // 10 req/min per IP
+  } as LimitConfig,
 };
 
 /**
@@ -203,6 +208,11 @@ const devLimits: typeof prodLimits = {
   contactFormDaily: {
     windowMs: 24 * 60 * 60 * 1000,
     max: 1000, // Very high for testing
+  },
+
+  widgetChat: {
+    windowMs: 60 * 1000,
+    max: 200,
   },
 };
 
