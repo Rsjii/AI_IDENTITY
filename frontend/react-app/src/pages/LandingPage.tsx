@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { Shield, Sparkles, Zap } from 'lucide-react';
+import { Shield, Sparkles, Zap, Play } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Testimonials } from '@/components/Testimonials';
 
 export function LandingPage() {
   const { state } = useAuth();
@@ -18,16 +19,16 @@ export function LandingPage() {
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs text-muted-foreground">
                 <span className="h-2 w-2 rounded-full bg-primary" />
-                Modern Identity Mirror
+                Clone Yourself. Scale Infinitely.
               </div>
 
               <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-                Reply without second-guessing
-                <span className="text-primary"> your tone</span>.
+                Clone Yourself.
+                <span className="text-primary"> Scale Infinitely</span>.
               </h1>
 
               <p className="text-base md:text-lg text-muted-foreground max-w-prose">
-                Maintain consistent communication across Gmail, LinkedIn, and Slack with your personal identity mirror.
+                Your AI handles 1000 conversations while you sleep. Deploy to Instagram, WhatsApp, Website in 10 minutes.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -43,7 +44,7 @@ export function LandingPage() {
                 ) : (
                   <>
                     <Button size="lg" onClick={() => window.location.href = '/auth'}>
-                      Create Your Identity
+                      Start Free Trial - No Credit Card
                     </Button>
                     <Button size="lg" variant="outline" onClick={() => window.location.href = '/auth'}>
                       I already have an account
@@ -119,6 +120,28 @@ export function LandingPage() {
               <div className="text-2xl font-bold mb-2">3</div>
               <div className="text-base font-semibold mb-1">Consistent across platforms</div>
               <div className="text-sm text-muted-foreground">Same voice on Gmail, LinkedIn, Slack</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Social Proof */}
+        <Testimonials />
+
+        {/* Demo Video Section */}
+        <section className="mt-12">
+          <div className="text-center space-y-2 mb-6">
+            <h2 className="text-2xl font-bold">See it in action</h2>
+            <p className="text-muted-foreground">Watch how creators deploy their AI clones in 10 minutes</p>
+          </div>
+          <div className="rounded-2xl border bg-card/40 p-8 glass flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
+                <Play className="h-8 w-8 text-primary ml-1" />
+              </div>
+              <div>
+                <div className="font-semibold">Demo Video (2 mins)</div>
+                <div className="text-sm text-muted-foreground">Coming soon: Watch how to clone yourself</div>
+              </div>
             </div>
           </div>
         </section>

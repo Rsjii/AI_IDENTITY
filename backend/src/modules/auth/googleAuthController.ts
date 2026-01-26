@@ -232,9 +232,9 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
           const redirectUrl = identity ? '/mirror' : '/identity/setup';
           res.redirect(redirectUrl);
         } else {
-          // ✅ Profile incomplete - redirect to profile completion form
-          logger.info(`Google OAuth: Profile incomplete, redirecting to profile form`);
-          res.redirect('/signup/profile?email=' + encodeURIComponent(user.email));
+          // ✅ Profile incomplete - redirect to onboarding quiz
+          logger.info(`Google OAuth: Profile incomplete, redirecting to onboarding`);
+          res.redirect('/onboarding/quiz');
         }
       } catch (error: any) {
         logger.error('Google OAuth callback processing error:', error);

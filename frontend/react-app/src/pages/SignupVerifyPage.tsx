@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
+import { useAuth } from '@/contexts/AuthContext';
 
 function useQuery() {
   const { search } = useLocation();
@@ -16,6 +17,7 @@ function useQuery() {
 export function SignupVerifyPage() {
   const navigate = useNavigate();
   const q = useQuery();
+  const { refresh } = useAuth();
 
   const [email, setEmail] = useState(q.get('email') || '');
   const [code, setCode] = useState('');
@@ -31,6 +33,7 @@ export function SignupVerifyPage() {
         '/api/auth/signup/verify',
         { method: 'POST', body: JSON.stringify({ email, code }) }
       );
+      await refresh(); // ✅ Refresh auth state after JWT cookie is set
       if (result.redirect) navigate(result.redirect);
     } catch (err: any) {
       setError(err.message || 'OTP verification failed.');

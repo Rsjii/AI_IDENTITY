@@ -36,6 +36,7 @@ import stripeRoutes from './modules/billing/stripeRoutes';
 import contentRoutes from './modules/content/contentRoutes';
 import publicRoutes from './modules/public/publicRoutes';
 import creatorRoutes from './modules/creator/creatorRoutes';
+import payPerChatRoutes from './modules/payments/payPerChatRoutes';
 
 
 // Page routes
@@ -236,6 +237,14 @@ app.use(async (req, res, next) => {
       '/reset-password',
       '/api/auth',
       '/api/csrf', // ✅ Allow CSRF token fetch for React SPA (needed even if profile incomplete)
+      // ✅ allow onboarding SPA routes
+      '/onboarding',
+      // ✅ allow onboarding APIs even if profile not completed yet
+      '/api/identity',
+      '/api/content',
+      '/api/creator',
+      '/api/payments',
+      '/api/public',
       '/identity',
       '/mirror',
     ];
@@ -440,6 +449,7 @@ app.use('/api/widget', widgetRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/billing/stripe', stripeRoutes);
+app.use('/api/payments/pay-per-chat', payPerChatRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);

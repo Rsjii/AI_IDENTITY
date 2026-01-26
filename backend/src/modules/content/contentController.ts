@@ -43,6 +43,36 @@ export async function upload(req: Request, res: Response) {
   const file = (req as any).file as Express.Multer.File | undefined;
   if (!file) return res.status(400).json({ error: 'No file provided' });
 
+  // Validate file type
+  const allowedMimeTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/x-m4a',
+    'audio/mp4',
+  ];
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.mp3', '.wav', '.m4a'];
+
+  const fileExt = '.' + (file.originalname.split('.').pop() || '').toLowerCase();
+  const isValidMime = allowedMimeTypes.includes(file.mimetype);
+  const isValidExt = allowedExtensions.includes(fileExt);
+
+  if (!isValidMime && !isValidExt) {
+    return res.status(400).json({
+      error: 'Unsupported file type. Allowed: PDF, Word, Text, MP3, WAV, M4A',
+    });
+  }
+
+  // Check file size (50MB limit)
+  const maxSize = 50 * 1024 * 1024; // 50MB
+  if (file.size > maxSize) {
+    return res.status(400).json({ error: 'File size exceeds 50MB limit' });
+  }
+
   const title = String((req as any).body?.title || '').trim() || undefined;
   const source = await createFileSource(userId, file, title);
   return res.json({ success: true, source });

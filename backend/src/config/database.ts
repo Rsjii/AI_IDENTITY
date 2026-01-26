@@ -411,6 +411,9 @@ CREATE TABLE IF NOT EXISTS "stripe_payments" (
   "currency" TEXT NOT NULL DEFAULT 'USD',
   "status" TEXT NOT NULL DEFAULT 'created' CHECK ("status" IN ('created','succeeded','failed','refunded')),
   "stripePaymentIntentId" TEXT,
+  "platformFeeCents" INTEGER,
+  "creatorEarningsCents" INTEGER,
+  "type" TEXT DEFAULT 'subscription',
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -420,6 +423,57 @@ CREATE INDEX IF NOT EXISTS "idx_stripe_payments_sessionId" ON "stripe_payments"(
 ALTER TABLE "stripe_payments" DROP CONSTRAINT IF EXISTS "stripe_payments_creatorId_fkey";
 ALTER TABLE "stripe_payments" ADD CONSTRAINT "stripe_payments_creatorId_fkey"
   FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Add missing columns to stripe_payments (idempotent)
+ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "platformFeeCents" INTEGER;
+ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "creatorEarningsCents" INTEGER;
+ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "type" TEXT DEFAULT 'subscription';
+
+-- Add missing columns to User table
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeConnectId" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "payoutEnabled" BOOLEAN DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "businessHours" JSONB;
+
+-- Add missing columns to mirror_runs
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "sessionId" TEXT;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "visitorId" TEXT;
+
+-- Create missing tables
+CREATE TABLE IF NOT EXISTS "active_sessions" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "visitorId" TEXT,
+  "sessionId" TEXT,
+  "lastActiveAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_active_sessions_creatorId" ON "active_sessions"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_active_sessions_lastActiveAt" ON "active_sessions"("lastActiveAt");
+
+CREATE TABLE IF NOT EXISTS "blocked_topics" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "topic" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "payout_requests" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "amount" INTEGER NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'pending',
+  "stripeTransferId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "processedAt" TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS "email_logs" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT,
+  "type" TEXT NOT NULL,
+  "recipient" TEXT NOT NULL,
+  "sentAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 export async function initializeDatabase() {
@@ -1035,17 +1089,24 @@ export const chatMessageQueries = {
     const r = await db.query(`SELECT * FROM "chat_messages" WHERE "sessionId"=$1 ORDER BY "createdAt" ASC`, [sessionId]);
     return r.rows;
   },
+  countBySession: async (sessionId: string) => {
+    const r = await db.query(
+      `SELECT COUNT(*) as count FROM "chat_messages" WHERE "sessionId"=$1 AND "role"='user'`,
+      [sessionId]
+    );
+    return parseInt(r.rows[0]?.count || '0', 10);
+  },
 };
 
 // ========== STRIPE PAYMENT QUERIES ==========
 export const stripePaymentQueries = {
-  create: async (params: { creatorId: string; payerUserId?: string | null; payerVisitorId?: string | null; sessionId?: string | null; amount: number; currency?: string; status?: string; stripePaymentIntentId?: string | null }) => {
+  create: async (params: { creatorId: string; payerUserId?: string | null; payerVisitorId?: string | null; sessionId?: string | null; amount: number; currency?: string; status?: string; stripePaymentIntentId?: string | null; platformFeeCents?: number | null; creatorEarningsCents?: number | null; type?: string }) => {
     const id = `sp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const r = await db.query(
-      `INSERT INTO "stripe_payments" (id,"creatorId","payerUserId","payerVisitorId","sessionId","amount","currency","status","stripePaymentIntentId")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO "stripe_payments" (id,"creatorId","payerUserId","payerVisitorId","sessionId","amount","currency","status","stripePaymentIntentId","platformFeeCents","creatorEarningsCents","type")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
-      [id, params.creatorId, params.payerUserId || null, params.payerVisitorId || null, params.sessionId || null, params.amount, params.currency || 'USD', params.status || 'created', params.stripePaymentIntentId || null]
+      [id, params.creatorId, params.payerUserId || null, params.payerVisitorId || null, params.sessionId || null, params.amount, params.currency || 'USD', params.status || 'created', params.stripePaymentIntentId || null, params.platformFeeCents || null, params.creatorEarningsCents || null, params.type || 'subscription']
     );
     return r.rows[0];
   },

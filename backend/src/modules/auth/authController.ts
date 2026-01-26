@@ -347,9 +347,31 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     // Activate user account
     await userQueries.activateUser(email.toLowerCase());
     
+    // ✅ IMPORTANT: Issue JWT cookie so user can access ProtectedRoute onboarding
+    const user = await userQueries.findByEmail(email.toLowerCase());
+    if (user) {
+      const token = generateJWT({
+        userId: user.id,
+        email: user.email,
+        handle: user.handle || '',
+      });
+      res.cookie('jwtToken', token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? 'lax' : 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/',
+      });
+      if (req.session) {
+        req.session.userId = user.id;
+        req.session.userEmail = user.email;
+        req.session.userHandle = user.handle;
+      }
+    }
+    
     res.json({ 
       message: 'Account activated successfully', 
-      redirect: '/signup/profile?email=' + encodeURIComponent(email)
+      redirect: '/onboarding/quiz'
     });
   } catch (error: any) {
     logger.error('Signup verify error:', error);
@@ -420,8 +442,8 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
       logger.warn('Failed to log profile_completed event:', eventError);
     }
 
-    // Get redirect URL (check if identity exists)
-    const redirectUrl = await getPostLoginRedirect(user.id);
+    // Get redirect URL - go to onboarding quiz
+    const redirectUrl = '/onboarding/quiz';
 
     res.json({ 
       message: 'Profile completed successfully', 
@@ -772,9 +794,15 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     // Get redirect URL
     let nextRedirect: string;
     if (user.profileCompleted) {
-      nextRedirect = await getPostLoginRedirect(user.id);
+      // Check onboarding step
+      if (user.onboardingStep === 'done' || user.onboardingStep === 'deploy') {
+        nextRedirect = await getPostLoginRedirect(user.id);
+      } else {
+        // Continue onboarding flow
+        nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+      }
     } else {
-      nextRedirect = '/signup/profile?email=' + encodeURIComponent(user.email);
+      nextRedirect = '/onboarding/quiz';
     }
   
   res.json({ 
@@ -895,9 +923,15 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     // Get redirect URL
     let nextRedirect: string;
     if (user.profileCompleted) {
-      nextRedirect = await getPostLoginRedirect(user.id);
+      // Check onboarding step
+      if (user.onboardingStep === 'done' || user.onboardingStep === 'deploy') {
+        nextRedirect = await getPostLoginRedirect(user.id);
+      } else {
+        // Continue onboarding flow
+        nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+      }
     } else {
-      nextRedirect = '/signup/profile?email=' + encodeURIComponent(user.email);
+      nextRedirect = '/onboarding/quiz';
     }
   
   res.json({ 

@@ -126,8 +126,25 @@ export function AuthPage() {
             </CardHeader>
 
             <CardContent className="space-y-4">
-              {/* OAuth */}
-              <Button type="button" variant="outline" className="w-full" onClick={goGoogle} disabled={loading}>
+              {/* Progress Indicator for Signup */}
+              {activeTab === 'signup' && (
+                <div className="mb-4">
+                  <div className="text-xs text-muted-foreground mb-2">Step 1 of 4: Create Account</div>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((step) => (
+                      <div
+                        key={step}
+                        className={`h-1 flex-1 rounded ${
+                          step === 1 ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* OAuth - Prominently at top */}
+              <Button type="button" className="w-full bg-white text-gray-900 hover:bg-gray-100 border border-gray-300" onClick={goGoogle} disabled={loading}>
                 <Chrome className="mr-2 h-4 w-4" />
                 Continue with Google
               </Button>
