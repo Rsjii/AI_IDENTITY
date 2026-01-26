@@ -18,7 +18,7 @@ export function AdminUserPage() {
 
   useEffect(() => {
     // Check if user is admin, if not redirect to 404
-    if (state.status === 'authenticated' && !state.user.isAdmin) {
+    if (state.status === 'authenticated' && !state.user?.isAdmin) {
       navigate('/404', { replace: true });
       return;
     }
@@ -32,7 +32,7 @@ export function AdminUserPage() {
   }, [state, navigate]);
 
   useEffect(() => {
-    if (state.status !== 'authenticated' || !state.user.isAdmin) return;
+    if (state.status !== 'authenticated' || !state.user?.isAdmin) return;
 
     (async () => {
       setError('');
@@ -68,7 +68,7 @@ export function AdminUserPage() {
     );
   }
 
-  if (state.status !== 'authenticated' || !state.user.isAdmin) {
+  if (state.status !== 'authenticated' || !state.user?.isAdmin) {
     return null; // Will redirect
   }
 

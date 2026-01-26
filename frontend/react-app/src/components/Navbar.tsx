@@ -38,7 +38,7 @@ export function Navbar() {
                 </>
               ) : null}
 
-              {isAuthed && state.user.isAdmin ? (
+              {isAuthed && state.user?.isAdmin ? (
                 <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                   Admin
                 </Link>
@@ -56,9 +56,9 @@ export function Navbar() {
                 <Link
                   to="/account"
                   className="hidden sm:inline-flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
-                  title={state.user.email}
+                  title={state.user?.email || ''}
                 >
-                  {state.user.name || state.user.handle || 'Account'}
+                  {state.user?.name || state.user?.handle || 'Account'}
                 </Link>
                 <Button size="sm" variant="outline" onClick={onLogout}>
                   Logout
