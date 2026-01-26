@@ -413,7 +413,7 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
     try {
       await EventLogger.logUserEvent(user.id, EVENT_TYPES.PROFILE_COMPLETED, { 
         name: user.name || name,
-        handle: user.handle || handle
+        handle: user.handle || ''
       });
     } catch (eventError) {
       logger.warn('Failed to log profile_completed event:', eventError);
