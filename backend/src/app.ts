@@ -361,8 +361,20 @@ app.use(passport.session());
 
 // ========== ROUTE MOUNTING ==========
 
-// Page routes (HTML rendering)
-app.use('/', pageRoutes);
+// Page routes (HTML rendering) - Only in dev (React app serves pages in prod)
+if (!isProd) {
+  app.use('/', pageRoutes);
+} else {
+  // In production, return API info for root route
+  app.get('/', (_req, res) => {
+    res.json({
+      message: 'Identity Mirror API',
+      version: '1.0.0',
+      frontend: config.frontendUrl || 'https://selflyx.com',
+      docs: '/health'
+    });
+  });
+}
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -412,7 +424,10 @@ app.use(errorHandlerMiddleware);
 
 // 404 handler
 app.use((_req, res) => {
-  res.status(404).render('errors/404', {
+  if (isProd) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  return res.status(404).render('errors/404', {
     title: 'Page Not Found',
     csrfToken: res.locals.csrfToken || '',
   });

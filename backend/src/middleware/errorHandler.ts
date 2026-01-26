@@ -3,7 +3,7 @@ import { AppError, ErrorCodes } from '../utils/errors';
 import { logger } from '../config/logger';
 import { EventLogger } from '../services/eventLogger';
 import { EVENT_TYPES } from '../config/constants';
-import { isProd } from '../config/env';
+import { isProd, config } from '../config/env';
 
 /**
  * Async wrapper utility to catch errors from async route handlers
@@ -81,15 +81,27 @@ export const errorHandlerMiddleware = (
       }
       res.status(err.statusCode).json(response);
       return;
-    }    
+    }
 
+    // ✅ In production, return JSON for non-API requests (React app handles pages)
+    if (isProd) {
+      if (requestId) {
+        res.setHeader('X-Request-Id', requestId);
+      }
+      return res.status(err.statusCode).json({
+        error: err.message,
+        errorCode: err.errorCode,
+        frontend: config.frontendUrl || 'https://selflyx.com'
+      });
+    }
+
+    // ✅ Only render views in development
     if (err.statusCode === 404) {
       return res.status(404).render('errors/404', {
         title: 'Page Not Found',
         message: err.message,
         user: req.user || null,
         csrfToken: res.locals.csrfToken || '',
-        // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
       });
     }
 
@@ -99,7 +111,6 @@ export const errorHandlerMiddleware = (
         message: err.message,
         user: req.user || null,
         csrfToken: res.locals.csrfToken || '',
-        // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
       });
     }
 
@@ -109,7 +120,6 @@ export const errorHandlerMiddleware = (
       errorCode: err.errorCode,
       user: req.user || null,
       csrfToken: res.locals['csrfToken'] || '',
-      // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
     });
   }
 
@@ -163,12 +173,22 @@ export const errorHandlerMiddleware = (
     return;
   }
 
+  // ✅ In production, return JSON for non-API requests
+  if (isProd) {
+    if (requestId) {
+      res.setHeader('X-Request-Id', requestId);
+    }
+    return res.status(500).json({
+      error: 'Internal server error',
+      errorCode: ErrorCodes.INTERNAL_ERROR,
+    });
+  }
+
   return res.status(500).render('errors/error', {
     title: 'Error',
     message: 'An unexpected error occurred',
     errorCode: ErrorCodes.INTERNAL_ERROR,
     user: req.user || null,
     csrfToken: res.locals['csrfToken'] || '',
-    // ✅ SECURITY: requestId not exposed to user-facing pages, only in headers/logs
   });
 };
