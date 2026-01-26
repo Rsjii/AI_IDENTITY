@@ -1,3 +1,5 @@
+import { buildApiUrl } from './api';
+
 // CSRF token management for React SPA
 let csrfToken: string | null = null;
 let tokenPromise: Promise<string> | null = null;
@@ -6,7 +8,7 @@ let tokenPromise: Promise<string> | null = null;
  * Fetch CSRF token from backend
  */
 async function fetchCSRFToken(): Promise<string> {
-  const response = await fetch('/api/csrf', {
+  const response = await fetch(buildApiUrl('/api/csrf'), {
     method: 'GET',
     credentials: 'include',
   });

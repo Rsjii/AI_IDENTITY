@@ -7,6 +7,21 @@ export interface ApiError {
   redirect?: string;
 }
 
+// Get API base URL from environment variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+// Helper to build full API URL
+export function buildApiUrl(path: string): string {
+  if (API_BASE_URL) {
+    // Remove trailing slash from base URL and leading slash from path
+    const base = API_BASE_URL.replace(/\/$/, '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${cleanPath}`;
+  }
+  // Fallback to relative URL (for local dev with proxy)
+  return path;
+}
+
 /**
  * API fetch wrapper with automatic CSRF token handling
  */
@@ -36,7 +51,7 @@ export async function apiFetch<T = any>(
   headers.set('Content-Type', 'application/json');
 
   // Make request
-  const response = await fetch(url, {
+  const response = await fetch(buildApiUrl(url), {
     ...options,
     headers,
     credentials: 'include', // Always include cookies (JWT)
@@ -51,7 +66,7 @@ export async function apiFetch<T = any>(
         csrfToken = await refreshCSRFToken();
         headers.set('X-CSRF-Token', csrfToken);
         
-        const retryResponse = await fetch(url, {
+        const retryResponse = await fetch(buildApiUrl(url), {
           ...options,
           headers,
           credentials: 'include',
@@ -130,7 +145,7 @@ export async function apiFetchForm<T = any>(
   if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
   // ✅ IMPORTANT: do NOT set Content-Type here (browser sets multipart boundary)
 
-  const response = await fetch(url, {
+  const response = await fetch(buildApiUrl(url), {
     ...options,
     method,
     headers,
