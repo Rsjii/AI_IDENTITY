@@ -135,9 +135,9 @@ export function PublicChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary-light flex flex-col">
+    <div className="theme-light min-h-screen bg-bg-primary flex flex-col">
       {/* Header */}
-      <div className="bg-bg-secondary-light border-b border-border-default-light px-4 py-3">
+      <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
           {creator?.avatarUrl && (
             <img 
@@ -147,8 +147,8 @@ export function PublicChatPage() {
             />
           )}
           <div className="flex-1">
-            <div className="font-semibold text-text-primary-light">{creator?.displayName || slug}</div>
-            <div className="text-sm text-text-secondary-light">
+            <div className="font-semibold text-text-primary">{creator?.displayName || slug}</div>
+            <div className="text-sm text-text-secondary">
               {creator?.meta?.expertise || 'AI Assistant'} • 
               <span className="ml-1 flex items-center gap-1">
                 <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
@@ -168,10 +168,10 @@ export function PublicChatPage() {
         <div className="max-w-4xl mx-auto space-y-4">
           {msgs.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-2xl font-bold text-text-primary-light mb-2">
+              <div className="text-2xl font-bold text-text-primary mb-2">
                 Hi! I'm {creator?.displayName || slug}'s AI clone
               </div>
-              <div className="text-text-secondary-light">
+              <div className="text-text-secondary">
                 Ask me anything about {creator?.meta?.topics || 'my expertise'}!
               </div>
             </div>
@@ -186,7 +186,7 @@ export function PublicChatPage() {
             const isUser = m.role === 'user';
 
             return (
-              <div key={m.id || i} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+              <div key={m.id || i} className={`group flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 {!isUser && (
                   <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0 mt-1">
                     <span className="text-xs font-semibold text-accent-primary">AI</span>
@@ -197,8 +197,8 @@ export function PublicChatPage() {
                   <div
                     className={`rounded-xl px-4 py-3 shadow-sm ${
                       isUser
-                        ? 'bg-bg-tertiary-light text-text-primary-light rounded-tr-sm'
-                        : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary-light rounded-tl-sm'
+                        ? 'bg-bg-tertiary text-text-primary rounded-tr-sm'
+                        : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary rounded-tl-sm'
                     }`}
                     style={{ borderRadius: '12px' }}
                   >
@@ -211,11 +211,11 @@ export function PublicChatPage() {
                           code: ({ children, className }) => {
                             const isInline = !className?.includes('language-');
                             return isInline ? (
-                              <code className="bg-bg-tertiary-light px-1.5 py-0.5 rounded text-sm font-mono">
+                              <code className="bg-bg-tertiary px-1.5 py-0.5 rounded text-sm font-mono">
                                 {children}
                               </code>
                             ) : (
-                              <pre className="bg-bg-tertiary-light p-3 rounded-lg overflow-x-auto my-2">
+                              <pre className="bg-bg-tertiary p-3 rounded-lg overflow-x-auto my-2">
                                 <code className="text-sm font-mono">{children}</code>
                               </pre>
                             );
@@ -243,7 +243,7 @@ export function PublicChatPage() {
                   {/* Timestamp and Feedback */}
                   <div className={`flex items-center gap-2 mt-1 ${isUser ? 'flex-row-reverse' : ''}`}>
                     {m.timestamp && showTimestamp && (
-                      <span className="text-xs text-text-tertiary-light opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
                         {formatTimeAgo(m.timestamp)}
                       </span>
                     )}
@@ -255,7 +255,7 @@ export function PublicChatPage() {
                           className={`p-1.5 rounded-lg transition-colors ${
                             feedbackSent.has(m.id!)
                               ? 'bg-success/20 text-success cursor-not-allowed'
-                              : 'bg-bg-tertiary-light hover:bg-bg-elevated-light text-text-secondary-light hover:text-success'
+                              : 'bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-success'
                           }`}
                           title="Helpful"
                         >
@@ -267,7 +267,7 @@ export function PublicChatPage() {
                           className={`p-1.5 rounded-lg transition-colors ${
                             feedbackSent.has(m.id!)
                               ? 'bg-error/20 text-error cursor-not-allowed'
-                              : 'bg-bg-tertiary-light hover:bg-bg-elevated-light text-text-secondary-light hover:text-error'
+                              : 'bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-error'
                           }`}
                           title="Not helpful"
                         >
@@ -295,11 +295,11 @@ export function PublicChatPage() {
               </div>
               <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-xl rounded-tl-sm px-4 py-3">
                 <div className="flex items-center gap-1">
-                  <span className="text-text-secondary-light text-sm">AI is typing</span>
+                  <span className="text-text-secondary text-sm">AI is typing</span>
                   <div className="flex gap-1 ml-2">
-                    <span className="w-1.5 h-1.5 bg-text-tertiary-light rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 bg-text-tertiary-light rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 bg-text-tertiary-light rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -311,7 +311,7 @@ export function PublicChatPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-bg-secondary-light border-t border-border-default-light px-4 py-4">
+      <div className="bg-bg-secondary border-t border-border-default px-4 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-2">
             <textarea
@@ -320,7 +320,7 @@ export function PublicChatPage() {
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               rows={1}
-              className="flex-1 resize-none rounded-lg border border-border-default-light bg-bg-primary-light px-4 py-3 text-text-primary-light placeholder:text-text-muted-light focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
+              className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
             <button
@@ -338,7 +338,7 @@ export function PublicChatPage() {
               )}
             </button>
           </div>
-          <p className="text-xs text-text-tertiary-light mt-2 text-center">
+          <p className="text-xs text-text-tertiary mt-2 text-center">
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>

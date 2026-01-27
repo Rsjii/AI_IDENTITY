@@ -303,3 +303,68 @@ a:hover {
   );
   background-size: 1000px 100%;
 }
+
+/* ============================================
+   THEME OVERRIDES (Route-level theme forcing)
+   ============================================ */
+.theme-light {
+  color-scheme: light;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F9FAFB;
+  --bg-tertiary: #F3F4F6;
+  --bg-elevated: #E5E7EB;
+
+  --accent-primary: #7C3AED;
+  --accent-hover: #6D28D9;
+
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  --text-muted: #9CA3AF;
+
+  --border-subtle: #E5E7EB;
+  --border-default: #D1D5DB;
+  --border-focus: #7C3AED;
+}
+
+.theme-dark {
+  color-scheme: dark;
+  --bg-primary: #0A0A0B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #27272A;
+  --bg-elevated: #3F3F46;
+
+  --accent-primary: #8B5CF6;
+  --accent-hover: #A78BFA;
+
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --text-muted: #52525B;
+
+  --border-subtle: #27272A;
+  --border-default: #3F3F46;
+  --border-focus: #8B5CF6;
+}
+
+/* ============================================
+   SLIDE ANIMATIONS (Replace missing tailwindcss-animate)
+   ============================================ */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-from-right-200 {
+  animation: slideInFromRight 0.2s ease-out;
+}
+
+.animate-slide-in-from-right-300 {
+  animation: slideInFromRight 0.3s ease-out;
+}

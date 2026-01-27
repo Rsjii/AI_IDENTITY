@@ -274,7 +274,7 @@ export function CreatorDashboardPage() {
               </div>
               <div className="text-sm text-text-secondary mb-2">User Satisfaction</div>
               <div className="text-xs text-text-tertiary">
-                Based on {data?.analytics?.satisfaction?.totalRatings || data?.analytics?.satisfaction?.positive + data?.analytics?.satisfaction?.negative || 0} ratings
+                Based on {data?.analytics?.satisfaction?.totalRatings || ((data?.analytics?.satisfaction?.positive || 0) + (data?.analytics?.satisfaction?.negative || 0)) || 0} ratings
               </div>
             </CardContent>
           </Card>

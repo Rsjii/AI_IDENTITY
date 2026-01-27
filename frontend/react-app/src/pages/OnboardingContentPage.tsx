@@ -84,15 +84,18 @@ export function OnboardingContentPage() {
     }
 
     setLoading(true);
-    const fileId = `${file.name}-${Date.now()}`;
+    // Use filename as key so it can match item.title
+    const fileId = file.name;
     setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+
+    let progressInterval: any = null;
 
     try {
       const fd = new FormData();
       fd.append('file', file);
       
       // Simulate progress (in real app, use XMLHttpRequest for progress tracking)
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           const current = prev[fileId] || 0;
           if (current < 90) {
@@ -104,8 +107,9 @@ export function OnboardingContentPage() {
 
       await apiFetchForm('/api/content/upload', { method: 'POST', body: fd });
       setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
-      clearInterval(progressInterval);
       
+      await refresh();
+
       setTimeout(() => {
         setUploadProgress(prev => {
           const newProgress = { ...prev };
@@ -113,12 +117,11 @@ export function OnboardingContentPage() {
           return newProgress;
         });
       }, 1000);
-
-      await refresh();
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
     } finally {
+      if (progressInterval) clearInterval(progressInterval);
       setLoading(false);
     }
   };
@@ -269,7 +272,7 @@ export function OnboardingContentPage() {
                     <div className="p-6 space-y-3 border-t border-border-default">
                       <h3 className="font-semibold mb-4">Uploaded Files</h3>
                       {items.map((item) => {
-                        const progress = uploadProgress[`${item.title}-${item.id}`];
+                        const progress = uploadProgress[item.title];
                         return (
                           <div
                             key={item.id}

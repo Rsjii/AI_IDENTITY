@@ -63,36 +63,38 @@ const LANGUAGE_OPTIONS = [
   { code: 'ru', name: 'Russian', flag: '🇷🇺' },
 ];
 
+function loadQuizState() {
+  const saved = localStorage.getItem('onboarding-quiz-answers');
+  if (!saved) {
+    return {
+      lastStep: 0,
+      answers: {
+        communicationStyle: {
+          casualVsProfessional: 50,
+          briefVsDetailed: 50,
+          directVsWarm: 50,
+        },
+        targetAudience: [],
+        exampleQuestions: ['', '', ''],
+        responseLength: 'medium',
+        emojiUsage: 'moderately',
+        personalityWords: ['', '', ''],
+      },
+    };
+  }
+  try {
+    const parsed = JSON.parse(saved);
+    return { lastStep: parsed.lastStep || 0, answers: parsed.answers || {} };
+  } catch {
+    return { lastStep: 0, answers: {} };
+  }
+}
+
 export function OnboardingQuizPage() {
   const nav = useNavigate();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Partial<QuizAnswers>>(() => {
-    // Load from localStorage if exists
-    const saved = localStorage.getItem('onboarding-quiz-answers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Resume from last answered question
-        const lastStep = parsed.lastStep || 0;
-        setCurrentStep(lastStep);
-        return parsed.answers || {};
-      } catch {
-        return {};
-      }
-    }
-    return {
-      communicationStyle: {
-        casualVsProfessional: 50,
-        briefVsDetailed: 50,
-        directVsWarm: 50,
-      },
-      targetAudience: [],
-      exampleQuestions: ['', '', ''],
-      responseLength: 'medium',
-      emojiUsage: 'moderately',
-      personalityWords: ['', '', ''],
-    };
-  });
+  const saved = loadQuizState();
+  const [currentStep, setCurrentStep] = useState(saved.lastStep);
+  const [answers, setAnswers] = useState<Partial<QuizAnswers>>(saved.answers);
 
   const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
@@ -111,7 +113,7 @@ export function OnboardingQuizPage() {
 
   const next = () => {
     if (currentStep < TOTAL_STEPS - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep((prev: number) => prev + 1);
     } else {
       handleSubmit();
     }
@@ -119,7 +121,7 @@ export function OnboardingQuizPage() {
 
   const prev = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
+      setCurrentStep((prev: number) => prev - 1);
     }
   };
 
@@ -227,7 +229,7 @@ export function OnboardingQuizPage() {
           <div className="max-w-4xl w-full">
             <div 
               key={currentStep}
-              className="animate-in fade-in slide-in-from-right-4 duration-200"
+              className="animate-slide-in-from-right-200"
             >
               {renderQuestion()}
             </div>
@@ -515,7 +517,7 @@ export function OnboardingQuizPage() {
                     onClick={() => updateAnswer('responseLength', opt.value)}
                     className={`flex-1 p-6 rounded-xl border-2 transition-all duration-200 ${
                       isSelected
-                        ? 'border-accent-primary bg-accent-primary/10 glow-purple'
+                        ? 'border-accent-primary bg-accent-primary/10 shadow-accent-glow'
                         : 'border-border-default bg-bg-secondary hover:border-accent-primary/50'
                     }`}
                   >

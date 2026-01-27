@@ -95,32 +95,6 @@ export function IdentityEditPage() {
   // Validation errors
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Auto-save function
-  const handleAutoSave = useCallback(async () => {
-    if (!validate()) return;
-    try {
-      const identityJson = buildIdentityJson();
-      await apiFetch<any>('/api/identity/version', {
-        method: 'POST',
-        body: JSON.stringify({ identityJson }),
-      });
-      setLastSaved(new Date());
-    } catch (err) {
-      // Silent fail for auto-save
-    }
-  }, [validate, buildIdentityJson]);
-
-  // Auto-save effect
-  useEffect(() => {
-    const autoSaveInterval = setInterval(() => {
-      if (!loading && displayName) {
-        handleAutoSave();
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(autoSaveInterval);
-  }, [loading, displayName, handleAutoSave]);
-
   // Load identity data
   useEffect(() => {
     (async () => {
@@ -409,6 +383,31 @@ export function IdentityEditPage() {
     formatEmojis, ctaEnabled, ctaMessage
   ]);
 
+  // Auto-save function (moved after validate and buildIdentityJson are declared)
+  const handleAutoSave = useCallback(async () => {
+    if (!validate()) return;
+    try {
+      const identityJson = buildIdentityJson();
+      await apiFetch<any>('/api/identity/version', {
+        method: 'POST',
+        body: JSON.stringify({ identityJson }),
+      });
+      setLastSaved(new Date());
+    } catch (err) {
+      // Silent fail for auto-save
+    }
+  }, [validate, buildIdentityJson]);
+
+  // Auto-save effect
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (!loading && displayName) {
+        handleAutoSave();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [loading, displayName, handleAutoSave]);
 
   const onSave = async () => {
     if (!validate()) {

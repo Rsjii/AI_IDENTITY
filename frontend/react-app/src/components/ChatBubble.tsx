@@ -57,8 +57,8 @@ export function ChatBubble({
         <div
           className={`rounded-xl px-4 py-3 shadow-sm ${
             isUser
-              ? 'bg-bg-tertiary-light text-text-primary-light rounded-tr-sm'
-              : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary-light rounded-tl-sm'
+              ? 'bg-bg-tertiary text-text-primary rounded-tr-sm'
+              : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary rounded-tl-sm'
           }`}
           style={{ borderRadius: '12px' }}
         >
@@ -71,11 +71,11 @@ export function ChatBubble({
                 code: ({ children, className }) => {
                   const isInline = !className?.includes('language-');
                   return isInline ? (
-                    <code className="bg-bg-tertiary-light px-1.5 py-0.5 rounded text-sm font-mono">
+                    <code className="bg-bg-tertiary px-1.5 py-0.5 rounded text-sm font-mono">
                       {children}
                     </code>
                   ) : (
-                    <pre className="bg-bg-tertiary-light p-3 rounded-lg overflow-x-auto my-2">
+                    <pre className="bg-bg-tertiary p-3 rounded-lg overflow-x-auto my-2">
                       <code className="text-sm font-mono">{children}</code>
                     </pre>
                   );
@@ -103,7 +103,7 @@ export function ChatBubble({
         {/* Timestamp and Feedback */}
         <div className={`flex items-center gap-2 mt-1 ${isUser ? 'flex-row-reverse' : ''}`}>
           {timestamp && (
-            <span className="text-xs text-text-tertiary-light opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-xs text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
               {formatTimeAgo(timestamp)}
             </span>
           )}
@@ -115,7 +115,7 @@ export function ChatBubble({
                 className={`p-1.5 rounded-lg transition-colors ${
                   feedbackSent
                     ? 'bg-success/20 text-success cursor-not-allowed'
-                    : 'bg-bg-tertiary-light hover:bg-bg-elevated-light text-text-secondary-light hover:text-success'
+                    : 'bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-success'
                 }`}
                 title="Helpful"
               >
@@ -127,7 +127,7 @@ export function ChatBubble({
                 className={`p-1.5 rounded-lg transition-colors ${
                   feedbackSent
                     ? 'bg-error/20 text-error cursor-not-allowed'
-                    : 'bg-bg-tertiary-light hover:bg-bg-elevated-light text-text-secondary-light hover:text-error'
+                    : 'bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-error'
                 }`}
                 title="Not helpful"
               >
