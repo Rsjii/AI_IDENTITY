@@ -1,151 +1,305 @@
-/* Import Inter font from Google Fonts */
+/* Import Inter font from Google Fonts - MUST BE FIRST (before @tailwind) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   CSS VARIABLES - Base (Light Mode Default)
+   ============================================ */
 :root {
+  /* Font */
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Color Scheme - Light Mode (Default) */
+  color-scheme: light;
+
+  /* Background Colors (Light Mode) */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F9FAFB;
+  --bg-tertiary: #F3F4F6;
+  --bg-elevated: #E5E7EB;
+
+  /* Accent Colors (Deeper Purple for Light Mode) */
+  --accent-primary: #7C3AED;
+  --accent-hover: #6D28D9;
+
+  /* Text Colors (Light Mode) */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  --text-muted: #9CA3AF;
+
+  /* Semantic Colors */
+  --success: #10B981;
+  --error: #EF4444;
+  --warning: #F59E0B;
+  --info: #3B82F6;
+
+  /* Borders (Light Mode) */
+  --border-subtle: #E5E7EB;
+  --border-default: #D1D5DB;
+  --border-focus: #7C3AED;
+
+  /* Legacy HSL variables for light mode */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 3.9%;
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 96.1%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --accent: 0 0% 96.1%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 89.8%;
+  --input: 0 0% 89.8%;
+  --ring: 262 83% 58%;
+  --radius: 0.5rem;
 }
 
-/* Typography Scale */
-:root {
-  /* Font sizes */
-  --text-xs: 12px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --text-xl: 20px;
-  --text-2xl: 24px;
-  --text-3xl: 32px;
-  --text-4xl: 48px;
+/* ============================================
+   CSS VARIABLES - Dark Mode (When .dark class is present)
+   ============================================ */
+:root.dark {
+  color-scheme: dark;
 
-  /* Line heights */
-  --leading-tight: 1.1;
-  --leading-heading: 1.2;
-  --leading-body: 1.5;
+  /* Background Colors (Dark Mode) */
+  --bg-primary: #0A0A0B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #27272A;
+  --bg-elevated: #3F3F46;
 
-  /* Font weights */
-  --font-normal: 400;
-  --font-medium: 500;
-  --font-semibold: 600;
-  --font-bold: 700;
+  /* Accent Colors (Purple) */
+  --accent-primary: #8B5CF6;
+  --accent-hover: #A78BFA;
+
+  /* Text Colors (Dark Mode) */
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --text-muted: #52525B;
+
+  /* Borders (Dark Mode) */
+  --border-subtle: #27272A;
+  --border-default: #3F3F46;
+  --border-focus: #8B5CF6;
+
+  /* Legacy HSL variables for shadcn/ui compatibility */
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 14.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%;
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 14.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 262 83% 58%;
 }
 
-/* Apply typography to elements */
-body {
-  font-size: var(--text-base);
-  line-height: var(--leading-body);
-  font-weight: var(--font-normal);
+/* ============================================
+   BASE STYLES
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-h1 {
-  font-size: var(--text-4xl);
-  line-height: var(--leading-tight);
-  font-weight: var(--font-bold);
-}
-
-h2 {
-  font-size: var(--text-3xl);
-  line-height: var(--leading-heading);
-  font-weight: var(--font-bold);
-}
-
-h3 {
-  font-size: var(--text-2xl);
-  line-height: var(--leading-heading);
-  font-weight: var(--font-semibold);
-}
-
-h4 {
-  font-size: var(--text-xl);
-  line-height: var(--leading-heading);
-  font-weight: var(--font-semibold);
-}
-
-h5 {
-  font-size: var(--text-lg);
-  line-height: var(--leading-heading);
-  font-weight: var(--font-semibold);
-}
-
-h6 {
-  font-size: var(--text-base);
-  line-height: var(--leading-heading);
-  font-weight: var(--font-semibold);
-}
-
-p {
-  font-size: var(--text-base);
-  line-height: var(--leading-body);
-}
-
-small, .text-sm {
-  font-size: var(--text-sm);
-  line-height: var(--leading-body);
-}
-
-.text-xs {
-  font-size: var(--text-xs);
-  line-height: var(--leading-body);
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  font-size: var(--text-base);
-  line-height: var(--leading-body);
-  font-weight: var(--font-normal);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* h1 styles already defined above */
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+h1 {
+  font-size: 48px;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 32px;
+}
+
+h3 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+h5 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+h6 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: color 0.2s ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.text-gradient {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass {
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+:root:not(.dark) .glass {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.bg-blob {
+  filter: blur(80px);
+  opacity: 0.3;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-default);
+}
+
+/* ============================================
+   FOCUS STYLES
+   ============================================ */
+*:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   SELECTION STYLES
+   ============================================ */
+::selection {
+  background-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-  a:hover {
-    color: #747bff;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
   }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    to right,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 1000px 100%;
 }

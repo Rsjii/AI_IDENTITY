@@ -67,51 +67,34 @@ export default {
           foreground: 'hsl(var(--card-foreground))',
         },
         
-        // NEW: Purple Palette (Direct hex values for new design system)
-        // Dark mode backgrounds (Primary - for creators/dashboard)
-        'bg-primary': '#0A0A0B',
-        'bg-secondary': '#18181B',
-        'bg-tertiary': '#27272A',
-        'bg-elevated': '#3F3F46',
+        // NEW: Purple Palette (Using CSS variables for dark/light mode support)
+        // Background colors - use as bg-bg-primary, bg-bg-secondary, etc.
+        'bg-primary': 'var(--bg-primary)',
+        'bg-secondary': 'var(--bg-secondary)',
+        'bg-tertiary': 'var(--bg-tertiary)',
+        'bg-elevated': 'var(--bg-elevated)',
         
-        // Light mode backgrounds (Secondary - for public/chat)
-        'bg-primary-light': '#FFFFFF',
-        'bg-secondary-light': '#F9FAFB',
-        'bg-tertiary-light': '#F3F4F6',
-        'bg-elevated-light': '#E5E7EB',
+        // Purple accent - use as bg-accent-primary, text-accent-primary, etc.
+        'accent-primary': 'var(--accent-primary)',
+        'accent-hover': 'var(--accent-hover)',
         
-        // Purple accent (main brand color)
-        'accent-primary': '#8B5CF6',
-        'accent-hover': '#A78BFA',
-        'accent-primary-light': '#7C3AED', // Deeper purple for light mode
-        'accent-hover-light': '#6D28D9',
-        
-        // Text colors (Dark mode)
-        'text-primary': '#FAFAFA',
-        'text-secondary': '#A1A1AA',
-        'text-tertiary': '#71717A',
-        'text-muted': '#52525B',
-        
-        // Text colors (Light mode)
-        'text-primary-light': '#111827',
-        'text-secondary-light': '#4B5563',
-        'text-tertiary-light': '#6B7280',
-        'text-muted-light': '#9CA3AF',
+        // Text colors - use as text-text-primary, text-text-secondary, etc.
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-tertiary': 'var(--text-tertiary)',
+        'text-muted': 'var(--text-muted)',
         
         // Semantic colors (same for both modes)
-        'success': '#10B981',
-        'error': '#EF4444',
-        'warning': '#F59E0B',
-        'info': '#3B82F6',
+        success: '#10B981',
+        error: '#EF4444',
+        warning: '#F59E0B',
+        info: '#3B82F6',
         'ai-active': '#8B5CF6',
         
-        // Borders
-        'border-subtle': '#27272A',
-        'border-default': '#3F3F46',
-        'border-focus': '#8B5CF6',
-        'border-subtle-light': '#E5E7EB',
-        'border-default-light': '#D1D5DB',
-        'border-focus-light': '#7C3AED',
+        // Borders - use as border-border-subtle, border-border-default, etc.
+        'border-subtle': 'var(--border-subtle)',
+        'border-default': 'var(--border-default)',
+        'border-focus': 'var(--border-focus)',
       },
       backgroundImage: {
         'accent-gradient': 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
