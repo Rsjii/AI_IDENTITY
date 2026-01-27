@@ -27,11 +27,11 @@ export async function dashboard(req: Request, res: Response) {
       [userId]
     );
 
-    // Revenue
-    const revenueThisMonth = await stripePaymentQueries.sumForCreatorSince(
-      userId,
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    );
+    // Revenue (separate pay-per-chat earnings from subscription revenue)
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const payPerChatEarnings = await stripePaymentQueries.sumPayPerChatEarningsSince(userId, monthStart);
+    const subscriptionRevenue = await stripePaymentQueries.sumSubscriptionRevenueSince(userId, monthStart);
+    const totalRevenue = payPerChatEarnings + subscriptionRevenue;
 
     // Active users (last 5 minutes)
     const activeR = await db.query(
@@ -107,7 +107,11 @@ export async function dashboard(req: Request, res: Response) {
         week: weekR.rows[0]?.c || 0,
         month: monthR.rows[0]?.c || 0,
       },
-      revenue: { thisMonthCents: revenueThisMonth },
+      revenue: { 
+        thisMonthCents: totalRevenue,
+        payPerChatEarningsCents: payPerChatEarnings,
+        subscriptionRevenueCents: subscriptionRevenue,
+      },
       activeUsers: activeR.rows[0]?.c || 0,
       analytics: {
         topQuestions: topQuestionsR.rows,

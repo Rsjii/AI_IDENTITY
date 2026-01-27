@@ -1121,6 +1121,24 @@ export const stripePaymentQueries = {
     );
     return r.rows[0]?.total || 0;
   },
+  sumPayPerChatEarningsSince: async (creatorId: string, sinceIso: string) => {
+    const r = await db.query(
+      `SELECT COALESCE(SUM("creatorEarningsCents"),0)::int AS total
+       FROM "stripe_payments"
+       WHERE "creatorId"=$1 AND "status"='succeeded' AND "type"='pay_per_chat' AND "createdAt">=$2::timestamptz`,
+      [creatorId, sinceIso]
+    );
+    return r.rows[0]?.total || 0;
+  },
+  sumSubscriptionRevenueSince: async (creatorId: string, sinceIso: string) => {
+    const r = await db.query(
+      `SELECT COALESCE(SUM(amount),0)::int AS total
+       FROM "stripe_payments"
+       WHERE "creatorId"=$1 AND "status"='succeeded' AND "type"='subscription' AND "createdAt">=$2::timestamptz`,
+      [creatorId, sinceIso]
+    );
+    return r.rows[0]?.total || 0;
+  },
 };
 
 // Export db for direct use

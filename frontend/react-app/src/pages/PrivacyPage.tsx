@@ -117,7 +117,7 @@ export function PrivacyPage() {
             <ul className="list-disc list-inside space-y-1 ml-4">
               <li><strong>LLM Providers (Groq, OpenAI):</strong> To generate replies. Your messages are sent to these services but are not stored by them.</li>
               <li><strong>Email Service (Resend):</strong> To send authentication emails and notifications.</li>
-              <li><strong>Payment Processor (Razorpay):</strong> To process subscription payments. Payment data is handled by Razorpay and subject to their privacy policy.</li>
+              <li><strong>Payment Processor (Stripe):</strong> To process subscription and pay-per-chat payments. Payment data is handled by Stripe and subject to their privacy policy.</li>
             </ul>
           </CardContent>
         </Card>

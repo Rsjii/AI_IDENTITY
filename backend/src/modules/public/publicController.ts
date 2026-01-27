@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { userQueries, chatSessionQueries, chatMessageQueries, db } from '../../config/database';
+import { userQueries, chatSessionQueries, chatMessageQueries, db, mirrorRunQueries, identityVersionQueries, identityQueries, trustEventQueries } from '../../config/database';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
+import { logger } from '../../config/logger';
 
 const chatSchema = z.object({
   slug: z.string().min(1),
@@ -131,27 +132,19 @@ export async function publicChat(req: Request, res: Response) {
       });
     }
 
-    // No payment, show paywall
+    // No payment, show paywall (Option A: don't generate reply before payment)
     const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
-
-    // Generate reply but don't return full content
-    const result = await generateMirrorReplyWithLogging(u.id, 'public_chat', message, {
-      platform: 'web',
-      sessionId: sid,
-      visitorId,
-    });
 
     return res.json({
       success: true,
       requiresPayment: true,
       sessionId: sid,
+      creatorId: u.id,
       paymentOptions: {
         premium: { amount: pricing.premium?.amountCents || 500, label: 'Detailed Answer' },
         vip: { amount: pricing.vip?.amountCents || 5000, label: 'Full Consultation' },
       },
-      previewReply: result.reply?.substring(0, 100) + '...',
-      decision: result.decision,
-      mirrorRunId: result.mirrorRunId,
+      previewReply: 'This answer requires payment to unlock the full response. Click below to proceed.',
     });
   }
 
@@ -174,4 +167,62 @@ export async function publicChat(req: Request, res: Response) {
     decision: result.decision,
     mirrorRunId: result.mirrorRunId,
   });
+}
+
+const feedbackSchema = z.object({
+  messageId: z.string().optional(),
+  feedback: z.enum(['positive', 'negative']),
+  sessionId: z.string().optional(),
+  visitorId: z.string().optional(),
+  mirrorRunId: z.string().optional(),
+});
+
+export async function publicFeedback(req: Request, res: Response) {
+  try {
+    const { messageId, feedback, sessionId, visitorId, mirrorRunId } = feedbackSchema.parse(req.body);
+
+    // If mirrorRunId is provided, log as trust event (compatible with dashboard satisfaction score)
+    if (mirrorRunId) {
+      try {
+        // Verify mirror run exists and get creator
+        const mirrorRun = await mirrorRunQueries.findById(mirrorRunId);
+        if (!mirrorRun) {
+          return res.status(404).json({ error: 'Mirror run not found' });
+        }
+
+        // Get identity version and creator
+        const version = await identityVersionQueries.findById(mirrorRun.identityVersionId);
+        if (!version) {
+          return res.status(404).json({ error: 'Identity version not found' });
+        }
+
+        const identity = await identityQueries.findById(version.identityId);
+        if (!identity) {
+          return res.status(404).json({ error: 'Identity not found' });
+        }
+
+        // Map feedback to trust event format
+        const trustEvent: 'confirm_yes' | 'confirm_no' = feedback === 'positive' ? 'confirm_yes' : 'confirm_no';
+
+        // Create trust event (this feeds into dashboard satisfaction score)
+        await trustEventQueries.create(mirrorRunId, version.id, trustEvent);
+
+        logger.info(`[Public Feedback] Logged ${feedback} feedback for mirror run ${mirrorRunId}`);
+      } catch (error: any) {
+        logger.error('[Public Feedback] Error logging trust event:', error);
+        // Continue - don't fail the request if trust event logging fails
+      }
+    }
+
+    // Also log to a separate feedback table if needed (for analytics)
+    // For now, trust_events is sufficient since dashboard reads from it
+
+    return res.json({ success: true, message: 'Feedback recorded' });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    logger.error('[Public Feedback] Error:', error);
+    return res.status(500).json({ error: 'Failed to record feedback' });
+  }
 }

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ThumbsUp, ThumbsDown, Send, Loader2 } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Send, Loader2, X } from 'lucide-react';
+import { PaymentPrompt } from '@/components/PaymentPrompt';
 
 type Msg = { 
   role: 'user' | 'assistant'; 
   content: string;
   timestamp?: Date;
   id?: string;
+  mirrorRunId?: string;
 };
 
 function getOrCreateVisitorId(): string {
@@ -48,13 +50,26 @@ export function PublicChatPage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [typing, setTyping] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState<{
+    creatorId: string;
+    sessionId: string;
+    paymentOptions: { premium: { amount: number; label: string }; vip: { amount: number; label: string } };
+  } | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`/api/public/creator/${encodeURIComponent(slug)}`)
       .then((r) => r.json())
-      .then((d) => setCreator(d.creator))
+      .then((d) => {
+        setCreator(d.creator);
+        // Store creator ID for payment flow
+        if (d.creator?.id) {
+          // Creator object might not have id, but we'll get it from chat response
+        }
+      })
       .catch(() => setCreator(null));
   }, [slug]);
 
@@ -84,11 +99,41 @@ export function PublicChatPage() {
       });
       const d = await r.json();
       setSessionId(d.sessionId || sessionId);
+      
+      // Check if payment is required
+      if (d.requiresPayment) {
+        setTyping(false);
+        // Show preview message
+        const previewMsg: Msg = {
+          role: 'assistant',
+          content: d.previewReply || 'This answer requires payment to unlock the full response.',
+          timestamp: new Date(),
+          id: `msg_preview_${Date.now()}`,
+          mirrorRunId: d.mirrorRunId,
+        };
+        setMsgs((x) => [...x, previewMsg]);
+        
+        // Get creator ID from response
+        const creatorId = d.creatorId || '';
+        if (creatorId) {
+          setPaymentData({
+            creatorId,
+            sessionId: d.sessionId,
+            paymentOptions: d.paymentOptions,
+          });
+          setPendingMessage(m);
+          setShowPaymentModal(true);
+        }
+        return;
+      }
+      
+      // Normal reply
       const aiMsg: Msg = { 
         role: 'assistant', 
         content: d.reply || '...',
         timestamp: new Date(),
-        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        mirrorRunId: d.mirrorRunId,
       };
       setMsgs((x) => [...x, aiMsg]);
     } catch (error) {
@@ -105,10 +150,67 @@ export function PublicChatPage() {
     }
   };
 
+  const handlePaymentSuccess = async () => {
+    setShowPaymentModal(false);
+    // Re-send the pending message to get full answer
+    if (pendingMessage) {
+      const messageToSend = pendingMessage;
+      setPendingMessage('');
+      setText('');
+      
+      // Small delay to ensure payment is processed
+      setTimeout(async () => {
+        const userMsg: Msg = { 
+          role: 'user', 
+          content: messageToSend,
+          timestamp: new Date(),
+          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+        };
+        setMsgs((x) => [...x, userMsg]);
+        setTyping(true);
+
+        try {
+          const r = await fetch('/api/public/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug, message: messageToSend, visitorId, sessionId: sessionId || undefined }),
+          });
+          const d = await r.json();
+          setSessionId(d.sessionId || sessionId);
+          
+          // After payment, should get full reply
+          const aiMsg: Msg = { 
+            role: 'assistant', 
+            content: d.reply || '...',
+            timestamp: new Date(),
+            id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+            mirrorRunId: d.mirrorRunId,
+          };
+          setMsgs((x) => [...x, aiMsg]);
+        } catch (error) {
+          console.error('Chat error:', error);
+          const errorMsg: Msg = {
+            role: 'assistant',
+            content: 'Sorry, I encountered an error. Please try again.',
+            timestamp: new Date(),
+            id: `msg_error_${Date.now()}`
+          };
+          setMsgs((x) => [...x, errorMsg]);
+        } finally {
+          setTyping(false);
+        }
+      }, 1000);
+    }
+  };
+
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     if (feedbackSent.has(messageId)) return;
     
     setFeedbackSent(prev => new Set(prev).add(messageId));
+    
+    // Find the message to get mirrorRunId
+    const msg = msgs.find(m => m.id === messageId);
+    const mirrorRunId = msg?.mirrorRunId;
     
     // Send feedback to backend
     try {
@@ -119,7 +221,8 @@ export function PublicChatPage() {
           messageId, 
           feedback, 
           sessionId,
-          visitorId 
+          visitorId,
+          mirrorRunId: mirrorRunId || undefined,
         }),
       });
     } catch (error) {
@@ -309,6 +412,27 @@ export function PublicChatPage() {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && paymentData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-bg-secondary rounded-lg max-w-md w-full relative">
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <PaymentPrompt
+              creatorId={paymentData.creatorId}
+              sessionId={paymentData.sessionId}
+              paymentOptions={paymentData.paymentOptions}
+              onSuccess={handlePaymentSuccess}
+              onCancel={() => setShowPaymentModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="bg-bg-secondary border-t border-border-default px-4 py-4">

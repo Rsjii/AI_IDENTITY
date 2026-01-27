@@ -87,7 +87,7 @@ const CheckoutForm: React.FC<{
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${window.location.origin}/chat/${creatorId}?payment_success=true`,
+          return_url: window.location.href,
         },
         redirect: 'if_required',
       });
@@ -150,8 +150,12 @@ const CheckoutForm: React.FC<{
         </Select>
       </div>
 
-      {clientSecret && (
+      {clientSecret ? (
         <PaymentElement options={{ layout: 'tabs' }} />
+      ) : (
+        <div className="text-sm text-muted-foreground text-center py-4">
+          {loading ? 'Loading payment form...' : 'Select a tier to continue'}
+        </div>
       )}
 
       <div className="flex gap-2">

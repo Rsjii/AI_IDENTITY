@@ -7,6 +7,26 @@ import { initializePostHog, shutdownPostHog } from './services/posthogService';
 import { validateEnv } from './config/envValidation';
 import { initializeRazorpay } from './services/razorpayService';
 
+// Initialize Sentry (error tracking)
+if (process.env.SENTRY_DSN && !isDev) {
+  try {
+    const Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: config.nodeEnv,
+      tracesSampleRate: config.nodeEnv === 'production' ? 0.1 : 1.0,
+      beforeSend(event) {
+        // Don't send events in dev mode
+        if (isDev) return null;
+        return event;
+      },
+    });
+    logger.info('✅ Sentry initialized for error tracking');
+  } catch (error: any) {
+    logger.warn('⚠️ Sentry initialization failed:', error.message);
+  }
+}
+
 // ✅ NEW: Global process error handlers (MUST be before startServer)
 process.on('uncaughtException', (error: Error) => {
   logger.error('❌ UNCAUGHT EXCEPTION - Process will exit', {

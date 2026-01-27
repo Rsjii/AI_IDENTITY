@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { detokenizeId } from '../../utils/idTokenization';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
-import { widgetChatLogQueries, voiceCloneQueries } from '../../config/database';
+import { widgetChatLogQueries, voiceCloneQueries, userQueries, db, chatSessionQueries } from '../../config/database';
 import { generateVoiceAudio } from '../voice/voiceService';
 import { logger } from '../../config/logger';
 
@@ -12,6 +12,35 @@ const chatSchema = z.object({
   voiceEnabled: z.boolean().optional().default(false),
   visitorId: z.string().optional(), // For chat history tracking
 });
+
+// Plan tier limits (same as publicController.ts)
+type PlanTier = 'free' | 'starter' | 'growth' | 'scale';
+const PLAN_LIMITS: Record<PlanTier, number> = {
+  free: 500,
+  starter: 5000,
+  growth: 25000,
+  scale: Number.MAX_SAFE_INTEGER,
+};
+
+async function getUserPlan(userId: string): Promise<{ tier: PlanTier; trialActive: boolean }> {
+  const r = await db.query(
+    `SELECT "planTier","trialEndsAt" FROM "User" WHERE id=$1 LIMIT 1`,
+    [userId]
+  );
+  const tier = (r.rows[0]?.planTier || 'free') as PlanTier;
+  const trialEndsAt = r.rows[0]?.trialEndsAt ? new Date(r.rows[0].trialEndsAt) : null;
+  const trialActive = !!(trialEndsAt && trialEndsAt.getTime() > Date.now());
+  return { tier, trialActive };
+}
+
+async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
+  const r = await db.query(
+    `SELECT COUNT(*)::int AS c FROM "chat_sessions"
+     WHERE "creatorId"=$1 AND "createdAt" >= date_trunc('month', now())`,
+    [creatorId]
+  );
+  return r.rows[0]?.c || 0;
+}
 
 export async function widgetChat(req: Request, res: Response) {
   const parsed = chatSchema.safeParse(req.body);
@@ -23,12 +52,40 @@ export async function widgetChat(req: Request, res: Response) {
   const detok = detokenizeId(creatorId, { endpoint: '/api/widget/chat' });
   const creatorUserId = detok?.id || creatorId;
 
+  // ✅ Check creator's plan limit (PHASE1 requirement - same as public chat)
+  const { tier, trialActive } = await getUserPlan(creatorUserId);
+  const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
+  const limit = PLAN_LIMITS[effectiveTier];
+  const used = await countCreatorChatsThisMonth(creatorUserId);
+
+  if (used >= limit) {
+    return res.status(402).json({
+      error: 'Creator plan limit reached',
+      errorCode: 'CREATOR_PLAN_LIMIT',
+      tier: effectiveTier,
+      used,
+      limit,
+      upgradeUrl: '/pricing',
+    });
+  }
+
   // Generate visitorId if not provided (for chat history tracking)
   const finalVisitorId = visitorId || `widget_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  // Create chat session (for plan limit counting)
+  // Widget chats should count towards monthly limits - create new session per widget interaction
+  // (This ensures accurate counting; we could optimize later to reuse sessions per visitorId)
+  const session = await chatSessionQueries.create({
+    creatorId: creatorUserId,
+    visitorId: finalVisitorId,
+    userId: null,
+    platform: 'widget',
+  });
 
   const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, { 
     platform: 'api',
     visitorId: finalVisitorId,
+    sessionId: session.id,
   });
 
   await widgetChatLogQueries.create(creatorUserId, null, message, result.reply || '');

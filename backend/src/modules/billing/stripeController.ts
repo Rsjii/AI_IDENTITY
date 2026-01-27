@@ -222,13 +222,30 @@ export async function stripeWebhook(req: Request, res: Response) {
     // Handle customer.subscription.deleted - subscription cancelled
     else if (event.type === 'customer.subscription.deleted') {
       const subscription: any = event.data.object;
+      const customerId = subscription?.customer;
+      
       logger.info(`[Stripe] Subscription cancelled:`, {
         subscriptionId: subscription?.id,
-        customerId: subscription?.customer,
+        customerId,
       });
 
-      // Optional: Set user planTier to null or 'free'
-      // await db.query(`UPDATE "User" SET "planTier"=NULL WHERE ...`);
+      // Downgrade user to free tier
+      try {
+        const customerResult = await db.query(
+          `SELECT "userId" FROM "stripe_customers" WHERE "stripeCustomerId"=$1 LIMIT 1`,
+          [customerId]
+        );
+        
+        if (customerResult.rows[0]?.userId) {
+          const userId = customerResult.rows[0].userId;
+          await db.query(`UPDATE "User" SET "planTier"='free' WHERE id=$1`, [userId]);
+          logger.info(`[Stripe] ✅ Downgraded user ${userId} to free tier after subscription cancellation`);
+        } else {
+          logger.warn(`[Stripe] Could not find user for customer ${customerId}`);
+        }
+      } catch (err: any) {
+        logger.error(`[Stripe] Error downgrading user after cancellation:`, err.message);
+      }
     }
     else {
       logger.debug(`[Stripe Webhook] Unhandled event type: ${event.type}`);

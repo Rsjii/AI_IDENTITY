@@ -53,7 +53,7 @@ export function PricingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Website widget</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Basic features only</li>
               </ul>
               <Button className="w-full" variant="outline">Current</Button>
             </CardContent>
@@ -65,6 +65,10 @@ export function PricingPage() {
               <CardDescription>$49/mo (5K chats)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Website widget</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> All features</li>
+              </ul>
               <Button className="w-full" disabled={loading} onClick={() => goStripe('starter')}>Choose</Button>
             </CardContent>
           </Card>

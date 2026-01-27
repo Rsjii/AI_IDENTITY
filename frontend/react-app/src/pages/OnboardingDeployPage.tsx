@@ -20,7 +20,7 @@ export function OnboardingDeployPage() {
   const [welcomeMessage, setWelcomeMessage] = useState('Hey! Ask me anything!');
 
   const slug = user?.publicSlug || user?.handle || '';
-  const creatorId = user?.id || '';
+  const creatorId = (user as any)?.publicId || user?.id || '';
   const apiBase = window.location.origin;
 
   const standaloneLink = useMemo(() => (slug ? `${apiBase}/chat/${slug}` : ''), [slug, apiBase]);
