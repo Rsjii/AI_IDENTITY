@@ -15,12 +15,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('theme') as Theme;
     if (saved) return saved;
     
+    // NEW: Default to dark mode (as per design spec - dark-first)
     // Check system preference
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
     
-    return 'light';
+    // Default to dark for creators/dashboard (can be overridden)
+    return 'dark';
   });
 
   useEffect(() => {
