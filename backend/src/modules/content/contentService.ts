@@ -1,6 +1,7 @@
 import { uploadPublicBuffer } from '../../services/s3Service';
 import { knowledgeSourceQueries, knowledgeChunkQueries } from '../../config/database';
 import { logger } from '../../config/logger';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 // PDF parsing
 let pdfParse: any = null;
@@ -43,7 +44,6 @@ async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string
     throw new Error('OpenAI API not configured for audio transcription');
   }
   try {
-    // Create a File-like object for OpenAI API (Node.js compatible)
     const file = new (require('openai').FileFromBuffer)(buffer, 'audio', mimeType);
     const transcription = await openaiClient.audio.transcriptions.create({
       file: file,
@@ -51,13 +51,12 @@ async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string
     });
     return transcription.text || '';
   } catch (error: any) {
-    // Fallback: try with buffer directly if FileFromBuffer doesn't work
     try {
       const FormData = require('form-data');
       const form = new FormData();
       form.append('file', buffer, { filename: 'audio', contentType: mimeType });
       form.append('model', 'whisper-1');
-      
+
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
@@ -66,12 +65,12 @@ async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string
         },
         body: form,
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`OpenAI API error: ${errorText}`);
       }
-      
+
       const result = await response.json() as { text?: string };
       return result.text || '';
     } catch (fallbackError: any) {
@@ -89,13 +88,32 @@ async function getYouTubeTranscript(url: string): Promise<string> {
   }
   const videoId = videoIdMatch[1];
 
-  // Try to get captions via YouTube Data API (if API key available)
-  // For now, return empty - can be enhanced with yt-dlp or YouTube Data API
-  // This is a placeholder - full implementation would require:
-  // 1. YouTube Data API key + fetch captions
-  // 2. Or use yt-dlp to download and extract audio, then Whisper
-  logger.warn(`YouTube transcription not fully implemented for ${videoId}. URL stored only.`);
-  return '';
+  try {
+    // Try to get transcript using youtube-transcript package
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+
+    if (transcript && transcript.length > 0) {
+      // Combine all transcript segments into one text
+      const fullText = transcript.map(segment => segment.text).join(' ');
+      logger.info(`Successfully transcribed YouTube video ${videoId}: ${fullText.length} characters`);
+      return fullText;
+    }
+
+    logger.warn(`No transcript available for video ${videoId}`);
+    return '';
+  } catch (error: any) {
+    // Handle specific error cases
+    if (error.message?.includes('disabled') || error.message?.includes('Transcript is disabled')) {
+      logger.warn(`Transcripts disabled for video ${videoId}`);
+    } else if (error.message?.includes('not found') || error.message?.includes('Video not found')) {
+      logger.warn(`Video not found: ${videoId}`);
+    } else {
+      logger.error({ error, videoId }, 'YouTube transcription failed');
+    }
+
+    // Return empty string - URL will still be stored
+    return '';
+  }
 }
 
 export async function createPasteSource(userId: string, title: string | undefined, rawText: string) {
@@ -130,7 +148,6 @@ export async function createFileSource(userId: string, file: Express.Multer.File
   let extractedText = '';
   const mimeType = file.mimetype || '';
 
-  // Extract text based on file type
   try {
     if (mimeType === 'application/pdf' && pdfParse) {
       const data = await pdfParse(file.buffer);
@@ -141,14 +158,12 @@ export async function createFileSource(userId: string, file: Express.Multer.File
     } else if (mimeType.startsWith('text/')) {
       extractedText = file.buffer.toString('utf-8');
     } else if (mimeType.startsWith('audio/') && openaiClient) {
-      // Transcribe audio files using Whisper
       extractedText = await transcribeAudio(file.buffer, mimeType);
     }
   } catch (error: any) {
     logger.warn({ error, mimeType, filename: file.originalname }, 'File parsing/transcription failed, storing file only');
   }
 
-  // Store file bytes to S3/R2 as public URL
   const upload = await uploadPublicBuffer({
     keyPrefix: `knowledge/${userId}/files`,
     contentType: file.mimetype || 'application/octet-stream',
@@ -164,7 +179,6 @@ export async function createFileSource(userId: string, file: Express.Multer.File
     rawText: extractedText || undefined,
   });
 
-  // Create chunks from extracted text
   const chunks = extractedText ? chunkText(extractedText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
   return source;
