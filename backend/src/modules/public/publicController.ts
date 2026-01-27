@@ -30,11 +30,57 @@ export async function getCreator(req: Request, res: Response) {
   });
 }
 
+// Plan tier limits (same as planGate.ts)
+type PlanTier = 'free' | 'starter' | 'growth' | 'scale';
+const PLAN_LIMITS: Record<PlanTier, number> = {
+  free: 500,
+  starter: 5000,
+  growth: 25000,
+  scale: Number.MAX_SAFE_INTEGER,
+};
+
+async function getUserPlan(userId: string): Promise<{ tier: PlanTier; trialActive: boolean }> {
+  const r = await db.query(
+    `SELECT "planTier","trialEndsAt" FROM "User" WHERE id=$1 LIMIT 1`,
+    [userId]
+  );
+  const tier = (r.rows[0]?.planTier || 'free') as PlanTier;
+  const trialEndsAt = r.rows[0]?.trialEndsAt ? new Date(r.rows[0].trialEndsAt) : null;
+  const trialActive = !!(trialEndsAt && trialEndsAt.getTime() > Date.now());
+  return { tier, trialActive };
+}
+
+async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
+  const r = await db.query(
+    `SELECT COUNT(*)::int AS c FROM "chat_sessions"
+     WHERE "creatorId"=$1 AND "createdAt" >= date_trunc('month', now())`,
+    [creatorId]
+  );
+  return r.rows[0]?.c || 0;
+}
+
 export async function publicChat(req: Request, res: Response) {
   const { slug, message, visitorId, sessionId } = chatSchema.parse(req.body);
 
   const u = await userQueries.findBySlugOrHandle(slug);
   if (!u) return res.status(404).json({ error: 'Creator not found' });
+
+  // ✅ Check creator's plan limit (PHASE1 requirement)
+  const { tier, trialActive } = await getUserPlan(u.id);
+  const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
+  const limit = PLAN_LIMITS[effectiveTier];
+  const used = await countCreatorChatsThisMonth(u.id);
+
+  if (used >= limit) {
+    return res.status(402).json({
+      error: 'Creator plan limit reached',
+      errorCode: 'CREATOR_PLAN_LIMIT',
+      tier: effectiveTier,
+      used,
+      limit,
+      upgradeUrl: '/pricing',
+    });
+  }
 
   // session: reuse if provided else create
   let sid = sessionId || null;

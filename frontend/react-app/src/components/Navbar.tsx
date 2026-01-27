@@ -29,9 +29,6 @@ export function Navbar() {
                   <Link to="/mirror" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Mirror
                   </Link>
-                  <Link to="/history" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    History
-                  </Link>
                   <Link to="/identity/edit" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Identity
                   </Link>
@@ -40,6 +37,9 @@ export function Navbar() {
                   </Link>
                   <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Integrations
+                  </Link>
+                  <Link to="/settings" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Settings
                   </Link>
                 </>
               ) : null}
@@ -60,11 +60,11 @@ export function Navbar() {
             ) : isAuthed ? (
               <>
                 <Link
-                  to="/account"
+                  to="/settings"
                   className="hidden sm:inline-flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
                   title={state.user?.email || ''}
                 >
-                  {state.user?.name || state.user?.handle || 'Account'}
+                  {state.user?.name || state.user?.handle || 'Settings'}
                 </Link>
                 <Button size="sm" variant="outline" onClick={onLogout}>
                   Logout

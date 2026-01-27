@@ -11,6 +11,8 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardData {
+  planTier?: string;
+  trialEndsAt?: string | null;
   chats: {
     total: number;
     today: number;
@@ -104,7 +106,7 @@ export function CreatorDashboardPage() {
               <Database className="h-4 w-4 mr-2" />
               Knowledge Base
             </Button>
-            <Button variant="outline" onClick={() => window.location.href = '/integrations'}>
+            <Button variant="outline" onClick={() => window.location.href = '/settings'}>
               <Settings className="h-4 w-4 mr-2" />
               Settings
             </Button>
@@ -131,6 +133,29 @@ export function CreatorDashboardPage() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* Current Plan Display */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Current Plan</CardTitle>
+                <CardDescription>Your subscription tier and limits</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold capitalize">{data?.planTier || 'Free'}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {data?.planTier === 'free' ? '500 chats/month' :
+                       data?.planTier === 'starter' ? '5,000 chats/month' :
+                       data?.planTier === 'growth' ? '25,000 chats/month' :
+                       'Unlimited chats'}
+                    </div>
+                  </div>
+                  <Button onClick={() => window.location.href = '/settings?tab=billing'}>
+                    Manage Plan
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             {/* Stats Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card className="glass">
@@ -342,9 +367,9 @@ export function CreatorDashboardPage() {
                   {data?.analytics?.peakHours && data.analytics.peakHours.length > 0 ? (
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={data.analytics.peakHours}>
-                        <XAxis dataKey="hour" tickFormatter={(h: number) => `${h}:00`} />
+                        <XAxis dataKey="hour" tickFormatter={(h) => `${h}:00`} />
                         <YAxis />
-                        <Tooltip labelFormatter={(h: number) => `${h}:00`} />
+                        <Tooltip labelFormatter={(h) => `${h}:00`} />
                         <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -435,7 +460,7 @@ export function CreatorDashboardPage() {
             </Card>
 
             {/* Payout Settings */}
-            <Card className="glass">
+        <Card className="glass">
               <CardHeader>
                 <CardTitle>Payout Settings</CardTitle>
                 <CardDescription>Configure how you receive your earnings</CardDescription>
@@ -447,8 +472,8 @@ export function CreatorDashboardPage() {
                 <Button onClick={() => alert('Stripe Connect integration coming soon!')}>
                   Setup Payouts
                 </Button>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
           </div>
         )}
       </div>

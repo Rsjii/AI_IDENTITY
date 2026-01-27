@@ -17,11 +17,28 @@ export function OnboardingPlanPage() {
 
   const checkout = async (tier: 'starter' | 'growth' | 'scale') => {
     setLoading(true);
-    const r = await apiFetch<{ url: string }>('/api/billing/stripe/create-checkout-session', {
-      method: 'POST',
-      body: JSON.stringify({ tier }),
-    });
-    window.location.href = r.url;
+    try {
+      const r = await apiFetch<{ url: string }>('/api/billing/stripe/create-checkout-session', {
+        method: 'POST',
+        body: JSON.stringify({ tier }),
+      });
+      if (r.url) {
+        window.location.href = r.url;
+      } else {
+        alert('Failed to create checkout session. Please try again.');
+        setLoading(false);
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      
+      // Handle specific Stripe setup errors
+      if (error.errorCode === 'STRIPE_ACCOUNT_SETUP_REQUIRED') {
+        alert('Stripe account setup required!\n\nPlease set your business name in Stripe Dashboard:\nhttps://dashboard.stripe.com/account\n\nAfter setting up, try again.');
+      } else {
+        alert(error.message || 'Failed to start checkout. Please try again.');
+      }
+      setLoading(false);
+    }
   };
 
   return (

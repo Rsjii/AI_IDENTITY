@@ -244,6 +244,7 @@ app.use(async (req, res, next) => {
       '/api/content',
       '/api/creator',
       '/api/payments',
+      '/api/billing',
       '/api/public',
       '/identity',
       '/mirror',
@@ -366,11 +367,13 @@ app.use((req, res, next) => {
   const start = Date.now();
 
   // Log request (body only in dev to avoid logging sensitive data)
+  // Skip body for webhook routes (they use raw Buffer which logs as huge array)
+  const isWebhookRoute = req.path.includes('/webhook');
   logger.info({
     method: req.method,
     path: req.path,
     query: req.query,
-    ...(isDev && (req.method === 'POST' || req.method === 'PUT') ? { body: req.body } : {}),
+    ...(isDev && (req.method === 'POST' || req.method === 'PUT') && !isWebhookRoute ? { body: req.body } : {}),
     ip: req.ip,
   }, `📥 ${req.method} ${req.path}`);
 

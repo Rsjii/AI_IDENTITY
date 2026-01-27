@@ -44,9 +44,11 @@ export function QuizQuestion({
 
       case 'select':
         return (
-          <Select value={value || ''} onValueChange={onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={placeholder || 'Select an option'} />
+          <Select value={value || ''} onValueChange={(val) => onChange(val)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={placeholder || 'Select an option'}>
+                {value || placeholder || 'Select an option'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {options.map((opt) => (
@@ -238,4 +240,5 @@ export function QuizQuestion({
     </div>
   );
 }
+
 

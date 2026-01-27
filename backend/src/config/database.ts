@@ -430,6 +430,8 @@ ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "creatorEarningsCents" IN
 ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "type" TEXT DEFAULT 'subscription';
 
 -- Add missing columns to User table
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMPTZ;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "planTier" TEXT NOT NULL DEFAULT 'free';
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeConnectId" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "payoutEnabled" BOOLEAN DEFAULT false;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "businessHours" JSONB;

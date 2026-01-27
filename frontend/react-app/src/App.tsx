@@ -12,7 +12,6 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { IdentitySetupPage } from './pages/IdentitySetupPage';
 import { IdentityEditPage } from './pages/IdentityEditPage';
 import { MirrorPage } from './pages/MirrorPage';
-import { HistoryPage } from './pages/HistoryPage';
 import { VoiceSetupPage } from './pages/VoiceSetupPage';
 import { VoiceManagePage } from './pages/VoiceManagePage';
 import { IntegrationsPage } from './pages/Integrations';
@@ -20,6 +19,7 @@ import { AdminPage } from './pages/AdminPage';
 import { AdminUserPage } from './pages/AdminUserPage';
 import { ForgotPasswordResetPage } from './pages/ForgotPasswordResetPage';
 import { AccountPage } from './pages/AccountPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { PricingPage } from './pages/PricingPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
@@ -69,7 +69,6 @@ function App() {
               <Route path="/identity/setup" element={<IdentitySetupPage />} />
               <Route path="/identity/edit" element={<IdentityEditPage />} />
               <Route path="/mirror" element={<ProtectedRoute><MirrorPage /></ProtectedRoute>} />
-              <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
               <Route path="/voice/setup" element={<ProtectedRoute><VoiceSetupPage /></ProtectedRoute>} />
               <Route path="/voice/manage" element={<ProtectedRoute><VoiceManagePage /></ProtectedRoute>} />
               <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
@@ -77,6 +76,7 @@ function App() {
               <Route path="/admin/users/:userId" element={<AdminUserPage />} />
               <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/pricing" element={<PricingPage />} />
 
               <Route path="/privacy" element={<PrivacyPage />} />

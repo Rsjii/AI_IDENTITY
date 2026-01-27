@@ -92,8 +92,15 @@ export async function dashboard(req: Request, res: Response) {
       [userId]
     );
 
+    // Get user plan info
+    const userR = await db.query(`SELECT "planTier", "trialEndsAt" FROM "User" WHERE id=$1 LIMIT 1`, [userId]);
+    const planTier = userR.rows[0]?.planTier || 'free';
+    const trialEndsAt = userR.rows[0]?.trialEndsAt || null;
+
     return res.json({
       success: true,
+      planTier,
+      trialEndsAt,
       chats: {
         total: totalR.rows[0]?.c || 0,
         today: todayR.rows[0]?.c || 0,
