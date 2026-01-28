@@ -12,6 +12,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
   XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
+import { MirrorPage } from './MirrorPage';
 
 interface DashboardData {
   chats: {
@@ -50,7 +51,7 @@ interface DashboardData {
 export function CreatorDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'engagement' | 'revenue' | 'content' | 'ai-health'>('engagement');
+  const [activeTab, setActiveTab] = useState<'engagement' | 'revenue' | 'content' | 'ai-health' | 'test'>('engagement');
   const [messagesToday, setMessagesToday] = useState(0);
 
   useEffect(() => {
@@ -289,6 +290,7 @@ export function CreatorDashboardPage() {
                 { id: 'revenue' as const, label: 'Revenue', icon: DollarSign },
                 { id: 'content' as const, label: 'Content Performance', icon: FileText },
                 { id: 'ai-health' as const, label: 'AI Health', icon: Zap },
+                { id: 'test' as const, label: 'Test AI', icon: MessageSquare },
               ]).map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -578,8 +580,15 @@ export function CreatorDashboardPage() {
               <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary">
                 Generate Report
               </Button>
-            </CardContent>
-          </Card>
+
+            {/* Test AI Tab */}
+            {activeTab === 'test' && (
+              <div className="space-y-6">
+                <MirrorPage />
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
           {/* Action Items */}
           <Card className="bg-bg-secondary border-border-default">

@@ -143,21 +143,99 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
         // Continue to create new user below
       } else {
         // User exists and is active (verified)
-        // Check if it's a Google OAuth account
+        // ✅ FIX: If OAuth account exists, allow password linking
         if (existingUser.googleId && !existingUser.passwordHash) {
-          logger.warn(`Signup failed: Email already registered via Google - ${email}`);
+          // OAuth-only account - allow password linking
+          logger.info(`Linking password to existing OAuth account: ${email}`);
+          const passwordHash = await hashPassword(password);
+          await userQueries.updatePassword(email.toLowerCase(), passwordHash);
+          
+          // Get updated user
+          const updatedUser = await userQueries.findByEmail(email.toLowerCase());
+          if (!updatedUser) {
+            return res.status(500).json({
+              error: 'Failed to update account. Please try again.',
+              errorCode: 'DATABASE_ERROR'
+            });
+          }
+          
+          // Continue with OTP generation for verification (skip user creation)
+          // Set user and referrerId for later use
+          const user = updatedUser;
+          let referrerId = null;
+          if (referralCode) {
+            const referrer = await userQueries.findByReferralCode(referralCode);
+            if (referrer) {
+              referrerId = referrer.id;
+            }
+          }
+          
+          // Log signup event (for password linking)
+          try {
+            await EventLogger.logUserEvent(user.id, EVENT_TYPES.PASSWORD_LINKED, {
+              source: 'signup'
+            });
+          } catch (eventError) {
+            logger.warn({ err: eventError }, 'Failed to log password linking event');
+          }
+          
+          // If they were referred, link them
+          if (referrerId) {
+            const { db } = await import('../../config/database');
+            const { generateId } = await import('../../utils/idGenerator');
+            
+            const inviteId = generateId.invite();
+            await db.query(
+              'INSERT INTO "Invite" (id, code, "inviterId", "acceptedBy") VALUES ($1, $2, $3, $4)',
+              [inviteId, referralCode, referrerId, user.id]
+            );
+            
+            await EventLogger.logInviteAccepted(user.id, referralCode, referrerId);
+          }
+          
+          // Generate OTP for password verification
+          const otp = generateOTP(config.otp.codeLength);
+          const hashedOTP = await hashOTP(otp);
+          const expiryMinutes = Number.isFinite(config.otp.expiryMinutes) ? config.otp.expiryMinutes : 10;
+          const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+          
+          await otpQueries.create(email.toLowerCase(), hashedOTP, expiresAt, 'signup');
+          logger.info(`OTP created for password linking: ${email}`);
+          
+          const emailSent = await emailService.sendOTP(email, otp, 'signup');
+          
+          if (isProd) {
+            if (!emailSent) {
+              logger.error(`❌ [SIGNUP] Email send failed for ${email} in production`);
+              return res.status(500).json({
+                error: 'Failed to send verification email. Please check your email configuration or try again later.',
+                errorCode: 'EMAIL_SEND_FAILED',
+              });
+            }
+          } else {
+            logger.info(`📧 [SIGNUP] Development mode: OTP ${otp} generated (not sent via email)`);
+          }
+          
+          return res.json({ 
+            message: 'Password linked successfully. OTP sent to your email for verification.',
+            redirect: '/signup/verify?email=' + encodeURIComponent(email)
+          });
+        } else if (existingUser.passwordHash && !existingUser.googleId) {
+          // Password account exists - suggest login
+          logger.warn(`Signup failed: User already exists and active - ${email}`);
           return res.status(409).json({
-            error: 'This email is registered via Google. Please login with Google or use a different email.',
-            errorCode: 'EMAIL_USED_WITH_GOOGLE',
-            suggestGoogleLogin: true
+            error: 'Account already exists. Please login instead.',
+            errorCode: 'USER_ALREADY_EXISTS',
+            suggestLogin: true
+          });
+        } else {
+          // Both exist or account already complete
+          logger.warn(`Signup failed: User already exists with both auth methods - ${email}`);
+          return res.status(409).json({
+            error: 'Account already exists. Please login instead.',
+            errorCode: 'USER_ALREADY_EXISTS'
           });
         }
-        // Normal email/password account
-        logger.warn(`Signup failed: User already exists and active - ${email}`);
-        return res.status(409).json({
-          error: 'Account already exists. Please login instead.',
-          errorCode: 'USER_ALREADY_EXISTS'
-        });
       }
     }    
     
@@ -346,6 +424,12 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     
     // Activate user account
     await userQueries.activateUser(email.toLowerCase());
+    
+    // ✅ Set emailVerified flag
+    await db.query(
+      `UPDATE "User" SET "emailVerified" = true, "emailVerifiedAt" = CURRENT_TIMESTAMP WHERE email = $1`,
+      [email.toLowerCase()]
+    );
     
     // ✅ IMPORTANT: Issue JWT cookie so user can access ProtectedRoute onboarding
     const user = await userQueries.findByEmail(email.toLowerCase());
@@ -708,6 +792,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required'),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 const loginVerifySchema = z.object({
@@ -717,7 +802,7 @@ const loginVerifySchema = z.object({
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const { email, password, rememberMe } = loginSchema.parse(req.body);
     
     // Find user
     const user = await userQueries.findByEmail(email.toLowerCase());
@@ -773,7 +858,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'lax' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000, // 30 days if rememberMe, else 7 days
       path: '/' // ✅ ADD: Explicit path      
     });
 

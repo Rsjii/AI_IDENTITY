@@ -59,31 +59,38 @@ if (!config.google || !config.google.clientId || !config.google.clientSecret) {
           return done(new Error('Email already registered with different Google account'), null);
         }
         
-       // ✅ If user is active:
-// - allow Google login if it's the SAME googleId (even if passwordHash also exists)
-// - block only when it's a password-only account (no googleId)
+       // ✅ FIX: Account linking logic - allow OAuth + password on same account
 if (user.active) {
   if (user.googleId) {
+    // User already has Google linked
     if (user.googleId !== googleId) {
       logger.warn(`Google login blocked: different googleId for same email - ${email}`);
       return done(new Error('Email already registered with different Google account'), null);
     }
-    // ✅ same googleId => allow login (continue)
+    // ✅ Same googleId => allow login (continue)
   } else if (user.passwordHash) {
-    logger.warn(`Google login blocked: password account exists - ${email}`);
-    return done(new Error('This email is already registered with email/password. Please login with your password.'), null);
+    // ✅ FIX: Allow linking Google to existing password account
+    // Instead of blocking, link the accounts
+    if (!googleEmailVerified) {
+      logger.error(`Cannot link Google account: email not verified for ${email}`);
+      return done(new Error('Google email is not verified. Please verify your email with Google first.'), null);
+    }
+    logger.info(`Linking Google account to existing password account: ${email}`);
+    await userQueries.linkGoogleByEmail(email, googleId, googleEmail, googleEmailVerified);
+    // Reload user to get updated fields
+    user = await userQueries.findByEmail(email);
+    // Continue to login (don't return here)
   }
 }
         
-        // ✅ Only allow linking if user is INACTIVE (incomplete signup)
-        // Link Google account if not already linked
+        // ✅ Link Google account if not already linked (for inactive users)
         // ✅ SECURITY: Only link if Google email is verified
         if (!user.googleId) {
           if (!googleEmailVerified) {
             logger.error(`Cannot link Google account: email not verified for ${email}`);
             return done(new Error('Google email is not verified. Please verify your email with Google first.'), null);
           }
-          logger.info(`Linking Google account to inactive email user: ${email}`);
+          logger.info(`Linking Google account to email user: ${email}`);
           await userQueries.linkGoogleByEmail(email, googleId, googleEmail, googleEmailVerified);
           // Reload user to get updated fields
           user = await userQueries.findByEmail(email);
@@ -93,6 +100,14 @@ if (user.active) {
         if (!user.active) {
           await userQueries.activateUser(email);
           user = await userQueries.findByEmail(email);
+        }
+        
+        // ✅ Set emailVerified flag if Google email is verified
+        if (googleEmailVerified) {
+          await db.query(
+            `UPDATE "User" SET "emailVerified" = true, "emailVerifiedAt" = CURRENT_TIMESTAMP WHERE email = $1 AND ("emailVerified" IS NULL OR "emailVerified" = false)`,
+            [email]
+          );
         }
         
         logger.info(`Google OAuth: Existing user found/linked: ${email}`);
@@ -106,9 +121,9 @@ if (user.active) {
         
         try {
           const result = await db.query(
-            `INSERT INTO "User" (id, email, "googleId", "googleEmail", "googleEmailVerified", "referralCode", active, "createdAt", "updatedAt") 
-             VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8) RETURNING *`,
-            [userId, email, googleId, googleEmail, googleEmailVerified, referralCode, now, now]
+            `INSERT INTO "User" (id, email, "googleId", "googleEmail", "googleEmailVerified", "referralCode", active, "emailVerified", "emailVerifiedAt", "createdAt", "updatedAt") 
+             VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10) RETURNING *`,
+            [userId, email, googleId, googleEmail, googleEmailVerified, referralCode, googleEmailVerified, googleEmailVerified ? now : null, now, now]
           );
           user = result.rows[0];
           logger.info(`OAuth user created successfully: ${user.id}`);

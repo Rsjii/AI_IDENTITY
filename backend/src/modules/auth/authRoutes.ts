@@ -46,4 +46,18 @@ router.post('/logout', logout);
 // Resend OTP
 router.post('/resend-otp', sanitizeInput, otpRequestRateLimit, resendOTP);
 
+// Check email availability (for real-time validation)
+router.get('/check-email', async (req, res) => {
+  try {
+    const email = req.query.email as string;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    
+    const { userQueries } = await import('../../config/database');
+    const user = await userQueries.findByEmail(email.toLowerCase());
+    return res.json({ exists: !!user && user.active });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to check email' });
+  }
+});
+
 export default router;

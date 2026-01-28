@@ -96,6 +96,7 @@ export const EVENT_TYPES = {
   SIGNUP: 'signup',
   LOGIN: 'login',
   LOGOUT: 'logout',
+  PASSWORD_LINKED: 'password_linked', // When OAuth user links password or vice versa
   INVITE_SENT: 'invite_sent',
   INVITE_ACCEPTED: 'invite_accepted',
   

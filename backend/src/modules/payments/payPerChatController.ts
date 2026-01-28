@@ -172,12 +172,18 @@ export async function confirmPayment(req: Request, res: Response) {
           </html>
         `;
 
-        // Note: EmailService.sendOTP is for OTP, we need a generic send method
-        // For now, we'll log it - you can extend EmailService to add sendEmail method
-        logger.info(`[Payment] Would send receipt email to ${payerEmail} with reply length ${fullReply.length}`);
+        // ✅ Send receipt email with full answer
+        const emailSent = await emailService.sendEmail(
+          payerEmail, 
+          'Payment Receipt - Your Full Answer', 
+          emailHtml
+        );
         
-        // TODO: Extend EmailService to support generic email sending
-        // await emailService.sendEmail(payerEmail, 'Payment Receipt - Your Full Answer', emailHtml);
+        if (emailSent) {
+          logger.info(`✅ [Payment] Receipt email sent successfully to ${payerEmail}`);
+        } else {
+          logger.warn(`⚠️ [Payment] Failed to send receipt email to ${payerEmail}`);
+        }
       } catch (err: any) {
         logger.error('[Payment] Error sending receipt email:', err);
       }

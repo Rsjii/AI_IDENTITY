@@ -147,6 +147,38 @@ export async function publicChat(req: Request, res: Response) {
       // No payment, show paywall (Option A: don't generate reply before payment)
       const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
 
+      // ✅ Generate teaser reply (limited preview)
+      let previewReply = 'This answer requires payment to unlock the full response. Click below to proceed.';
+      
+      try {
+        // Generate a short teaser by calling AI with truncated context
+        const teaserResult = await generateMirrorReplyWithLogging(
+          u.id, 
+          'public_chat', 
+          message, 
+          {
+            platform: 'web',
+            sessionId: sid,
+            visitorId,
+          }
+        );
+        
+        if (teaserResult.reply) {
+          // Truncate to first 200 characters as teaser
+          const teaser = teaserResult.reply.substring(0, 200);
+          // If truncated, add ellipsis
+          previewReply = teaserResult.reply.length > 200 
+            ? teaser + '...' 
+            : teaser;
+          
+          // Don't save this teaser as a message - it's just for preview
+          // The full reply will be generated after payment
+        }
+      } catch (err: any) {
+        logger.warn('[Public Chat] Failed to generate teaser, using default message:', err);
+        // Use default previewReply
+      }
+      
       return res.json({
         success: true,
         requiresPayment: true,
@@ -156,7 +188,7 @@ export async function publicChat(req: Request, res: Response) {
           premium: { amount: pricing.premium?.amountCents || 500, label: 'Detailed Answer' },
           vip: { amount: pricing.vip?.amountCents || 5000, label: 'Full Consultation' },
         },
-        previewReply: 'This answer requires payment to unlock the full response. Click below to proceed.',
+        previewReply,
       });
     }
   }

@@ -219,6 +219,48 @@ export class EmailService {
       return false;
     }
   }
+
+  /**
+   * Generic email sending method for receipts, notifications, etc.
+   */
+  async sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+    try {
+      if (!config.mail.smtp.pass || !this.resend) {
+        logger.error('❌ [EMAIL] Resend API not configured');
+        return false;
+      }
+
+      if (isProd) {
+        try {
+          const result = await this.resend.emails.send({
+            from: config.mail.from || 'onboarding@resend.dev',
+            to,
+            subject,
+            html,
+          });
+
+          const { data, error } = result || { data: null, error: null };
+          if (error) {
+            logger.error('❌ [EMAIL] Send failed:', error);
+            return false;
+          }
+
+          logger.info(`✅ [EMAIL] Email sent: ${subject} to ${to}`, { emailId: data?.id });
+          return true;
+        } catch (error: any) {
+          logger.error('❌ [EMAIL] Send error:', error);
+          return false;
+        }
+      } else {
+        // Development: Log but don't send
+        logger.info(`📧 [EMAIL] Development mode: Would send email "${subject}" to ${to}`);
+        return true;
+      }
+    } catch (error: any) {
+      logger.error('❌ [EMAIL] Send error:', error);
+      return false;
+    }
+  }
 }
 
 // OTP utilities

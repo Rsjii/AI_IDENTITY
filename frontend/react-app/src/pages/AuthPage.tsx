@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,11 +39,37 @@ export function AuthPage() {
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Signup state
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupReferralCode, setSignupReferralCode] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  // Real-time email validation on signup
+  useEffect(() => {
+    if (!signupEmail || !signupEmail.includes('@')) {
+      setEmailError('');
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(signupEmail)}`);
+        const data = await res.json();
+        if (data.exists) {
+          setEmailError('This email is already registered. Try logging in instead.');
+        } else {
+          setEmailError('');
+        }
+      } catch (err) {
+        // Ignore errors
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [signupEmail]);
 
   const goGoogle = () => {
     // Backend mounted at: /api/auth/google
@@ -58,7 +84,7 @@ export function AuthPage() {
     try {
       const result = await apiFetch<{ message: string; redirect: string; token?: string }>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, rememberMe }),
       });
 
       if (result.redirect) {
@@ -212,6 +238,19 @@ export function AuthPage() {
                       />
                     </div>
 
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="remember-me"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="remember-me" className="text-sm cursor-pointer text-muted-foreground">
+                        Remember me for 30 days
+                      </label>
+                    </div>
+
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? (
                         <>
@@ -240,7 +279,11 @@ export function AuthPage() {
                         onChange={(e) => setSignupEmail(e.target.value)}
                         required
                         disabled={loading}
+                        className={emailError ? 'border-red-500' : ''}
                       />
+                      {emailError && (
+                        <p className="text-sm text-red-500">{emailError}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS "User" (
     "phone" TEXT,
     "bio" TEXT,
     "active" BOOLEAN NOT NULL DEFAULT false,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "emailVerifiedAt" TIMESTAMPTZ,
     "referralCode" TEXT,
     "onboardingCompleted" BOOLEAN DEFAULT false,
     "usernameLastChanged" TIMESTAMP,

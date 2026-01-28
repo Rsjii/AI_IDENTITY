@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, Copy, FileText } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, Copy, FileText, Info, Chrome } from 'lucide-react';
+import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 
@@ -55,6 +57,15 @@ export function SettingsPage() {
     pendingEarningsCents: number;
   } | null>(null);
   const [requestingPayout, setRequestingPayout] = useState(false);
+
+  // Password management
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
 
   useEffect(() => {
     if (state.status === 'authenticated') {
@@ -125,6 +136,62 @@ export function SettingsPage() {
       setError(e.message || 'Failed to request payout');
     } finally {
       setRequestingPayout(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordSaving(true);
+    setPasswordError('');
+    setPasswordSuccess('');
+    try {
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setPasswordSuccess('Password changed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (e: any) {
+      setPasswordError(e.message || 'Failed to change password');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleRequestSetPasswordOTP = async () => {
+    setPasswordSaving(true);
+    setPasswordError('');
+    try {
+      await apiFetch('/api/auth/set-password/request-otp', {
+        method: 'POST',
+      });
+      setOtpSent(true);
+      setPasswordSuccess('OTP sent to your email!');
+    } catch (e: any) {
+      setPasswordError(e.message || 'Failed to send OTP');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    setPasswordSaving(true);
+    setPasswordError('');
+    setPasswordSuccess('');
+    try {
+      await apiFetch('/api/auth/set-password', {
+        method: 'POST',
+        body: JSON.stringify({ otpCode, newPassword }),
+      });
+      setPasswordSuccess('Password set successfully! You can now login with email/password.');
+      setOtpCode('');
+      setNewPassword('');
+      setOtpSent(false);
+      await refresh(); // Refresh user data to update hasPassword
+    } catch (e: any) {
+      setPasswordError(e.message || 'Failed to set password');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -648,28 +715,173 @@ export function SettingsPage() {
 
         {/* Security Tab */}
         {activeTab === 'security' && (
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your account security</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <p className="text-sm text-muted-foreground">Password changes are not yet available. Contact support.</p>
-              </div>
+          <div className="space-y-6">
+            {/* Password Section */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Password</CardTitle>
+                <CardDescription>
+                  {state.user.hasPassword 
+                    ? 'Change your password' 
+                    : 'Set a password for your account (currently using Google login)'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {passwordError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{passwordError}</AlertDescription>
+                  </Alert>
+                )}
+                {passwordSuccess && (
+                  <Alert>
+                    <Check className="h-4 w-4" />
+                    <AlertDescription>{passwordSuccess}</AlertDescription>
+                  </Alert>
+                )}
+                {state.user.hasPassword ? (
+                  // Change Password Form
+                  <>
+                    <div className="space-y-2">
+                      <Label>Current Password</Label>
+                      <Input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>New Password</Label>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                      />
+                      <PasswordStrengthMeter password={newPassword} />
+                    </div>
+                    <Button 
+                      onClick={handleChangePassword} 
+                      disabled={passwordSaving || !currentPassword || !newPassword}
+                    >
+                      {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Change Password
+                    </Button>
+                  </>
+                ) : (
+                  // Set Password Form (for OAuth users)
+                  <>
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        You're currently using Google login. Set a password to enable email/password login.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Request OTP</Label>
+                        <Button 
+                          variant="outline" 
+                          onClick={handleRequestSetPasswordOTP}
+                          disabled={passwordSaving || otpSent}
+                        >
+                          {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Send OTP to {state.user.email}
+                        </Button>
+                      </div>
+                      {otpSent && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>OTP Code</Label>
+                            <Input
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              placeholder="Enter 6-digit OTP"
+                              maxLength={6}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>New Password</Label>
+                            <Input
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              placeholder="Enter new password"
+                            />
+                            <PasswordStrengthMeter password={newPassword} />
+                          </div>
+                          <Button 
+                            onClick={handleSetPassword} 
+                            disabled={passwordSaving || !otpCode || !newPassword || otpCode.length !== 6}
+                          >
+                            {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Set Password
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Two-Factor Authentication</label>
+            {/* Connected Accounts */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Connected Accounts</CardTitle>
+                <CardDescription>Manage your connected authentication methods</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Chrome className="h-5 w-5" />
+                    <div>
+                      <div className="font-medium">Google</div>
+                      <div className="text-sm text-muted-foreground">
+                        {state.user.hasGoogle ? 'Connected' : 'Not connected'}
+                      </div>
+                    </div>
+                  </div>
+                  {state.user.hasGoogle ? (
+                    <Button variant="outline" size="sm" disabled>
+                      Connected
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.location.href = '/api/auth/google'}
+                    >
+                      Connect
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Two-Factor Authentication */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Two-Factor Authentication</CardTitle>
+                <CardDescription>Add an extra layer of security to your account</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <p className="text-sm text-muted-foreground">2FA is coming soon.</p>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Active Sessions</label>
+            {/* Active Sessions */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Active Sessions</CardTitle>
+                <CardDescription>Manage your active login sessions</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <p className="text-sm text-muted-foreground">Session management coming soon.</p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </Layout>
