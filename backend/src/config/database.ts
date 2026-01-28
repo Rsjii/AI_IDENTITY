@@ -533,6 +533,53 @@ CREATE TABLE IF NOT EXISTS "email_logs" (
   "recipient" TEXT NOT NULL,
   "sentAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ========== A1: ERROR LOGGING ==========
+CREATE TABLE IF NOT EXISTS "error_logs" (
+  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "message" TEXT NOT NULL,
+  "stack" TEXT,
+  "source" TEXT NOT NULL DEFAULT 'backend',
+  "severity" TEXT NOT NULL DEFAULT 'error' CHECK ("severity" IN ('info', 'warning', 'error', 'critical')),
+  "userId" TEXT,
+  "meta" JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_error_logs_createdAt" ON "error_logs"("createdAt");
+CREATE INDEX IF NOT EXISTS "idx_error_logs_severity" ON "error_logs"("severity");
+CREATE INDEX IF NOT EXISTS "idx_error_logs_source" ON "error_logs"("source");
+CREATE INDEX IF NOT EXISTS "idx_error_logs_userId" ON "error_logs"("userId");
+CREATE INDEX IF NOT EXISTS "idx_error_logs_severity_createdAt" ON "error_logs"("severity", "createdAt");
+
+-- ========== B1: ADDITIONAL INDEXES FOR OPTIMIZATION ==========
+-- Chat sessions optimization
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_creatorId" ON "chat_sessions"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_visitorId" ON "chat_sessions"("visitorId");
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_platform" ON "chat_sessions"("platform");
+
+-- Chat messages optimization
+CREATE INDEX IF NOT EXISTS "idx_chat_messages_sessionId" ON "chat_messages"("sessionId");
+CREATE INDEX IF NOT EXISTS "idx_chat_messages_createdAt" ON "chat_messages"("createdAt");
+
+-- Stripe payments optimization
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_creatorId" ON "stripe_payments"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_status" ON "stripe_payments"("status");
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_type" ON "stripe_payments"("type");
+CREATE INDEX IF NOT EXISTS "idx_stripe_payments_createdAt" ON "stripe_payments"("createdAt");
+
+-- Mirror runs optimization
+CREATE INDEX IF NOT EXISTS "idx_mirror_runs_model" ON "mirror_runs"("model");
+CREATE INDEX IF NOT EXISTS "idx_mirror_runs_platform" ON "mirror_runs"("platform");
+CREATE INDEX IF NOT EXISTS "idx_mirror_runs_latencyMs" ON "mirror_runs"("latencyMs");
+
+-- User optimization
+CREATE INDEX IF NOT EXISTS "idx_user_planTier" ON "User"("planTier");
+CREATE INDEX IF NOT EXISTS "idx_user_createdAt" ON "User"("createdAt");
+CREATE INDEX IF NOT EXISTS "idx_user_profileCompleted" ON "User"("profileCompleted");
+
+-- Knowledge chunks optimization for RAG
+CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_userId_sourceId" ON "knowledge_chunks"("userId", "sourceId");
 `;
 
 export async function initializeDatabase() {

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { 
-  Briefcase, Code, Palette, TrendingUp, Heart, GraduationCap, 
+import {
+  Briefcase, Code, Palette, TrendingUp, Heart, GraduationCap,
   DollarSign, Target, Sparkles
 } from 'lucide-react';
 
@@ -95,6 +95,9 @@ export function OnboardingQuizPage() {
   const saved = loadQuizState();
   const [currentStep, setCurrentStep] = useState(saved.lastStep);
   const [answers, setAnswers] = useState<Partial<QuizAnswers>>(saved.answers);
+  const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
+  const [isAnimating, setIsAnimating] = useState(false);
+  const questionRef = useRef<HTMLDivElement>(null);
 
   const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
@@ -113,7 +116,12 @@ export function OnboardingQuizPage() {
 
   const next = () => {
     if (currentStep < TOTAL_STEPS - 1) {
-      setCurrentStep((prev: number) => prev + 1);
+      setAnimationDirection('right');
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentStep((prev: number) => prev + 1);
+        setIsAnimating(false);
+      }, 150);
     } else {
       handleSubmit();
     }
@@ -121,7 +129,12 @@ export function OnboardingQuizPage() {
 
   const prev = () => {
     if (currentStep > 0) {
-      setCurrentStep((prev: number) => prev - 1);
+      setAnimationDirection('left');
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentStep((prev: number) => prev - 1);
+        setIsAnimating(false);
+      }, 150);
     }
   };
 
@@ -204,20 +217,65 @@ export function OnboardingQuizPage() {
     }
   };
 
+  // Get animation class based on direction and state
+  const getAnimationClass = () => {
+    if (isAnimating) {
+      return animationDirection === 'right'
+        ? 'opacity-0 translate-x-[-20px]'
+        : 'opacity-0 translate-x-[20px]';
+    }
+    return 'opacity-100 translate-x-0';
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-bg-primary flex items-center justify-center">
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-bg-primary via-bg-primary to-accent-primary/5 flex items-center justify-center">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-accent-primary/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-purple-500/5 blur-3xl" />
+      </div>
+
       {/* Full-screen modal */}
-      <div className="w-full h-full flex flex-col">
-        {/* Progress Bar - Top */}
+      <div className="w-full h-full flex flex-col relative z-10">
+        {/* Header with Progress Bar */}
         <div className="w-full px-6 pt-6 pb-4">
-          <div className="max-w-4xl mx-auto space-y-2">
-            <div className="flex justify-between text-sm text-text-secondary">
-              <span>Question {currentStep + 1} of {TOTAL_STEPS}</span>
-              <span>{Math.round(progress)}%</span>
+          <div className="max-w-4xl mx-auto">
+            {/* Step indicators */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              {Array.from({ length: TOTAL_STEPS }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx < currentStep
+                      ? 'w-8 bg-accent-primary'
+                      : idx === currentStep
+                      ? 'w-8 bg-accent-gradient'
+                      : 'w-2 bg-bg-tertiary'
+                  }`}
+                />
+              ))}
             </div>
-            <div className="h-2 w-full bg-bg-tertiary rounded-full overflow-hidden">
+
+            {/* Progress text */}
+            <div className="flex justify-between text-sm text-text-secondary">
+              <span className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent-primary/10 text-accent-primary text-xs font-medium">
+                  {currentStep + 1}
+                </span>
+                <span>of {TOTAL_STEPS} questions</span>
+              </span>
+              <span className="flex items-center gap-1">
+                {currentStep > 0 && (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                )}
+                <span>{Math.round(progress)}% complete</span>
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-1.5 w-full bg-bg-tertiary rounded-full overflow-hidden mt-2">
               <div
-                className="h-full bg-accent-gradient transition-all duration-300"
+                className="h-full bg-gradient-to-r from-accent-primary to-purple-500 transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -227,9 +285,10 @@ export function OnboardingQuizPage() {
         {/* Question Content - Center */}
         <div className="flex-1 flex items-center justify-center px-6 py-8 overflow-hidden">
           <div className="max-w-4xl w-full">
-            <div 
+            <div
+              ref={questionRef}
               key={currentStep}
-              className="animate-slide-in-from-right-200"
+              className={`transition-all duration-300 ease-out ${getAnimationClass()}`}
             >
               {renderQuestion()}
             </div>
@@ -238,24 +297,62 @@ export function OnboardingQuizPage() {
 
         {/* Navigation - Bottom */}
         <div className="w-full px-6 pb-6">
-          <div className="max-w-4xl mx-auto flex justify-between items-center">
-            <Button
-              variant="ghost"
-              onClick={prev}
-              disabled={currentStep === 0}
-              className="text-text-secondary hover:text-text-primary"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <Button
-              onClick={next}
-              disabled={!canProceed()}
-              className="bg-accent-gradient hover:opacity-90 text-white px-8"
-            >
-              {currentStep === TOTAL_STEPS - 1 ? 'Complete' : 'Next'}
-              {currentStep < TOTAL_STEPS - 1 && <ArrowRight className="h-4 w-4 ml-2" />}
-            </Button>
+          <div className="max-w-4xl mx-auto">
+            {/* Validation feedback */}
+            {!canProceed() && currentStep !== 4 && (
+              <div className="text-center text-sm text-text-tertiary mb-4">
+                {currentStep === 0 && !answers.expertise && 'Select your primary expertise to continue'}
+                {currentStep === 2 && (answers.targetAudience?.length || 0) === 0 && 'Select at least 1 audience type'}
+                {currentStep === 2 && (answers.targetAudience?.length || 0) > 3 && 'Maximum 3 audience types allowed'}
+                {currentStep === 3 && (answers.topics?.length || 0) < 10 && 'Enter at least 10 characters'}
+                {currentStep === 5 && !answers.language && 'Select your primary language'}
+                {currentStep === 6 && !answers.exampleQuestions?.every(q => q.length >= 10) && 'Each example needs at least 10 characters'}
+                {currentStep === 7 && !answers.responseLength && 'Select your preferred response length'}
+                {currentStep === 8 && !answers.emojiUsage && 'Select your emoji preference'}
+                {currentStep === 9 && (!answers.personalityWords?.every(w => w.length >= 3) || new Set(answers.personalityWords).size !== 3) && 'Enter 3 unique words (3-15 chars each)'}
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
+              <Button
+                variant="ghost"
+                onClick={prev}
+                disabled={currentStep === 0 || isAnimating}
+                className="text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+
+              <div className="flex items-center gap-4">
+                {currentStep === TOTAL_STEPS - 1 && (
+                  <span className="text-sm text-text-tertiary hidden md:block">
+                    Almost done!
+                  </span>
+                )}
+                <Button
+                  onClick={next}
+                  disabled={!canProceed() || isAnimating}
+                  className={`px-8 transition-all duration-200 ${
+                    canProceed()
+                      ? 'bg-accent-gradient hover:opacity-90 hover:scale-105 text-white shadow-lg shadow-accent-primary/20'
+                      : 'bg-bg-tertiary text-text-tertiary'
+                  }`}
+                >
+                  {currentStep === TOTAL_STEPS - 1 ? (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Complete
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { apiFetch, apiFetchForm } from '@/lib/api';
-import { 
-  Upload, FileText, Link as LinkIcon, Youtube, Twitter, 
-  Linkedin, File, X, CheckCircle2, Loader2
+import {
+  Upload, FileText, Link as LinkIcon, Youtube, Twitter,
+  Linkedin, File, X, CheckCircle2, Loader2, AlertCircle,
+  FileImage, FileSpreadsheet, Star, Sparkles, TrendingUp,
+  Check, ExternalLink
 } from 'lucide-react';
 
 interface ContentItem {
@@ -17,7 +21,22 @@ interface ContentItem {
   wordCount?: number;
 }
 
+interface SocialConnection {
+  platform: string;
+  connected: boolean;
+  username?: string;
+  itemCount?: number;
+}
+
 type TabType = 'files' | 'text' | 'url' | 'social';
+
+const QUALITY_THRESHOLDS = {
+  excellent: { min: 10000, label: 'Excellent', color: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-500' },
+  great: { min: 5000, label: 'Great', color: 'from-green-500 to-green-600', bg: 'bg-green-500' },
+  good: { min: 2000, label: 'Good', color: 'from-yellow-500 to-yellow-600', bg: 'bg-yellow-500' },
+  fair: { min: 500, label: 'Fair', color: 'from-orange-500 to-orange-600', bg: 'bg-orange-500' },
+  needsMore: { min: 0, label: 'Needs More', color: 'from-red-500 to-red-600', bg: 'bg-red-500' }
+};
 
 export function OnboardingContentPage() {
   const nav = useNavigate();
@@ -28,21 +47,51 @@ export function OnboardingContentPage() {
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([
+    { platform: 'youtube', connected: false },
+    { platform: 'twitter', connected: false },
+    { platform: 'medium', connected: false },
+    { platform: 'linkedin', connected: false },
+  ]);
 
   // Stats calculation
   const totalFiles = items.length;
   const totalWords = items.reduce((sum, item) => sum + (item.wordCount || 0), 0);
   const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
-  const estimatedHours = Math.ceil(totalWords / 500); // Rough estimate: 500 words/hour
-  const qualityScore = totalWords > 10000 ? 'Excellent' : totalWords > 5000 ? 'Great' : totalWords > 1000 ? 'Good' : 'Needs More';
+  const estimatedHours = Math.ceil(totalWords / 500);
+
+  // Quality score calculation
+  const getQualityTier = () => {
+    if (totalWords >= QUALITY_THRESHOLDS.excellent.min) return QUALITY_THRESHOLDS.excellent;
+    if (totalWords >= QUALITY_THRESHOLDS.great.min) return QUALITY_THRESHOLDS.great;
+    if (totalWords >= QUALITY_THRESHOLDS.good.min) return QUALITY_THRESHOLDS.good;
+    if (totalWords >= QUALITY_THRESHOLDS.fair.min) return QUALITY_THRESHOLDS.fair;
+    return QUALITY_THRESHOLDS.needsMore;
+  };
+
+  const qualityTier = getQualityTier();
+  const qualityProgress = Math.min((totalWords / QUALITY_THRESHOLDS.excellent.min) * 100, 100);
+
+  // Content breakdown by type
+  const contentBreakdown = items.reduce((acc, item) => {
+    const type = item.type.includes('pdf') ? 'pdf'
+      : item.type.includes('word') || item.type.includes('doc') ? 'doc'
+      : item.type.includes('text') || item.type.includes('markdown') ? 'text'
+      : item.type.includes('sheet') || item.type.includes('excel') || item.type.includes('csv') ? 'spreadsheet'
+      : item.type.includes('youtube') ? 'youtube'
+      : item.type.includes('paste') ? 'paste'
+      : 'other';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   const refresh = async () => {
     const r = await apiFetch<{ items: ContentItem[] }>('/api/content/list');
     setItems(r.items || []);
   };
 
-  useEffect(() => { 
-    refresh().catch(() => {}); 
+  useEffect(() => {
+    refresh().catch(() => {});
   }, []);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -69,7 +118,6 @@ export function OnboardingContentPage() {
   }, []);
 
   const uploadFile = async (file: File) => {
-    // Validate file type
     const allowedTypes = ['.pdf', '.txt', '.md', '.docx', '.doc', '.xlsx', '.csv'];
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedTypes.includes(fileExt)) {
@@ -77,14 +125,12 @@ export function OnboardingContentPage() {
       return;
     }
 
-    // Validate file size (25 MB max)
     if (file.size > 25 * 1024 * 1024) {
       alert('File size exceeds 25 MB limit');
       return;
     }
 
     setLoading(true);
-    // Use filename as key so it can match item.title
     const fileId = file.name;
     setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
 
@@ -93,8 +139,7 @@ export function OnboardingContentPage() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      
-      // Simulate progress (in real app, use XMLHttpRequest for progress tracking)
+
       progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           const current = prev[fileId] || 0;
@@ -105,7 +150,6 @@ export function OnboardingContentPage() {
         });
       }, 200);
 
-      // ✅ Get CSRF token and add to FormData
       try {
         const csrfRes = await fetch('/api/csrf', { credentials: 'include' });
         const csrfData = await csrfRes.json();
@@ -116,7 +160,7 @@ export function OnboardingContentPage() {
 
       await apiFetchForm('/api/content/upload', { method: 'POST', body: fd });
       setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
-      
+
       await refresh();
 
       setTimeout(() => {
@@ -154,9 +198,9 @@ export function OnboardingContentPage() {
     }
     setLoading(true);
     try {
-      await apiFetch('/api/content/paste', { 
-        method: 'POST', 
-        body: JSON.stringify({ title: 'Paste', text: pasteText }) 
+      await apiFetch('/api/content/paste', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Paste', text: pasteText })
       });
       setPasteText('');
       await refresh();
@@ -171,9 +215,9 @@ export function OnboardingContentPage() {
     if (!youtubeUrl.trim()) return;
     setLoading(true);
     try {
-      await apiFetch('/api/content/youtube', { 
-        method: 'POST', 
-        body: JSON.stringify({ url: youtubeUrl, title: 'YouTube' }) 
+      await apiFetch('/api/content/youtube', {
+        method: 'POST',
+        body: JSON.stringify({ url: youtubeUrl, title: 'YouTube' })
       });
       setYoutubeUrl('');
       await refresh();
@@ -185,17 +229,74 @@ export function OnboardingContentPage() {
   };
 
   const getFileIcon = (type: string) => {
-    if (type.includes('pdf')) return '📄';
-    if (type.includes('text') || type.includes('markdown')) return '📝';
-    if (type.includes('word') || type.includes('doc')) return '📊';
-    if (type.includes('sheet') || type.includes('excel')) return '📈';
-    return '📁';
+    if (type.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+    if (type.includes('text') || type.includes('markdown')) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (type.includes('word') || type.includes('doc')) return <FileText className="h-5 w-5 text-blue-600" />;
+    if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (type.includes('youtube')) return <Youtube className="h-5 w-5 text-red-500" />;
+    if (type.includes('paste')) return <FileText className="h-5 w-5 text-purple-500" />;
+    return <File className="h-5 w-5 text-gray-500" />;
   };
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleSocialConnect = async (platform: string) => {
+    if (platform === 'youtube') {
+      const url = window.prompt('Enter your YouTube channel URL');
+      if (!url) return;
+      try {
+        setLoading(true);
+        await apiFetch('/api/content/social/youtube-channel', {
+          method: 'POST',
+          body: JSON.stringify({ channelUrl: url }),
+        });
+        setSocialConnections(prev => prev.map(c =>
+          c.platform === 'youtube' ? { ...c, connected: true, username: url } : c
+        ));
+        await refresh();
+        alert('YouTube channel saved! Content will be imported shortly.');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save YouTube channel.');
+      } finally {
+        setLoading(false);
+      }
+    } else if (platform === 'twitter') {
+      try {
+        setLoading(true);
+        window.location.href = '/api/content/social/twitter/authorize';
+      } catch (err) {
+        console.error(err);
+        alert('Failed to connect Twitter.');
+        setLoading(false);
+      }
+    } else {
+      alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} import will be added in the next phase.`);
+    }
+  };
+
+  const getSocialIcon = (platform: string) => {
+    switch (platform) {
+      case 'youtube': return <Youtube className="h-6 w-6" />;
+      case 'twitter': return <Twitter className="h-6 w-6" />;
+      case 'medium': return <FileText className="h-6 w-6" />;
+      case 'linkedin': return <Linkedin className="h-6 w-6" />;
+      default: return <ExternalLink className="h-6 w-6" />;
+    }
+  };
+
+  const getSocialColor = (platform: string) => {
+    switch (platform) {
+      case 'youtube': return 'bg-red-600 hover:bg-red-700';
+      case 'twitter': return 'bg-black hover:bg-gray-900';
+      case 'medium': return 'bg-black hover:bg-gray-900';
+      case 'linkedin': return 'bg-blue-600 hover:bg-blue-700';
+      default: return 'bg-gray-600 hover:bg-gray-700';
+    }
   };
 
   return (
@@ -206,7 +307,7 @@ export function OnboardingContentPage() {
           <div className="flex-1 space-y-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">Upload Your Content</h1>
-              <p className="text-text-secondary">Add your knowledge base to train your AI</p>
+              <p className="text-text-secondary">Add your knowledge base to train your AI clone</p>
             </div>
 
             {/* Tabs */}
@@ -270,7 +371,7 @@ export function OnboardingContentPage() {
                       accept=".pdf,.txt,.md,.docx,.doc,.xlsx,.csv"
                     />
                     <label htmlFor="file-upload">
-                      <Button className="bg-accent-gradient hover:opacity-90 text-white">
+                      <Button className="bg-accent-gradient hover:opacity-90 text-white cursor-pointer">
                         Choose Files
                       </Button>
                     </label>
@@ -279,32 +380,39 @@ export function OnboardingContentPage() {
                   {/* Uploaded Files List */}
                   {items.length > 0 && (
                     <div className="p-6 space-y-3 border-t border-border-default">
-                      <h3 className="font-semibold mb-4">Uploaded Files</h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold">Uploaded Content ({items.length})</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {formatFileSize(totalSize)} total
+                        </Badge>
+                      </div>
                       {items.map((item) => {
                         const progress = uploadProgress[item.title];
                         return (
                           <div
                             key={item.id}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary border border-border-default"
+                            className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary border border-border-default hover:border-accent-primary/50 transition-colors"
                           >
-                            <span className="text-2xl">{getFileIcon(item.type)}</span>
+                            <div className="flex-shrink-0">
+                              {getFileIcon(item.type)}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-medium truncate">{item.title || item.type}</p>
                                 {item.size && (
-                                  <span className="text-xs text-text-tertiary">
+                                  <Badge variant="outline" className="text-xs">
                                     {formatFileSize(item.size)}
-                                  </span>
+                                  </Badge>
+                                )}
+                                {item.wordCount && (
+                                  <Badge variant="outline" className="text-xs bg-accent-primary/10">
+                                    {item.wordCount.toLocaleString()} words
+                                  </Badge>
                                 )}
                               </div>
                               {progress !== undefined && progress < 100 && (
                                 <div className="mt-2">
-                                  <div className="h-1 bg-bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-accent-gradient transition-all duration-300"
-                                      style={{ width: `${progress}%` }}
-                                    />
-                                  </div>
+                                  <Progress value={progress} className="h-1" />
                                 </div>
                               )}
                             </div>
@@ -312,7 +420,7 @@ export function OnboardingContentPage() {
                               onClick={() => removeItem(item.id)}
                               className="p-1 hover:bg-bg-elevated rounded transition-colors"
                             >
-                              <X className="h-4 w-4 text-text-tertiary" />
+                              <X className="h-4 w-4 text-text-tertiary hover:text-error" />
                             </button>
                           </div>
                         );
@@ -327,14 +435,25 @@ export function OnboardingContentPage() {
                   <Textarea
                     value={pasteText}
                     onChange={(e) => setPasteText(e.target.value)}
-                    placeholder="Paste your blog posts, articles, social media content..."
+                    placeholder="Paste your blog posts, articles, social media content, notes, expertise..."
                     className="min-h-[300px] bg-bg-secondary border-border-default text-text-primary placeholder:text-text-muted focus:border-accent-primary"
                     maxLength={50000}
                   />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-text-tertiary">
-                      Min 100 characters • {pasteText.length} / 50,000
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-text-tertiary">
+                        Min 100 characters
+                      </span>
+                      <Badge variant={pasteText.length >= 100 ? 'default' : 'outline'} className="text-xs">
+                        {pasteText.length.toLocaleString()} / 50,000
+                      </Badge>
+                      {pasteText.length >= 100 && (
+                        <Badge className="text-xs bg-green-500/10 text-green-500 border-green-500/20">
+                          <Check className="h-3 w-3 mr-1" />
+                          Ready to add
+                        </Badge>
+                      )}
+                    </div>
                     <Button
                       onClick={addPaste}
                       disabled={loading || pasteText.trim().length < 100}
@@ -352,7 +471,7 @@ export function OnboardingContentPage() {
                     <Input
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
-                      placeholder="https://youtube.com/... or https://medium.com/... or any URL"
+                      placeholder="https://youtube.com/... or any URL with content"
                       className="flex-1 bg-bg-secondary border-border-default text-text-primary placeholder:text-text-muted focus:border-accent-primary"
                     />
                     <Button
@@ -363,77 +482,88 @@ export function OnboardingContentPage() {
                       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add URL'}
                     </Button>
                   </div>
-                  <p className="text-sm text-text-tertiary">
-                    Supports: YouTube (transcript), Medium/Substack articles, Google Docs (public links), Twitter threads
-                  </p>
+                  <div className="rounded-lg bg-bg-secondary border border-border-default p-4">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-accent-primary" />
+                      Supported URL Types
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Youtube className="h-4 w-4 text-red-500" />
+                        YouTube videos (transcript)
+                      </div>
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <FileText className="h-4 w-4 text-green-500" />
+                        Medium / Substack articles
+                      </div>
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                        Google Docs (public links)
+                      </div>
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Twitter className="h-4 w-4 text-black dark:text-white" />
+                        Twitter/X threads
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {activeTab === 'social' && (
-                <div className="space-y-4">
-                  <p className="text-text-secondary">
-                    Connect your social media accounts to import your content automatically
-                  </p>
+                <div className="space-y-6">
+                  <div className="rounded-lg bg-gradient-to-r from-accent-primary/10 to-purple-500/10 border border-accent-primary/20 p-4">
+                    <h4 className="font-medium mb-1 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-accent-primary" />
+                      Import from Social Media
+                    </h4>
+                    <p className="text-sm text-text-secondary">
+                      Connect your accounts to automatically import your best content
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { name: 'YouTube Channel', icon: Youtube, color: 'bg-red-600', type: 'youtube' as const },
-                      { name: 'Twitter/X', icon: Twitter, color: 'bg-black', type: 'twitter' as const },
-                      { name: 'Medium', icon: FileText, color: 'bg-black', type: 'medium' as const },
-                      { name: 'LinkedIn', icon: Linkedin, color: 'bg-blue-600', type: 'linkedin' as const },
-                    ].map((platform) => {
-                      const Icon = platform.icon;
+                    {socialConnections.map((connection) => {
+                      const isConnected = connection.connected;
                       return (
                         <button
-                          key={platform.name}
-                          className={`p-6 rounded-xl border-2 border-border-default bg-bg-secondary hover:border-accent-primary transition-all flex items-center gap-3 ${platform.color} text-white`}
-                          onClick={async () => {
-                            if (platform.type === 'youtube') {
-                              const url = window.prompt('Enter your YouTube channel URL');
-                              if (!url) return;
-                              try {
-                                setLoading(true);
-                                await apiFetch('/api/content/social/youtube-channel', {
-                                  method: 'POST',
-                                  body: JSON.stringify({ channelUrl: url }),
-                                });
-                                await refresh();
-                                alert('YouTube channel saved! Full auto-import will come in the next phase.');
-                              } catch (err) {
-                                console.error(err);
-                                alert('Failed to save YouTube channel.');
-                              } finally {
-                                setLoading(false);
-                              }
-                            } else if (platform.type === 'twitter') {
-                              // ✅ NEW: Use OAuth flow instead of handle input
-                              try {
-                                setLoading(true);
-                                // Redirect to Twitter OAuth
-                                window.location.href = '/api/content/social/twitter/authorize';
-                              } catch (err) {
-                                console.error(err);
-                                alert('Failed to connect Twitter.');
-                                setLoading(false);
-                              }
-                            } else {
-                              alert('Medium/LinkedIn import will be added in the next phase.');
-                            }
-                          }}
+                          key={connection.platform}
+                          onClick={() => handleSocialConnect(connection.platform)}
+                          className={`relative p-6 rounded-xl border-2 transition-all ${
+                            isConnected
+                              ? 'border-green-500/50 bg-green-500/5'
+                              : 'border-border-default bg-bg-secondary hover:border-accent-primary/50'
+                          }`}
                         >
-                          <Icon className="h-6 w-6" />
-                          <div className="flex-1 text-left">
-                            <div className="font-semibold">{platform.name}</div>
-                            <div className="text-sm opacity-90">
-                              Connect
+                          {isConnected && (
+                            <div className="absolute top-3 right-3">
+                              <Badge className="bg-green-500 text-white text-xs">
+                                <Check className="h-3 w-3 mr-1" />
+                                Connected
+                              </Badge>
+                            </div>
+                          )}
+                          <div className={`inline-flex p-3 rounded-lg mb-3 ${getSocialColor(connection.platform)} text-white`}>
+                            {getSocialIcon(connection.platform)}
+                          </div>
+                          <div className="text-left">
+                            <div className="font-semibold capitalize mb-1">
+                              {connection.platform === 'twitter' ? 'Twitter / X' : connection.platform}
+                            </div>
+                            <div className="text-sm text-text-secondary">
+                              {isConnected
+                                ? `${connection.itemCount || 0} items imported`
+                                : 'Click to connect'}
                             </div>
                           </div>
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-xs text-text-tertiary">
-                    🔒 We only read your content, never post on your behalf
-                  </p>
+
+                  <div className="flex items-center gap-2 text-xs text-text-tertiary bg-bg-secondary rounded-lg p-3">
+                    <AlertCircle className="h-4 w-4" />
+                    We only read your public content. We never post on your behalf.
+                  </div>
                 </div>
               )}
             </div>
@@ -458,13 +588,62 @@ export function OnboardingContentPage() {
 
           {/* Stats Sidebar (30%) */}
           <div className="w-[30%] space-y-4">
+            {/* Quality Score Card */}
             <div className="bg-bg-secondary rounded-xl p-6 border border-border-default sticky top-6">
-              <h2 className="text-lg font-semibold mb-4">Content Summary</h2>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Star className="h-5 w-5 text-accent-primary" />
+                AI Quality Score
+              </h2>
+
+              {/* Visual Quality Gauge */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-2xl font-bold bg-gradient-to-r ${qualityTier.color} bg-clip-text text-transparent`}>
+                    {qualityTier.label}
+                  </span>
+                  <span className="text-sm text-text-tertiary">
+                    {Math.round(qualityProgress)}%
+                  </span>
+                </div>
+                <div className="h-3 bg-bg-tertiary rounded-full overflow-hidden">
+                  <div
+                    className={`h-full bg-gradient-to-r ${qualityTier.color} transition-all duration-500`}
+                    style={{ width: `${qualityProgress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-text-tertiary mt-1">
+                  <span>0</span>
+                  <span>2K</span>
+                  <span>5K</span>
+                  <span>10K+ words</span>
+                </div>
+              </div>
+
+              {/* Quality Tips */}
+              {totalWords < 5000 && (
+                <div className="mb-6 rounded-lg bg-accent-primary/10 border border-accent-primary/20 p-3">
+                  <div className="flex items-start gap-2">
+                    <TrendingUp className="h-4 w-4 text-accent-primary mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-accent-primary">Improve your AI</p>
+                      <p className="text-text-secondary text-xs mt-1">
+                        {totalWords < 1000
+                          ? 'Add more content for better responses. Aim for at least 2,000 words.'
+                          : totalWords < 2000
+                          ? 'Good start! Add more content to reach "Good" quality.'
+                          : 'Great progress! Aim for 5,000+ words for best results.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stats */}
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center gap-2 text-text-secondary mb-1">
                     <File className="h-4 w-4" />
-                    <span className="text-sm">Total Files</span>
+                    <span className="text-sm">Content Items</span>
                   </div>
                   <div className="text-2xl font-bold text-text-primary">{totalFiles}</div>
                 </div>
@@ -482,10 +661,10 @@ export function OnboardingContentPage() {
                 <div>
                   <div className="flex items-center gap-2 text-text-secondary mb-1">
                     <Loader2 className="h-4 w-4" />
-                    <span className="text-sm">Estimated Training</span>
+                    <span className="text-sm">Est. Training Time</span>
                   </div>
                   <div className="text-2xl font-bold text-text-primary">
-                    ~{estimatedHours} hours
+                    ~{estimatedHours} {estimatedHours === 1 ? 'hour' : 'hours'}
                   </div>
                 </div>
 
@@ -497,31 +676,41 @@ export function OnboardingContentPage() {
                   <div className="text-2xl font-bold text-text-primary">
                     {formatFileSize(totalSize)}
                   </div>
-                  <div className="text-xs text-text-tertiary mt-1">
-                    / 100 MB (Free plan)
+                  <div className="mt-1">
+                    <Progress
+                      value={(totalSize / (100 * 1024 * 1024)) * 100}
+                      className="h-1.5"
+                    />
+                    <div className="text-xs text-text-tertiary mt-1">
+                      / 100 MB (Free plan)
+                    </div>
                   </div>
-                </div>
-
-                <div className="pt-4 border-t border-border-default">
-                  <div className="flex items-center gap-2 text-text-secondary mb-2">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm">AI Quality Score</span>
-                  </div>
-                  <div className={`text-xl font-bold ${
-                    qualityScore === 'Excellent' ? 'text-success' :
-                    qualityScore === 'Great' ? 'text-success' :
-                    qualityScore === 'Good' ? 'text-warning' :
-                    'text-error'
-                  }`}>
-                    {qualityScore}
-                  </div>
-                  {qualityScore === 'Needs More' && (
-                    <p className="text-xs text-text-tertiary mt-1">
-                      Add more content for better AI responses
-                    </p>
-                  )}
                 </div>
               </div>
+
+              {/* Content Breakdown */}
+              {Object.keys(contentBreakdown).length > 0 && (
+                <div className="mt-6 pt-4 border-t border-border-default">
+                  <h3 className="text-sm font-medium text-text-secondary mb-3">Content Breakdown</h3>
+                  <div className="space-y-2">
+                    {Object.entries(contentBreakdown).map(([type, count]) => (
+                      <div key={type} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          {type === 'pdf' && <FileText className="h-3.5 w-3.5 text-red-500" />}
+                          {type === 'doc' && <FileText className="h-3.5 w-3.5 text-blue-500" />}
+                          {type === 'text' && <FileText className="h-3.5 w-3.5 text-gray-500" />}
+                          {type === 'spreadsheet' && <FileSpreadsheet className="h-3.5 w-3.5 text-green-500" />}
+                          {type === 'youtube' && <Youtube className="h-3.5 w-3.5 text-red-500" />}
+                          {type === 'paste' && <FileText className="h-3.5 w-3.5 text-purple-500" />}
+                          {type === 'other' && <File className="h-3.5 w-3.5 text-gray-400" />}
+                          <span className="capitalize text-text-secondary">{type}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs">{count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
