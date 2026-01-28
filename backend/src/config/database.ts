@@ -460,6 +460,7 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "planTier" TEXT NOT NULL DEFAULT 'fr
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeConnectId" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "payoutEnabled" BOOLEAN DEFAULT false;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "businessHours" JSONB;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "notificationPreferences" JSONB;
 
 -- Add missing columns to mirror_runs
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "sessionId" TEXT;

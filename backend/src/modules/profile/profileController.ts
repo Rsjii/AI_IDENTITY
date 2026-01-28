@@ -112,10 +112,15 @@ export const updateProfile = async (req: Request, res: Response) => {
       bio: z.string().max(300, 'Bio too long').optional(),
       profileImage: z.string().nullable().optional(),
       timeZone: z.string().max(64).optional(),
+      notificationPreferences: z.object({
+        emailNotifications: z.boolean().optional(),
+        paymentNotifications: z.boolean().optional(),
+        weeklySummary: z.boolean().optional(),
+      }).optional(),
     });    
 
     // ✅ FIX: Parse from req.body (multer will parse multipart/form-data)
-    const { name, phone, profileImage, timeZone } = updateProfileSchema.parse(req.body);
+    const { name, phone, profileImage, timeZone, notificationPreferences } = updateProfileSchema.parse(req.body);
 
     // Get current user data
     const currentUser = await userQueries.findByEmail(req.user.email);
@@ -142,6 +147,15 @@ export const updateProfile = async (req: Request, res: Response) => {
       finalProfileImage,
       timeZone
     );
+
+    // ✅ Save notification preferences if provided
+    if (notificationPreferences !== undefined) {
+      await db.query(
+        `UPDATE "User" SET "notificationPreferences" = $1 WHERE email = $2`,
+        [JSON.stringify(notificationPreferences), req.user.email]
+      );
+      logger.info(`Notification preferences updated for user: ${req.user.email}`);
+    }
 
     return res.json({
       success: true,

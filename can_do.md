@@ -210,6 +210,25 @@ This document contains low priority features and improvements that can be implem
 
 ---
 
+## 12. Unused Event Types (Future Features)
+
+**Description:** Event types defined in `EVENT_TYPES` but not yet implemented. These should be logged when corresponding features are added.
+
+**Event Types:**
+- `SHARE_CLICKED` - Log when share button is clicked (social sharing feature)
+- `PROFILE_VIEWED` - Log when a creator's profile is viewed (profile analytics)
+- `ACCOUNT_DELETED` - Log when user deletes their account (account deletion feature)
+- `PRIVACY_SETTINGS_UPDATED` - Log when privacy settings are changed (privacy settings feature)
+- `USER_BLOCKED` - Log when a user is blocked (user blocking feature)
+- `CONTENT_MODERATED` - Log when content is moderated (content moderation feature)
+- `CONTENT_REPORTED` - Log when content is reported (content reporting feature)
+- `INVITE_SENT` - Log when referral invite is sent (referral system - partially implemented)
+- `INVITE_ACCEPTED` - Log when referral invite is accepted (referral system - partially implemented)
+
+**Note:** These events are defined in `backend/src/config/constants.ts` but not currently logged. They should be implemented when the corresponding features are added.
+
+---
+
 ## Priority Ranking
 
 1. **WebSocket for Real-Time Updates** - High impact on UX
