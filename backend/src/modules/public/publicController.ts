@@ -102,50 +102,63 @@ export async function publicChat(req: Request, res: Response) {
   // Save user message
   await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
 
-  // Check payment requirement
-  if (sessionMessages >= FREE_MESSAGE_LIMIT) {
-    // ✅ Check if payment already made for this session
-    const paidResult = await db.query(
-      `SELECT 1 FROM "stripe_payments"
-       WHERE "sessionId"=$1 AND "status"='succeeded' AND "type"='pay_per_chat'
-       ORDER BY "createdAt" DESC
-       LIMIT 1`,
-      [sid]
-    );
-    
-    if (paidResult.rowCount > 0) {
-      // Payment already made, unlock full reply
-      const result = await generateMirrorReplyWithLogging(u.id, 'public_chat', message, {
-        platform: 'web',
-        sessionId: sid,
-        visitorId,
-      });
-      if (result.reply) {
-        await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+  // Check payment requirement - only if creator has enabled pay-per-chat
+  const enablePayments = (u.priceConfig as any)?.enablePayments === true;
+  if (enablePayments) {
+    // Check payment trigger rules
+    const triggerRules = (u.priceConfig as any)?.paymentTriggerRules || {};
+    const shouldRequirePayment = 
+      sessionMessages >= FREE_MESSAGE_LIMIT || // Always after free limit
+      triggerRules.alwaysRequire === true || // Creator set always require
+      (triggerRules.keywords?.length > 0 && triggerRules.keywords.some((kw: string) => 
+        message.toLowerCase().includes(kw.toLowerCase())
+      )) || // Contains trigger keyword
+      (triggerRules.minLength > 0 && message.length >= triggerRules.minLength); // Exceeds length threshold
+
+    if (shouldRequirePayment) {
+      // ✅ Check if payment already made for this session
+      const paidResult = await db.query(
+        `SELECT 1 FROM "stripe_payments"
+         WHERE "sessionId"=$1 AND "status"='succeeded' AND "type"='pay_per_chat'
+         ORDER BY "createdAt" DESC
+         LIMIT 1`,
+        [sid]
+      );
+      
+      if (paidResult.rowCount > 0) {
+        // Payment already made, unlock full reply
+        const result = await generateMirrorReplyWithLogging(u.id, 'public_chat', message, {
+          platform: 'web',
+          sessionId: sid,
+          visitorId,
+        });
+        if (result.reply) {
+          await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+        }
+        return res.json({
+          success: true,
+          sessionId: sid,
+          reply: result.reply || '',
+          decision: result.decision,
+          mirrorRunId: result.mirrorRunId,
+        });
       }
+
+      // No payment, show paywall (Option A: don't generate reply before payment)
+      const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
+
       return res.json({
         success: true,
+        requiresPayment: true,
         sessionId: sid,
-        reply: result.reply || '',
-        decision: result.decision,
-        mirrorRunId: result.mirrorRunId,
+        creatorId: u.id,
+        paymentOptions: {
+          premium: { amount: pricing.premium?.amountCents || 500, label: 'Detailed Answer' },
+          vip: { amount: pricing.vip?.amountCents || 5000, label: 'Full Consultation' },
+        },
+        previewReply: 'This answer requires payment to unlock the full response. Click below to proceed.',
       });
     }
-
-    // No payment, show paywall (Option A: don't generate reply before payment)
-    const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
-
-    return res.json({
-      success: true,
-      requiresPayment: true,
-      sessionId: sid,
-      creatorId: u.id,
-      paymentOptions: {
-        premium: { amount: pricing.premium?.amountCents || 500, label: 'Detailed Answer' },
-        vip: { amount: pricing.vip?.amountCents || 5000, label: 'Full Consultation' },
-      },
-      previewReply: 'This answer requires payment to unlock the full response. Click below to proceed.',
-    });
   }
 
   // mirror + save messages via identityService opts

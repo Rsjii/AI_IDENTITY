@@ -22,6 +22,9 @@ export function OnboardingDeployPage() {
   const slug = user?.publicSlug || user?.handle || '';
   const creatorId = (user as any)?.publicId || user?.id || '';
   const apiBase = window.location.origin;
+  const avatarUrl = user?.profileImage || '';
+  const voiceEnabled = (user as any)?.voiceClones?.some((v: any) => v.status === 'ready') || false;
+  const popularQuestions = ((user as any)?.priceConfig?.popularQuestions || []).join(',');
 
   const standaloneLink = useMemo(() => (slug ? `${apiBase}/chat/${slug}` : ''), [slug, apiBase]);
 
@@ -32,13 +35,17 @@ export function OnboardingDeployPage() {
   src="${apiBase}/embed.js"
   data-api-base="${apiBase}"
   data-creator-id="${creatorId}"
+  data-creator-slug="${slug}"
   data-color="${widgetColor}"
   data-position="${widgetPosition}"
   data-title="${widgetTitle}"
+  data-avatar-url="${avatarUrl}"
+  data-voice-enabled="${voiceEnabled}"
   data-welcome-message="${welcomeMessage}"
+  data-popular-questions="${popularQuestions}"
 ></script>
 <link rel="stylesheet" href="${apiBase}/embed.css" />`;
-  }, [creatorId, apiBase, widgetColor, widgetPosition, widgetTitle, welcomeMessage]);
+  }, [creatorId, slug, apiBase, widgetColor, widgetPosition, widgetTitle, avatarUrl, voiceEnabled, welcomeMessage, popularQuestions]);
 
   // Generate QR code
   useEffect(() => {

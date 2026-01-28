@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { detokenizeId } from '../../utils/idTokenization';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
-import { widgetChatLogQueries, voiceCloneQueries, userQueries, db, chatSessionQueries } from '../../config/database';
+import { widgetChatLogQueries, voiceCloneQueries, db, chatSessionQueries } from '../../config/database';
 import { generateVoiceAudio } from '../voice/voiceService';
 import { logger } from '../../config/logger';
 
@@ -72,15 +72,27 @@ export async function widgetChat(req: Request, res: Response) {
   // Generate visitorId if not provided (for chat history tracking)
   const finalVisitorId = visitorId || `widget_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-  // Create chat session (for plan limit counting)
-  // Widget chats should count towards monthly limits - create new session per widget interaction
-  // (This ensures accurate counting; we could optimize later to reuse sessions per visitorId)
-  const session = await chatSessionQueries.create({
-    creatorId: creatorUserId,
-    visitorId: finalVisitorId,
-    userId: null,
-    platform: 'widget',
-  });
+  // Reuse existing session per visitor (to avoid over-counting sessions for plan limits)
+  let session;
+  const existingSession = await db.query(
+    `SELECT id FROM "chat_sessions"
+     WHERE "creatorId"=$1 AND "visitorId"=$2 AND platform='widget'
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    [creatorUserId, finalVisitorId]
+  );
+
+  if (existingSession.rows[0]) {
+    session = { id: existingSession.rows[0].id };
+  } else {
+    // Create new session only if none exists for this visitor
+    session = await chatSessionQueries.create({
+      creatorId: creatorUserId,
+      visitorId: finalVisitorId,
+      userId: null,
+      platform: 'widget',
+    });
+  }
 
   const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, { 
     platform: 'api',

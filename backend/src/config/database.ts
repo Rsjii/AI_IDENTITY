@@ -428,6 +428,25 @@ ALTER TABLE "stripe_payments" ADD CONSTRAINT "stripe_payments_creatorId_fkey"
 ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "platformFeeCents" INTEGER;
 ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "creatorEarningsCents" INTEGER;
 ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "type" TEXT DEFAULT 'subscription';
+ALTER TABLE "stripe_payments" ADD COLUMN IF NOT EXISTS "payoutId" TEXT;
+
+-- Create stripe_payouts table
+CREATE TABLE IF NOT EXISTS "stripe_payouts" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "amountCents" INTEGER NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending','processing','completed','failed')),
+  "stripePayoutId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "completedAt" TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS "idx_stripe_payouts_creatorId" ON "stripe_payouts"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_stripe_payouts_status" ON "stripe_payouts"("status");
+
+ALTER TABLE "stripe_payouts" DROP CONSTRAINT IF EXISTS "stripe_payouts_creatorId_fkey";
+ALTER TABLE "stripe_payouts" ADD CONSTRAINT "stripe_payouts_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Add missing columns to User table
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMPTZ;

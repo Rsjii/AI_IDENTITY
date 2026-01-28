@@ -27,7 +27,8 @@ const CheckoutForm: React.FC<{
   paymentOptions: PaymentPromptProps['paymentOptions'];
   onSuccess: () => void;
   onCancel: () => void;
-}> = ({ creatorId, sessionId, paymentOptions, onSuccess, onCancel }) => {
+  onClientSecretChange: (secret: string | null) => void;
+}> = ({ creatorId, sessionId, paymentOptions, onSuccess, onCancel, onClientSecretChange }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -64,14 +65,16 @@ const CheckoutForm: React.FC<{
           }
         );
         setClientSecret(res.clientSecret);
+        onClientSecretChange(res.clientSecret);
       } catch (err: any) {
         setMessage(err.message || 'Failed to create payment intent.');
+        onClientSecretChange(null);
       } finally {
         setLoading(false);
       }
     };
     fetchPaymentIntent();
-  }, [creatorId, selectedTier, visitorId, sessionId]);
+  }, [creatorId, selectedTier, visitorId, sessionId, onClientSecretChange]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -134,6 +137,7 @@ const CheckoutForm: React.FC<{
           onValueChange={(value: 'premium' | 'vip') => {
             setSelectedTier(value);
             setClientSecret(null); // Reset to fetch new intent
+            onClientSecretChange(null);
           }}
         >
           <SelectTrigger id="tier-select">
@@ -183,6 +187,8 @@ const CheckoutForm: React.FC<{
 };
 
 export function PaymentPrompt(props: PaymentPromptProps) {
+  const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+
   if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
     return (
       <Card className="glass shadow-sm">
@@ -198,12 +204,20 @@ export function PaymentPrompt(props: PaymentPromptProps) {
     <Card className="glass shadow-sm">
       <CardHeader>
         <CardTitle>Unlock Premium Content</CardTitle>
-        <CardDescription>Choose a tier to get a detailed response.</CardDescription>
+        <CardDescription>
+          Choose a tier to unlock a detailed response. You'll receive the full answer via email after payment.
+          <div className="mt-2 text-xs text-muted-foreground">
+            Platform fee: 25% | Creator earnings: 75%
+          </div>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {stripePromise && (
-          <Elements stripe={stripePromise}>
-            <CheckoutForm {...props} />
+          <Elements 
+            stripe={stripePromise} 
+            options={clientSecret ? { clientSecret } : undefined}
+          >
+            <CheckoutForm {...props} onClientSecretChange={setClientSecret} />
           </Elements>
         )}
       </CardContent>

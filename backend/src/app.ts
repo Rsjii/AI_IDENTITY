@@ -363,6 +363,10 @@ app.use((req, res, next) => {
 });
 
 // ✅ ENHANCED: Request/Response logging middleware (before routes)
+// ✅ Performance monitoring middleware
+import { performanceMonitor } from './middleware/performanceMonitor';
+app.use(performanceMonitor);
+
 app.use((req, res, next) => {
   const start = Date.now();
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, Copy } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, Copy, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 
@@ -38,12 +38,23 @@ export function SettingsPage() {
   const [enablePayments, setEnablePayments] = useState(false);
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [popularQuestions, setPopularQuestions] = useState<string[]>(['']);
+  const [paymentTriggerRules, setPaymentTriggerRules] = useState<{
+    keywords: string[];
+    minLength: number;
+    alwaysRequire: boolean;
+  }>({ keywords: [], minLength: 0, alwaysRequire: false });
 
   // Billing
   const [planTier, setPlanTier] = useState('free');
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(false);
+  const [earningsBalances, setEarningsBalances] = useState<{
+    totalEarningsCents: number;
+    availableEarningsCents: number;
+    pendingEarningsCents: number;
+  } | null>(null);
+  const [requestingPayout, setRequestingPayout] = useState(false);
 
   useEffect(() => {
     if (state.status === 'authenticated') {
@@ -60,6 +71,7 @@ export function SettingsPage() {
       setEnablePayments(config.enablePayments || false);
       setWelcomeMessage(config.welcomeMessage || '');
       setPopularQuestions(config.popularQuestions?.length ? config.popularQuestions : ['']);
+      setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
 
       loadBillingHistory();
     }
@@ -69,12 +81,50 @@ export function SettingsPage() {
     if (state.status !== 'authenticated') return;
     setLoadingBilling(true);
     try {
-      const res = await apiFetch<{ items: any[] }>('/api/creator/earnings');
+      const res = await apiFetch<{ items: any[]; balances?: any }>('/api/creator/earnings');
       setBillingHistory(res.items || []);
+      if (res.balances) {
+        setEarningsBalances(res.balances);
+      }
     } catch (e: any) {
       console.error('Failed to load billing:', e);
     } finally {
       setLoadingBilling(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const res = await fetch('/api/creator/earnings/export', {
+        headers: { 'Authorization': `Bearer ${(state as any).token || ''}` }
+      });
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `earnings-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e: any) {
+      setError('Failed to export CSV');
+    }
+  };
+
+  const handleRequestPayout = async () => {
+    setRequestingPayout(true);
+    setError('');
+    try {
+      const res = await apiFetch<{ payoutId: string; amountCents: number; message?: string }>('/api/creator/earnings/payout', {
+        method: 'POST',
+      });
+      alert(`Payout request submitted! Amount: ${formatCurrency(res.amountCents)}. ${res.message || ''}`);
+      await loadBillingHistory();
+    } catch (e: any) {
+      setError(e.message || 'Failed to request payout');
+    } finally {
+      setRequestingPayout(false);
     }
   };
 
@@ -104,6 +154,7 @@ export function SettingsPage() {
         vip: { amountCents: vipPrice },
         welcomeMessage: welcomeMessage || undefined,
         popularQuestions: popularQuestions.filter(q => q.trim()),
+        paymentTriggerRules: paymentTriggerRules,
       };
       await apiFetch('/api/profile/update', {
         method: 'POST',
@@ -390,6 +441,55 @@ export function SettingsPage() {
                         Add Question
                       </Button>
                     </div>
+
+                    <div className="space-y-4 pt-4 border-t">
+                      <label className="text-sm font-medium">Payment Trigger Rules</label>
+                      <p className="text-xs text-muted-foreground">
+                        Configure when payment should be required (in addition to the 3 free messages limit)
+                      </p>
+                      
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="alwaysRequire"
+                          checked={paymentTriggerRules.alwaysRequire}
+                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, alwaysRequire: e.target.checked })}
+                          className="rounded"
+                        />
+                        <label htmlFor="alwaysRequire" className="text-sm cursor-pointer">
+                          Always require payment (after free messages)
+                        </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Keywords (comma-separated)</label>
+                        <Input
+                          value={paymentTriggerRules.keywords.join(', ')}
+                          onChange={(e) => {
+                            const keywords = e.target.value.split(',').map(k => k.trim()).filter(Boolean);
+                            setPaymentTriggerRules({ ...paymentTriggerRules, keywords });
+                          }}
+                          placeholder="consultation, detailed, premium, urgent"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Questions containing these keywords will require payment
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Minimum Length (characters)</label>
+                        <Input
+                          type="number"
+                          value={paymentTriggerRules.minLength || 0}
+                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, minLength: parseInt(e.target.value) || 0 })}
+                          min={0}
+                          placeholder="0 = disabled"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Questions longer than this will require payment (0 to disable)
+                        </p>
+                      </div>
+                    </div>
                   </>
                 )}
 
@@ -411,6 +511,59 @@ export function SettingsPage() {
         {/* Billing Tab */}
         {activeTab === 'billing' && (
           <div className="space-y-6">
+            {/* Earnings Balances */}
+            {earningsBalances && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>Earnings & Payouts</CardTitle>
+                  <CardDescription>Your pay-per-chat earnings and payout status</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">Total Earnings</div>
+                      <div className="text-2xl font-bold">{formatCurrency(earningsBalances.totalEarningsCents)}</div>
+                    </div>
+                    <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Available for Payout</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(earningsBalances.availableEarningsCents)}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Ready to withdraw (7+ days old)</div>
+                    </div>
+                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Pending</div>
+                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(earningsBalances.pendingEarningsCents)}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Hold period (last 7 days)</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleRequestPayout} 
+                      disabled={requestingPayout || earningsBalances.availableEarningsCents < 1000}
+                      className="flex-1"
+                    >
+                      {requestingPayout ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        `Request Payout (Min $10.00)`
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleExportCSV}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  </div>
+                  {earningsBalances.availableEarningsCents < 1000 && (
+                    <p className="text-xs text-muted-foreground">
+                      Minimum payout is $10.00. You need ${formatCurrency(1000 - earningsBalances.availableEarningsCents)} more to request a payout.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Current Plan</CardTitle>

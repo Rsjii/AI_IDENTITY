@@ -157,9 +157,14 @@
       const data = await res.json();
       removeTypingIndicator();
 
-      if (data.requiresPayment) {
-        // Show payment prompt
-        addMessage(`This is a premium feature. Click here to unlock: ${API_BASE}/chat/${CREATOR_ID}?upgrade=1`, false);
+      if (res.status === 402) {
+        // Creator plan limit reached
+        const upgradeUrl = data.upgradeUrl || `${API_BASE}/pricing`;
+        addMessage(`The creator has reached their plan limit. Please visit ${upgradeUrl} to upgrade.`, false);
+      } else if (data.requiresPayment) {
+        // Show payment prompt with proper link
+        const creatorSlug = script.getAttribute('data-creator-slug') || CREATOR_ID;
+        addMessage(`This is a premium feature. Click here to unlock: ${API_BASE}/chat/${creatorSlug}?upgrade=1`, false);
       } else if (data.reply) {
         addMessage(data.reply, false, data.audioUrl);
       } else {

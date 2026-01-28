@@ -130,12 +130,142 @@ export async function earnings(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  // Get all payments
   const r = await db.query(
-    `SELECT * FROM "stripe_payments" WHERE "creatorId"=$1 ORDER BY "createdAt" DESC LIMIT 100`,
+    `SELECT * FROM "stripe_payments" WHERE "creatorId"=$1 ORDER BY "createdAt" DESC LIMIT 1000`,
     [userId]
   );
 
-  return res.json({ success: true, items: r.rows });
+  // Calculate balances
+  // Available: earnings that are ready for payout (older than 7 days, not yet paid out)
+  // Pending: earnings from last 7 days (hold period)
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const allEarnings = r.rows.filter((p: any) => p.status === 'succeeded' && p.type === 'pay_per_chat');
+  const totalEarnings = allEarnings.reduce((sum: number, p: any) => sum + (p.creatorEarningsCents || 0), 0);
+  
+  const availableEarnings = allEarnings
+    .filter((p: any) => new Date(p.createdAt) < sevenDaysAgo && !p.payoutId)
+    .reduce((sum: number, p: any) => sum + (p.creatorEarningsCents || 0), 0);
+  
+  const pendingEarnings = allEarnings
+    .filter((p: any) => new Date(p.createdAt) >= sevenDaysAgo)
+    .reduce((sum: number, p: any) => sum + (p.creatorEarningsCents || 0), 0);
+
+  // Get payout history
+  const payoutsR = await db.query(
+    `SELECT * FROM "stripe_payouts" WHERE "creatorId"=$1 ORDER BY "createdAt" DESC LIMIT 50`,
+    [userId]
+  );
+
+  return res.json({ 
+    success: true, 
+    items: r.rows,
+    balances: {
+      totalEarningsCents: totalEarnings,
+      availableEarningsCents: availableEarnings,
+      pendingEarningsCents: pendingEarnings,
+    },
+    payouts: payoutsR.rows,
+  });
+}
+
+export async function exportEarningsCSV(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const r = await db.query(
+    `SELECT 
+      "createdAt",
+      "amount" as "totalAmountCents",
+      "creatorEarningsCents",
+      "platformFeeCents",
+      "status",
+      "type",
+      "stripePaymentIntentId"
+     FROM "stripe_payments" 
+     WHERE "creatorId"=$1 
+     ORDER BY "createdAt" DESC`,
+    [userId]
+  );
+
+  // Generate CSV
+  const headers = ['Date', 'Total Amount ($)', 'Your Earnings ($)', 'Platform Fee ($)', 'Status', 'Type', 'Payment ID'];
+  const rows = r.rows.map((p: any) => [
+    new Date(p.createdAt).toISOString(),
+    (p.totalAmountCents / 100).toFixed(2),
+    ((p.creatorEarningsCents || 0) / 100).toFixed(2),
+    ((p.platformFeeCents || 0) / 100).toFixed(2),
+    p.status,
+    p.type,
+    p.stripePaymentIntentId || '',
+  ]);
+
+  const csv = [
+    headers.join(','),
+    ...rows.map((row: any[]) => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="earnings-${new Date().toISOString().split('T')[0]}.csv"`);
+  return res.send(csv);
+}
+
+export async function requestPayout(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Get available earnings
+  const earningsR = await db.query(
+    `SELECT SUM("creatorEarningsCents")::int as total
+     FROM "stripe_payments"
+     WHERE "creatorId"=$1 
+       AND "status"='succeeded' 
+       AND "type"='pay_per_chat'
+       AND "createdAt" < NOW() - INTERVAL '7 days'
+       AND "payoutId" IS NULL`,
+    [userId]
+  );
+
+  const availableCents = earningsR.rows[0]?.total || 0;
+  const minPayoutCents = 1000; // $10 minimum
+
+  if (availableCents < minPayoutCents) {
+    return res.status(400).json({ 
+      error: `Minimum payout is $${(minPayoutCents / 100).toFixed(2)}. You have $${(availableCents / 100).toFixed(2)} available.` 
+    });
+  }
+
+  // Create payout record (in real implementation, this would trigger Stripe Connect transfer)
+  const payoutId = `payout_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  await db.query(
+    `INSERT INTO "stripe_payouts" (id, "creatorId", "amountCents", "status", "createdAt")
+     VALUES ($1, $2, $3, 'pending', NOW())`,
+    [payoutId, userId, availableCents]
+  );
+
+  // Mark payments as being paid out
+  await db.query(
+    `UPDATE "stripe_payments"
+     SET "payoutId"=$1
+     WHERE "creatorId"=$2 
+       AND "status"='succeeded' 
+       AND "type"='pay_per_chat'
+       AND "createdAt" < NOW() - INTERVAL '7 days'
+       AND "payoutId" IS NULL`,
+    [payoutId, userId]
+  );
+
+  // TODO: In production, trigger actual Stripe Connect transfer here
+  // For now, we'll just mark it as pending
+
+  return res.json({ 
+    success: true, 
+    payoutId,
+    amountCents: availableCents,
+    message: 'Payout request submitted. In production, this would trigger a Stripe Connect transfer.',
+  });
 }
 
 const pricingSchema = z.object({
