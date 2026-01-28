@@ -188,6 +188,44 @@ async function startServer() {
       }
     });
 
+    // ✅ Schedule weekly summary emails (every Monday at 9 AM)
+    // Note: In production, use a proper cron service (e.g., node-cron, AWS EventBridge, etc.)
+    if (config.nodeEnv === 'production') {
+      try {
+        const { sendWeeklySummariesToAllCreators } = await import('./services/weeklySummaryService');
+        
+        // Calculate milliseconds until next Monday 9 AM
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+        const nextMonday = new Date(now);
+        nextMonday.setDate(now.getDate() + daysUntilMonday);
+        nextMonday.setHours(9, 0, 0, 0);
+        
+        const msUntilNextMonday = nextMonday.getTime() - now.getTime();
+        
+        // Schedule first run
+        setTimeout(() => {
+          logger.info('📧 Starting weekly summary email job...');
+          sendWeeklySummariesToAllCreators().catch((err) => {
+            logger.error('Error in weekly summary job:', err);
+          });
+          
+          // Then run every week (7 days)
+          setInterval(() => {
+            logger.info('📧 Starting weekly summary email job...');
+            sendWeeklySummariesToAllCreators().catch((err) => {
+              logger.error('Error in weekly summary job:', err);
+            });
+          }, 7 * 24 * 60 * 60 * 1000);
+        }, msUntilNextMonday);
+        
+        logger.info(`📧 Weekly summary emails scheduled (next run: ${nextMonday.toISOString()})`);
+      } catch (err: any) {
+        logger.warn('Failed to schedule weekly summary emails:', err);
+      }
+    }
+
     // Graceful shutdown
     process.on('SIGTERM', () => {
       logger.info('SIGTERM received, shutting down gracefully...');

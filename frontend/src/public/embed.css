@@ -150,11 +150,95 @@
   height: 32px;
 }
 
-/* Mobile responsive */
+/* ✅ Enhanced mobile responsive */
 @media (max-width: 480px) {
+  #selflyx-widget-container {
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+  }
+
+  #selflyx-widget-btn {
+    bottom: 16px;
+    right: 16px;
+    width: 60px;
+    height: 60px;
+  }
+
   #selflyx-widget-panel {
-    width: calc(100vw - 40px);
-    height: calc(100vh - 100px);
-    max-height: 500px;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: none !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  #selflyx-widget-input-container {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ✅ Notification badge for new messages */
+#selflyx-widget-btn.has-notification::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  background: #EF4444;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ✅ Minimize/maximize animations */
+#selflyx-widget-panel {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#selflyx-widget-panel:not(.selflyx-hidden) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ✅ Dark theme support */
+@media (prefers-color-scheme: dark) {
+  #selflyx-widget-panel {
+    background: #18181B;
+    border-color: #3F3F46;
+  }
+
+  #selflyx-widget-header {
+    border-color: #3F3F46;
+    color: #FAFAFA;
+  }
+
+  .selflyx-msg-user {
+    color: #FAFAFA;
+  }
+
+  .selflyx-msg-bot {
+    color: #A78BFA;
+  }
+
+  #selflyx-widget-input {
+    background: #27272A;
+    border-color: #3F3F46;
+    color: #FAFAFA;
+  }
+
+  #selflyx-widget-input:focus {
+    border-color: #8B5CF6;
   }
 }

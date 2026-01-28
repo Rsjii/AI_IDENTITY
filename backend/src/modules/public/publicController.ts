@@ -14,21 +14,66 @@ const chatSchema = z.object({
 });
 
 export async function getCreator(req: Request, res: Response) {
-  const slug = String(req.params.slug || '').trim();
+  const slug = String(req.params.slug || '').trim().replace(/^@/, ''); // Remove @ prefix if present
   const u = await userQueries.findBySlugOrHandle(slug);
   if (!u) return res.status(404).json({ error: 'Creator not found' });
+
+  // ✅ Get creator stats
+  const statsResult = await db.query(
+    `SELECT
+      COUNT(DISTINCT cs.id)::int AS "totalChats",
+      COALESCE(AVG(CASE WHEN te.event = 'confirm_yes' THEN 1 WHEN te.event = 'confirm_no' THEN 0 END), 0)::numeric AS rating,
+      COUNT(DISTINCT te.id)::int AS "totalRatings"
+     FROM "User" u
+     LEFT JOIN "chat_sessions" cs ON cs."creatorId" = u.id
+     LEFT JOIN "identity_versions" iv ON iv."identityId" = (SELECT id FROM identities WHERE "userId" = u.id LIMIT 1)
+     LEFT JOIN "trust_events" te ON te."identityVersionId" = iv.id
+     WHERE u.id = $1
+     GROUP BY u.id`,
+    [u.id]
+  );
+
+  const stats = statsResult.rows[0] || { totalChats: 0, rating: 0, totalRatings: 0 };
+
+  // Get identity info for bio/expertise
+  const identity = await identityQueries.findByUserId(u.id);
+  let identityJson: any = null;
+  if (identity?.activeVersionId) {
+    const version = await identityVersionQueries.findById(identity.activeVersionId);
+    if (version) {
+      identityJson = typeof version.identityJson === 'string' 
+        ? JSON.parse(version.identityJson) 
+        : version.identityJson;
+    }
+  }
 
   return res.json({
     success: true,
     creator: {
+      id: u.id,
+      handle: u.handle,
       slug: u.publicSlug || u.handle,
       displayName: u.name || u.handle || 'Creator',
+      bio: identityJson?.defaults?.bio || u.bio || '',
       avatarUrl: u.profileImage || null,
+      expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
+      topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
       priceConfig: u.priceConfig || null,
       creatorTitle: u.creatorTitle || null,
       creatorTags: u.creatorTags || null,
       welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
       popularQuestions: (u.priceConfig as any)?.popularQuestions || [],
+      stats: {
+        totalChats: stats.totalChats || 0,
+        rating: parseFloat(stats.rating || '0') || 0,
+        totalRatings: stats.totalRatings || 0,
+      },
+      socialLinks: (u.socialLinks as any) || {
+        twitter: null,
+        instagram: null,
+        youtube: null,
+        website: null,
+      },
     },
   });
 }
@@ -75,6 +120,19 @@ export async function publicChat(req: Request, res: Response) {
   const used = await countCreatorChatsThisMonth(u.id);
 
   if (used >= limit) {
+    // ✅ Better upgrade prompt with helpful message
+    const planNames: Record<PlanTier, string> = {
+      free: 'Free',
+      starter: 'Starter',
+      growth: 'Growth',
+      scale: 'Scale',
+    };
+    
+    const nextTier: PlanTier | null = effectiveTier === 'free' ? 'starter' 
+      : effectiveTier === 'starter' ? 'growth'
+      : effectiveTier === 'growth' ? 'scale'
+      : null;
+    
     return res.status(402).json({
       error: 'Creator plan limit reached',
       errorCode: 'CREATOR_PLAN_LIMIT',
@@ -82,7 +140,20 @@ export async function publicChat(req: Request, res: Response) {
       used,
       limit,
       upgradeUrl: '/pricing',
+      message: `You've reached your ${planNames[effectiveTier]} plan limit of ${limit.toLocaleString()} chats this month. ${nextTier ? `Upgrade to ${planNames[nextTier]} plan for more capacity.` : 'Contact support for higher limits.'}`,
+      nextTier,
     });
+  }
+  
+  // ✅ Warn when approaching limit (80% threshold)
+  if (used >= limit * 0.8) {
+    // Add warning header (non-blocking)
+    res.setHeader('X-Plan-Warning', JSON.stringify({
+      used,
+      limit,
+      percentage: Math.round((used / limit) * 100),
+      message: `You've used ${Math.round((used / limit) * 100)}% of your monthly limit. Consider upgrading soon.`,
+    }));
   }
 
   // session: reuse if provided else create
@@ -107,11 +178,25 @@ export async function publicChat(req: Request, res: Response) {
   // Check payment requirement - only if creator has enabled pay-per-chat
   const enablePayments = (u.priceConfig as any)?.enablePayments === true;
   if (enablePayments) {
-    // Check payment trigger rules
+    // ✅ Use intelligent pricing detection
+    const { shouldRequirePayment: intelligentPricing } = await import('../identity/intelligentPricing');
+    
+    // Get conversation context (last few messages)
+    const recentMessages = await chatMessageQueries.listForSession(sid);
+    const conversationContext = recentMessages
+      .filter((m: any) => m.role === 'user')
+      .slice(-5)
+      .map((m: any) => m.content);
+    
+    // Check payment trigger rules (creator's custom rules take precedence)
     const triggerRules = (u.priceConfig as any)?.paymentTriggerRules || {};
+    const intelligentDecision = intelligentPricing(message, conversationContext, u.priceConfig);
+    
+    // Combine intelligent pricing with creator rules
     const shouldRequirePayment = 
       sessionMessages >= FREE_MESSAGE_LIMIT || // Always after free limit
       triggerRules.alwaysRequire === true || // Creator set always require
+      intelligentDecision.requiresPayment || // Intelligent detection
       (triggerRules.keywords?.length > 0 && triggerRules.keywords.some((kw: string) => 
         message.toLowerCase().includes(kw.toLowerCase())
       )) || // Contains trigger keyword
@@ -190,7 +275,18 @@ export async function publicChat(req: Request, res: Response) {
         );
         
         if (teaserResult.reply) {
-          previewReply = teaserResult.reply;
+          // ✅ Truncate teaser to ~200 characters for preview (first sentence or first 200 chars)
+          const teaser = teaserResult.reply.trim();
+          const maxLength = 200;
+          if (teaser.length > maxLength) {
+            // Try to cut at sentence boundary
+            const sentenceEnd = teaser.substring(0, maxLength).lastIndexOf('.');
+            previewReply = sentenceEnd > maxLength * 0.5 
+              ? teaser.substring(0, sentenceEnd + 1)
+              : teaser.substring(0, maxLength) + '...';
+          } else {
+            previewReply = teaser;
+          }
           // Don't save this teaser as a message - it's just for preview
           // The full reply will be generated after payment
         }

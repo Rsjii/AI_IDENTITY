@@ -81,6 +81,9 @@ export const config = {
   // Frontend URL (required in production)
   frontendUrl: process.env['FRONTEND_URL'],
   
+  // App URL (for email links)
+  appUrl: process.env['APP_URL'] || process.env['FRONTEND_URL'] || 'https://selflyx.com',
+  
   // Google OAuth Configuration
   google: {
     clientId: process.env['GOOGLE_CLIENT_ID'],

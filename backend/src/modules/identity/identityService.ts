@@ -558,11 +558,44 @@ export async function generateMirrorReplyWithLogging(
 
   const identity = await identityQueries.findByUserId(userId);
   if (!identity || !identity.activeVersionId) {
-    throw new Error('Identity not found. Please create your identity first.');
+    // ✅ Return friendly error instead of crashing
+    logger.warn(`Identity not found for user ${userId}`);
+    return {
+      reply: "I'm not fully set up yet. Please complete your identity configuration in the dashboard.",
+      error: 'IDENTITY_NOT_CONFIGURED',
+      mirrorRunId: null,
+      decision: { action: 'defer' as const, confidence: 0 },
+    };
   }
 
-  const version = await identityVersionQueries.findById(identity.activeVersionId);
-  if (!version) throw new Error('Active identity version not found');
+  let version = await identityVersionQueries.findById(identity.activeVersionId);
+  if (!version) {
+    logger.warn(`Active identity version not found for user ${userId}`);
+    return {
+      reply: "I'm not fully set up yet. Please complete your identity configuration in the dashboard.",
+      error: 'IDENTITY_VERSION_NOT_FOUND',
+      mirrorRunId: null,
+      decision: { action: 'defer' as const, confidence: 0 },
+    };
+  }
+
+  // ✅ A/B Testing: If version is part of a variant group, select variant based on weights
+  if (version.variantGroupId) {
+    try {
+      const { selectVariant } = await import('./variantService');
+      const selectedVariantId = await selectVariant(version.variantGroupId);
+      if (selectedVariantId) {
+        const selectedVariant = await identityVersionQueries.findById(selectedVariantId);
+        if (selectedVariant && selectedVariant.status === 'active') {
+          version = selectedVariant;
+          logger.debug(`[A/B Test] Selected variant ${selectedVariant.variantLabel} (${selectedVariantId}) for user ${userId}`);
+        }
+      }
+    } catch (error) {
+      logger.warn(`[A/B Test] Failed to select variant, using default: ${error}`);
+      // Continue with default version if variant selection fails
+    }
+  }
 
   const identityJson =
     typeof version.identityJson === 'string' ? JSON.parse(version.identityJson) : version.identityJson;

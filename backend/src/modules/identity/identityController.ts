@@ -455,3 +455,60 @@ export const confirmTrust = async (req: AuthenticatedRequest, res: Response, nex
   }
 };
 
+/**
+ * GET /api/identity/training-status
+ * Get training status for onboarding
+ */
+export const getTrainingStatus = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        errorCode: ErrorCodes.UNAUTHORIZED,
+      });
+    }
+
+    const { identityQueries, identityVersionQueries } = await import('../../config/database');
+    const identity = await identityQueries.findByUserId(req.user.id);
+    
+    if (!identity) {
+      return res.json({
+        status: 'not_started',
+        progress: 0,
+        message: 'Identity not created yet',
+      });
+    }
+
+    if (!identity.activeVersionId) {
+      return res.json({
+        status: 'training',
+        progress: 50,
+        message: 'Creating identity version...',
+      });
+    }
+
+    const version = await identityVersionQueries.findById(identity.activeVersionId);
+    if (!version) {
+      return res.json({
+        status: 'training',
+        progress: 75,
+        message: 'Finalizing identity...',
+      });
+    }
+
+    // If identity and version exist, training is complete
+    return res.json({
+      status: 'ready',
+      progress: 100,
+      message: 'AI is ready!',
+    });
+  } catch (error: any) {
+    logger.error('Get training status error:', error);
+    return res.status(500).json({
+      status: 'error',
+      progress: 0,
+      message: 'Failed to check training status',
+    });
+  }
+};
+

@@ -17,7 +17,7 @@ interface PaymentPromptProps {
     premium: { amount: number; label: string };
     vip: { amount: number; label: string };
   };
-  onSuccess: () => void;
+  onSuccess: (reply?: string) => void;
   onCancel: () => void;
 }
 
@@ -100,9 +100,9 @@ const CheckoutForm: React.FC<{
         setMessage(error.message || 'Payment failed.');
         setLoading(false);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Confirm payment on backend
+        // Confirm payment on backend and get reply
         try {
-          await apiFetch('/api/payments/pay-per-chat/confirm', {
+          const result = await apiFetch<{ success: boolean; reply?: string }>('/api/payments/pay-per-chat/confirm', {
             method: 'POST',
             body: JSON.stringify({
               paymentIntentId: paymentIntent.id,
@@ -114,7 +114,8 @@ const CheckoutForm: React.FC<{
           setPaymentSuccess(true);
           setMessage('Payment succeeded! Your full answer is ready 🎉');
           setTimeout(() => {
-            onSuccess();
+            // ✅ Pass the reply to onSuccess callback
+            onSuccess(result.reply);
           }, 2000);
         } catch (err: any) {
           setMessage(err.message || 'Payment succeeded but confirmation failed.');

@@ -150,9 +150,24 @@ export function PublicChatPage() {
     }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (reply?: string) => {
     setShowPaymentModal(false);
-    // Re-send the pending message to get full answer
+    
+    // ✅ Use the reply returned from payment confirmation if available
+    if (reply) {
+      const aiMsg: Msg = { 
+        role: 'assistant', 
+        content: reply,
+        timestamp: new Date(),
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      };
+      setMsgs((x) => [...x, aiMsg]);
+      setPendingMessage('');
+      setText('');
+      return;
+    }
+    
+    // Fallback: If no reply provided, re-send the pending message
     if (pendingMessage) {
       const messageToSend = pendingMessage;
       setPendingMessage('');

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 export type MeUser = {
   id: string;
@@ -53,6 +54,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refresh();
+    
+    // Set up periodic refresh (every 5 minutes) to check session validity
+    const refreshInterval = setInterval(() => {
+      refresh().catch(() => {
+        // If refresh fails, user is logged out
+      });
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    // Refresh on window focus
+    const handleFocus = () => {
+      refresh().catch(() => {});
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    // Listen for session expired events from api.ts
+    const handleSessionExpired = () => {
+      setState({ status: 'unauthenticated', user: null });
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    
+    return () => {
+      clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
   }, []);
 
   // Session timeout warning
@@ -75,10 +101,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const timeUntilExpiry = SESSION_DURATION - timeSinceActivity;
 
       if (timeUntilExpiry < WARNING_TIME && timeUntilExpiry > 0) {
-        // Show warning (you can integrate with toast library)
-        console.warn('Your session will expire in 5 minutes. Please save your work.');
-        // TODO: Integrate with toast library for better UX
-        // toast.warning('Your session will expire in 5 minutes. Please save your work.');
+        // Show warning toast
+        const minutesLeft = Math.ceil(timeUntilExpiry / (60 * 1000));
+        showToast(
+          `Your session will expire in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}. Please save your work.`,
+          'warning',
+          10000 // Show for 10 seconds
+        );
       }
     };
 

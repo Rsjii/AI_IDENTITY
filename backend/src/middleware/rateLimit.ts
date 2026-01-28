@@ -353,6 +353,33 @@ export const widgetChatRateLimit = rateLimit({
   },
 });
 
+// ✅ ADD: Public chat rate limiter (more reasonable limits)
+export const publicChatRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).publicChat.windowMs),
+  windowMs: (RATE_LIMITS as any).publicChat.windowMs,
+  max: (RATE_LIMITS as any).publicChat.max,
+  keyGenerator: (req: any) => {
+    // Use session ID + IP for better tracking
+    const sessionId = (req.body as any)?.sessionId || req.headers['x-session-id'];
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    return rlKey('publicChat', sessionId ? `${sessionId}:${ip}` : ip);
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    const sessionId = (req.body as any)?.sessionId || req.headers['x-session-id'];
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const key = rlKey('publicChat', sessionId ? `${sessionId}:${ip}` : ip);
+    logRateLimitViolation(req, 'publicChat', key, (RATE_LIMITS as any).publicChat.max, (RATE_LIMITS as any).publicChat.windowMs);
+    return res.status(429).json({
+      success: false,
+      error: 'Too many messages. Please wait a few minutes before trying again.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).publicChat.windowMs),
+    });
+  },
+});
+
 // Login attempts limiter (per email/IP)
 export const loginRateLimit = rateLimit({
   store: createRateLimitStore(RATE_LIMITS.login.windowMs), // ✅ Use PostgreSQL store with windowMs

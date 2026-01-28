@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "creatorTitle" TEXT,
     "creatorTags" JSONB,
     "priceConfig" JSONB,
+    "socialLinks" JSONB,
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
@@ -111,6 +112,9 @@ CREATE TABLE IF NOT EXISTS "identity_versions" (
     "status" TEXT NOT NULL DEFAULT 'draft' CHECK ("status" IN ('draft', 'active', 'archived')),
     "identityJson" JSONB NOT NULL,
     "createdFromVersionId" TEXT,
+    "variantGroupId" TEXT,
+    "variantLabel" TEXT,
+    "variantWeight" INTEGER DEFAULT 50,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "identity_versions_pkey" PRIMARY KEY ("id")
 );

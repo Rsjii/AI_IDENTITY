@@ -5,24 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, TestTube } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 
-type Tab = 'profile' | 'payment' | 'billing' | 'security' | 'notifications';
+type Tab = 'profile' | 'payment' | 'billing' | 'security' | 'notifications' | 'ab-testing';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const [activeTab, setActiveTab] = useState<Tab>(tabParam && ['profile', 'payment', 'billing', 'security', 'notifications'].includes(tabParam) ? tabParam : 'profile');
+  const [activeTab, setActiveTab] = useState<Tab>(tabParam && ['profile', 'payment', 'billing', 'security', 'notifications', 'ab-testing'].includes(tabParam) ? tabParam : 'profile');
   
   useEffect(() => {
-    if (tabParam && ['profile', 'payment', 'billing', 'security', 'notifications'].includes(tabParam)) {
+    if (tabParam && ['profile', 'payment', 'billing', 'security', 'notifications', 'ab-testing'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -33,6 +33,14 @@ export function SettingsPage() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  
+  // Social links
+  const [socialLinks, setSocialLinks] = useState({
+    twitter: '',
+    instagram: '',
+    youtube: '',
+    website: '',
+  });
 
   // Payment settings
   const [premiumPrice, setPremiumPrice] = useState(500);
@@ -77,6 +85,14 @@ export function SettingsPage() {
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
+  // A/B Testing (Scale plan only)
+  const [variantGroups, setVariantGroups] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [variantMetrics, setVariantMetrics] = useState<any[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+  const [newVariantName, setNewVariantName] = useState('');
+  const [baseVersionId, setBaseVersionId] = useState('');
+
   useEffect(() => {
     if (state.status === 'authenticated') {
       setName(state.user.name || '');
@@ -84,6 +100,15 @@ export function SettingsPage() {
       setTimeZone((state.user as any).timeZone || '');
       setPlanTier((state.user as any).planTier || 'free');
       setTrialEndsAt((state.user as any).trialEndsAt || null);
+      
+      // Load social links
+      const links = (state.user as any).socialLinks || {};
+      setSocialLinks({
+        twitter: links.twitter || '',
+        instagram: links.instagram || '',
+        youtube: links.youtube || '',
+        website: links.website || '',
+      });
       
       const config = (state.user as any).priceConfig || {};
       setPremiumPrice(config.premium?.amountCents || 500);
@@ -94,6 +119,11 @@ export function SettingsPage() {
       setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
 
       loadBillingHistory();
+
+      // Load variant groups if Scale plan
+      if ((state.user as any).planTier === 'scale') {
+        loadVariantGroups();
+      }
     }
   }, [state]);
 
@@ -234,9 +264,20 @@ export function SettingsPage() {
     setSaving(true);
     setError('');
     try {
+      const socialLinksData: any = {};
+      if (socialLinks.twitter) socialLinksData.twitter = socialLinks.twitter;
+      if (socialLinks.instagram) socialLinksData.instagram = socialLinks.instagram;
+      if (socialLinks.youtube) socialLinksData.youtube = socialLinks.youtube;
+      if (socialLinks.website) socialLinksData.website = socialLinks.website;
+      
       await apiFetch('/api/profile/update', {
         method: 'POST',
-        body: JSON.stringify({ name, phone: phone || undefined, timeZone }),
+        body: JSON.stringify({ 
+          name, 
+          phone: phone || undefined, 
+          timeZone,
+          socialLinks: Object.keys(socialLinksData).length > 0 ? socialLinksData : undefined,
+        }),
       });
       await refresh();
     } catch (e: any) {
@@ -411,6 +452,46 @@ export function SettingsPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Timezone</label>
                 <Input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="Asia/Kolkata" />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-semibold text-text-primary">Social Links</h3>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Twitter/X</label>
+                  <Input 
+                    value={socialLinks.twitter} 
+                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })} 
+                    placeholder="https://twitter.com/yourhandle" 
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Instagram</label>
+                  <Input 
+                    value={socialLinks.instagram} 
+                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })} 
+                    placeholder="https://instagram.com/yourhandle" 
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">YouTube</label>
+                  <Input 
+                    value={socialLinks.youtube} 
+                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })} 
+                    placeholder="https://youtube.com/@yourhandle" 
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Website</label>
+                  <Input 
+                    value={socialLinks.website} 
+                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })} 
+                    placeholder="https://yourwebsite.com" 
+                    type="url"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1067,6 +1148,166 @@ export function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* A/B Testing Tab (Scale plan only) */}
+        {activeTab === 'ab-testing' && planTier === 'scale' && (
+          <div className="space-y-6">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>A/B Testing</CardTitle>
+                <CardDescription>Test different AI identity variants to see which performs better</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Create variant groups to test different versions of your AI identity. Variants are selected randomly based on weights you set.
+                  </AlertDescription>
+                </Alert>
+
+                {/* Load variant groups */}
+                {variantGroups.length === 0 && !loadingVariants && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No variant groups yet. Create one to start A/B testing.
+                  </div>
+                )}
+
+                {variantGroups.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Variant Groups</h3>
+                    {variantGroups.map((group: any) => (
+                      <Card key={group.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{group.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {group.variants.length} variants
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              setSelectedGroup(group.id);
+                              setLoadingVariants(true);
+                              try {
+                                const res = await apiFetch(`/api/identity/variants/${group.id}/metrics`);
+                                if (res.success) {
+                                  setVariantMetrics(res.metrics);
+                                }
+                              } catch (e: any) {
+                                setError(e.message || 'Failed to load metrics');
+                              } finally {
+                                setLoadingVariants(false);
+                              }
+                            }}
+                          >
+                            View Metrics
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {/* Metrics display */}
+                {selectedGroup && variantMetrics.length > 0 && (
+                  <Card className="mt-4">
+                    <CardHeader>
+                      <CardTitle>Variant Metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2">Variant</th>
+                              <th className="text-right p-2">Chats</th>
+                              <th className="text-right p-2">Rating</th>
+                              <th className="text-right p-2">Conversion</th>
+                              <th className="text-right p-2">Response Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {variantMetrics.map((metric: any) => (
+                              <tr key={metric.variantId} className="border-b">
+                                <td className="p-2 font-medium">Variant {metric.label}</td>
+                                <td className="p-2 text-right">{metric.totalChats}</td>
+                                <td className="p-2 text-right">
+                                  {metric.avgRating > 0 ? metric.avgRating.toFixed(2) : 'N/A'}
+                                </td>
+                                <td className="p-2 text-right">{metric.conversionRate.toFixed(1)}%</td>
+                                <td className="p-2 text-right">{metric.avgResponseTime}ms</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Create new variant */}
+                <div className="pt-4 border-t">
+                  <h3 className="font-semibold mb-4">Create New Variant</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Base Version ID</Label>
+                      <Input
+                        value={baseVersionId}
+                        onChange={(e) => setBaseVersionId(e.target.value)}
+                        placeholder="Enter identity version ID"
+                      />
+                    </div>
+                    <div>
+                      <Label>Variant Name</Label>
+                      <Input
+                        value={newVariantName}
+                        onChange={(e) => setNewVariantName(e.target.value)}
+                        placeholder="e.g., Variant B"
+                      />
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!baseVersionId || !newVariantName) {
+                          setError('Please fill in all fields');
+                          return;
+                        }
+                        setSaving(true);
+                        setError('');
+                        try {
+                          const res = await apiFetch('/api/identity/variants/create', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                              baseVersionId,
+                              variantName: newVariantName,
+                            }),
+                          });
+                          if (res.success) {
+                            setNewVariantName('');
+                            setBaseVersionId('');
+                            // Reload variant groups
+                            const groupsRes = await apiFetch('/api/identity/variants/list');
+                            if (groupsRes.success) {
+                              setVariantGroups(groupsRes.groups);
+                            }
+                          }
+                        } catch (e: any) {
+                          setError(e.message || 'Failed to create variant');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving || !baseVersionId || !newVariantName}
+                    >
+                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Create Variant
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </Layout>

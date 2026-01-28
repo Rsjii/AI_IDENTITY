@@ -8,8 +8,17 @@ import {
   createIdentityVersion,
   activateIdentityVersion,
   listIdentityVersions,
+  getTrainingStatus,
 } from './identityController';
 import { mirrorVoice } from './voiceMirrorController';
+import {
+  createVariant,
+  getVariantGroup,
+  getVariantMetrics,
+  updateVariantWeight,
+  toggleVariantStatus,
+  listVariantGroups,
+} from './variantController';
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { sanitizeInput } from '../../middleware/validation';
 import { validateCSRF } from '../../middleware/csrf';
@@ -25,6 +34,9 @@ router.post('/', sanitizeInput, validateCSRF, identityCreateRateLimit, createIde
 
 // Get identity
 router.get('/me', getIdentity);
+
+// Get training status (for onboarding)
+router.get('/training-status', getTrainingStatus);
 
 // Create new identity version (immutable) + activate
 router.post('/version', sanitizeInput, validateCSRF, createIdentityVersion);
@@ -46,6 +58,14 @@ router.post('/mirror-voice', sanitizeInput, validateCSRF, draftGenerationRateLim
 
 // Trust confirmation
 router.post('/trust/confirm', sanitizeInput, validateCSRF, trustConfirmRateLimit, confirmTrust);
+
+// A/B Testing Variants (Scale plan only)
+router.post('/variants/create', sanitizeInput, validateCSRF, createVariant);
+router.get('/variants/list', listVariantGroups);
+router.get('/variants/:variantGroupId', getVariantGroup);
+router.get('/variants/:variantGroupId/metrics', getVariantMetrics);
+router.post('/variants/update-weight', sanitizeInput, validateCSRF, updateVariantWeight);
+router.post('/variants/toggle-status', sanitizeInput, validateCSRF, toggleVariantStatus);
 
 export default router;
 

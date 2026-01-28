@@ -59,31 +59,31 @@ if (!config.google || !config.google.clientId || !config.google.clientSecret) {
           return done(new Error('Email already registered with different Google account'), null);
         }
         
-       // ✅ FIX: Account linking logic - allow OAuth + password on same account
-if (user.active) {
-  if (user.googleId) {
-    // User already has Google linked
-    if (user.googleId !== googleId) {
-      logger.warn(`Google login blocked: different googleId for same email - ${email}`);
-      return done(new Error('Email already registered with different Google account'), null);
-    }
-    // ✅ Same googleId => allow login (continue)
-  } else if (user.passwordHash) {
-    // ✅ FIX: Allow linking Google to existing password account
-    // Instead of blocking, link the accounts
-    if (!googleEmailVerified) {
-      logger.error(`Cannot link Google account: email not verified for ${email}`);
-      return done(new Error('Google email is not verified. Please verify your email with Google first.'), null);
-    }
-    logger.info(`Linking Google account to existing password account: ${email}`);
-    await userQueries.linkGoogleByEmail(email, googleId, googleEmail, googleEmailVerified);
-    // Reload user to get updated fields
-    user = await userQueries.findByEmail(email);
-    // Continue to login (don't return here)
-  }
-}
+        // ✅ FIX: Account linking logic - allow OAuth + password on same account
+        if (user.active) {
+          if (user.googleId) {
+            // User already has Google linked
+            if (user.googleId !== googleId) {
+              logger.warn(`Google login blocked: different googleId for same email - ${email}`);
+              return done(new Error('Email already registered with different Google account'), null);
+            }
+            // ✅ Same googleId => allow login (continue)
+          } else if (user.passwordHash) {
+            // ✅ FIX: Allow linking Google to existing password account
+            // Instead of blocking, link the accounts
+            if (!googleEmailVerified) {
+              logger.error(`Cannot link Google account: email not verified for ${email}`);
+              return done(new Error('Google email is not verified. Please verify your email with Google first.'), null);
+            }
+            logger.info(`Linking Google account to existing password account: ${email}`);
+            await userQueries.linkGoogleByEmail(email, googleId, googleEmail, googleEmailVerified);
+            // Reload user to get updated fields
+            user = await userQueries.findByEmail(email);
+            // Continue to login (don't return here)
+          }
+        }
         
-        // ✅ Link Google account if not already linked (for inactive users)
+        // ✅ Link Google account if not already linked (for inactive users or new OAuth-only accounts)
         // ✅ SECURITY: Only link if Google email is verified
         if (!user.googleId) {
           if (!googleEmailVerified) {

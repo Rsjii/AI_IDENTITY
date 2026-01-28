@@ -22,13 +22,18 @@ export function LandingPage() {
                 Clone Yourself. Scale Infinitely.
               </div>
 
-              <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-                Clone Yourself.
-                <span className="text-primary"> Scale Infinitely</span>.
+              <h1 className="text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
+                Clone Yourself with AI.
+                <br />
+                <span className="bg-gradient-to-r from-primary to-accent-secondary bg-clip-text text-transparent">
+                  Scale to 1000s Without Hiring
+                </span>
               </h1>
 
-              <p className="text-base md:text-lg text-muted-foreground max-w-prose">
-                Your AI handles 1000 conversations while you sleep. Deploy to Instagram, WhatsApp, Website in 10 minutes.
+              <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-prose">
+                Your AI handles DMs, creates content, and earns money 24/7.
+                <br />
+                Deploy to Instagram, Website, WhatsApp in 10 minutes.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -53,14 +58,18 @@ export function LandingPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-6 pt-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-4 pt-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 text-primary" />
-                  Secure by design
+                  No credit card required
                 </div>
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-primary" />
-                  Fast responses
+                  Setup in 10 minutes
+                </div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Cancel anytime
                 </div>
               </div>
             </div>

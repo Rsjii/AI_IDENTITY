@@ -33,6 +33,7 @@ import { OnboardingTrainingPage } from './pages/OnboardingTrainingPage';
 import { PublicChatPage } from './pages/PublicChatPage';
 import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
+import { CreatorPublicProfile } from './pages/CreatorPublicProfile';
 
 
 
@@ -92,6 +93,7 @@ function App() {
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
               <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
               <Route path="/chat/:slug" element={<PublicChatPage />} />
+              <Route path="/@:handle" element={<CreatorPublicProfile />} />
 
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>

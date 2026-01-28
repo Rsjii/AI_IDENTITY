@@ -88,6 +88,19 @@ export async function apiFetch<T = any>(
     }
   }
 
+  // Handle 401 (Unauthorized) - session expired
+  if (response.status === 401) {
+    // Dispatch custom event for AuthContext to handle
+    window.dispatchEvent(new CustomEvent('auth:session-expired'));
+    const errorData = await response.json().catch(() => ({
+      error: 'Session expired. Please login again.',
+    }));
+    const apiError = new Error(errorData.error || 'Session expired') as Error & ApiError & { status: number };
+    apiError.errorCode = 'UNAUTHORIZED';
+    apiError.status = 401;
+    throw apiError;
+  }
+
   // Handle other errors
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({

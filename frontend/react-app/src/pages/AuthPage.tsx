@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Chrome, Loader2 } from 'lucide-react';
+import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 
 type TabType = 'login' | 'signup';
 
@@ -300,7 +301,7 @@ export function AuthPage() {
                         disabled={loading}
                         minLength={8}
                       />
-                      <p className="text-xs text-muted-foreground">Min 8 chars. Use uppercase, lowercase, number.</p>
+                      <PasswordStrengthMeter password={signupPassword} />
                     </div>
 
                     <div className="space-y-2">

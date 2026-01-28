@@ -260,6 +260,45 @@ export async function stripeWebhook(req: Request, res: Response) {
         logger.error(`[Stripe] Error downgrading user after cancellation:`, err.message);
       }
     }
+    // ✅ ADD: Handle payment_intent.succeeded for pay-per-chat
+    else if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent: any = event.data.object;
+      const creatorId = paymentIntent.metadata?.creatorId;
+      const sessionId = paymentIntent.metadata?.sessionId;
+      const amount = paymentIntent.amount;
+
+      if (creatorId && sessionId) {
+        try {
+          // Calculate platform fee (25%) and creator earnings (75%)
+          const PLATFORM_FEE_PERCENT = 0.25;
+          const platformFee = Math.floor(amount * PLATFORM_FEE_PERCENT);
+          const creatorEarnings = amount - platformFee;
+
+          // Record payment in database
+          const { stripePaymentQueries } = await import('../../config/database');
+          await stripePaymentQueries.create({
+            creatorId,
+            sessionId,
+            amount,
+            status: 'succeeded',
+            stripePaymentIntentId: paymentIntent.id,
+            platformFeeCents: platformFee,
+            creatorEarningsCents: creatorEarnings,
+            type: 'pay_per_chat',
+          });
+
+          // Mark chat session as paid (unlock AI response)
+          await db.query(
+            `UPDATE "chat_sessions" SET "hasPaid" = true WHERE id = $1`,
+            [sessionId]
+          );
+
+          logger.info(`[Stripe] ✅ Pay-per-chat payment completed: ${paymentIntent.id}, Creator: ${creatorId}, Session: ${sessionId}`);
+        } catch (err: any) {
+          logger.error(`[Stripe] Error processing pay-per-chat payment:`, err.message);
+        }
+      }
+    }
     else {
       logger.debug(`[Stripe Webhook] Unhandled event type: ${event.type}`);
     }

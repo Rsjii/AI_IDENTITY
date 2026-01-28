@@ -114,6 +114,18 @@ const prodLimits = {
     windowMs: 60 * 1000, // 1 minute
     max: 10, // 10 req/min per IP
   } as LimitConfig,
+
+  // ✅ ADD: Public chat rate limits (more reasonable)
+  publicChat: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 messages per 15 min (was 3)
+  } as LimitConfig,
+
+  // ✅ ADD: Authenticated chat (higher limits)
+  authenticatedChat: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Much higher for logged-in users
+  } as LimitConfig,
 };
 
 /**
@@ -213,6 +225,18 @@ const devLimits: typeof prodLimits = {
   widgetChat: {
     windowMs: 60 * 1000,
     max: 200,
+  },
+
+  // ✅ ADD: Public chat rate limits (loose for dev)
+  publicChat: {
+    windowMs: 15 * 60 * 1000,
+    max: 1000, // Very high for testing
+  },
+
+  // ✅ ADD: Authenticated chat (loose for dev)
+  authenticatedChat: {
+    windowMs: 15 * 60 * 1000,
+    max: 10000, // Very high for testing
   },
 };
 

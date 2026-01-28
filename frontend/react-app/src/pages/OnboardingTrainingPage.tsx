@@ -17,37 +17,42 @@ export function OnboardingTrainingPage() {
   const [estimatedTime, setEstimatedTime] = useState(18); // hours
 
   useEffect(() => {
-    // Simulate training progress
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+    // ✅ Poll for real training status from backend
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/identity/training-status', {
+          credentials: 'include',
+        });
+        
+        if (!res.ok) {
+          console.error('Failed to fetch training status');
+          return;
         }
-        return prev + 2;
-      });
-
-      setDocumentsProcessed((prev) => {
-        if (prev < totalDocuments) {
-          return Math.min(prev + 1, totalDocuments);
+        
+        const data = await res.json();
+        const newProgress = data.progress || 0;
+        const newStatus = data.status || 'training';
+        
+        setProgress(newProgress);
+        setStatus(data.message || 'Processing...');
+        
+        if (newStatus === 'ready') {
+          clearInterval(pollInterval);
+          // Auto-redirect after 2 seconds
+          setTimeout(() => {
+            nav('/onboarding/plan');
+          }, 2000);
+        } else if (newStatus === 'error') {
+          clearInterval(pollInterval);
+          setStatus('Training failed. Please try again.');
         }
-        return prev;
-      });
-
-      // Update status messages
-      if (progress < 30) {
-        setStatus('Processing documents...');
-      } else if (progress < 60) {
-        setStatus('Analyzing writing style...');
-      } else if (progress < 90) {
-        setStatus('Building personality profile...');
-      } else {
-        setStatus('Finalizing AI clone...');
+      } catch (error) {
+        console.error('Training status polling error:', error);
       }
-    }, 2000);
+    }, 3000); // Poll every 3 seconds
 
-    return () => clearInterval(interval);
-  }, [progress, totalDocuments]);
+    return () => clearInterval(pollInterval);
+  }, [nav]);
 
   return (
     <Layout>

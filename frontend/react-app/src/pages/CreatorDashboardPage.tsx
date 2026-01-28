@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 import {
   MessageSquare, DollarSign, Clock, Star, TrendingUp, TrendingDown,
   Settings, Database, BarChart3, Zap, 
@@ -54,6 +55,8 @@ export function CreatorDashboardPage() {
   const [activeTab, setActiveTab] = useState<'engagement' | 'revenue' | 'content' | 'ai-health' | 'test'>('engagement');
   const [messagesToday, setMessagesToday] = useState(0);
   const [aiStatus, setAiStatus] = useState<'active' | 'training' | 'inactive' | 'not_setup'>('not_setup');
+  const [lastChatCount, setLastChatCount] = useState(0);
+  const [lastRevenue, setLastRevenue] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,17 +88,79 @@ export function CreatorDashboardPage() {
     };
     fetchData();
 
-    // Update messages today every 10 seconds
-    const interval = setInterval(async () => {
+    // ✅ Real-time updates: Poll every 5 seconds + on window focus
+    const updateDashboard = async () => {
       try {
         const res = await apiFetch('/api/creator/dashboard');
-        setMessagesToday(res?.chats?.today || 0);
+        const newChatCount = res?.chats?.today || 0;
+        const newRevenue = res?.revenue?.thisMonthCents || 0;
+        
+        // ✅ Show toast notifications for new chats/payments
+        if (lastChatCount > 0 && newChatCount > lastChatCount) {
+          const diff = newChatCount - lastChatCount;
+          showToast(`New Chat${diff > 1 ? 's' : ''}: ${diff} new conversation${diff > 1 ? 's' : ''}`, 'success');
+          
+          // Browser notification if permitted
+          if (Notification.permission === 'granted') {
+            new Notification(`New Chat${diff > 1 ? 's' : ''}`, {
+              body: `You have ${diff} new conversation${diff > 1 ? 's' : ''}`,
+              icon: '/favicon.ico',
+            });
+          }
+        }
+        
+        if (lastRevenue > 0 && newRevenue > lastRevenue) {
+          const diff = newRevenue - lastRevenue;
+          showToast(`💰 Earned $${(diff / 100).toFixed(2)}!`, 'success');
+          
+          if (Notification.permission === 'granted') {
+            new Notification('💰 New Payment!', {
+              body: `You earned $${(diff / 100).toFixed(2)}`,
+              icon: '/favicon.ico',
+            });
+          }
+        }
+        
+        setMessagesToday(newChatCount);
+        setLastChatCount(newChatCount);
+        setLastRevenue(newRevenue);
+        setData(prev => ({
+          ...prev,
+          ...res,
+          earnings: prev?.earnings || res?.earnings || [],
+        }));
       } catch (e) {
         // Ignore errors
       }
-    }, 10000);
+    };
+    
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
-    return () => clearInterval(interval);
+    // Poll every 5 seconds
+    const interval = setInterval(updateDashboard, 5000);
+
+    // Update on window focus (user returns to tab)
+    const handleFocus = () => {
+      updateDashboard();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Update on visibility change
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        updateDashboard();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const formatCurrency = (cents: number) => {
@@ -614,6 +679,12 @@ export function CreatorDashboardPage() {
             {/* Test AI Tab */}
             {activeTab === 'test' && (
               <div className="space-y-6">
+                <div className="bg-gradient-to-r from-accent-primary/10 to-accent-secondary/10 rounded-lg p-6 mb-6 border border-accent-primary/20">
+                  <h3 className="text-xl font-semibold text-text-primary mb-2">Test Your AI Clone</h3>
+                  <p className="text-text-secondary text-sm mb-4">
+                    Send test messages to see how your AI clone responds. This helps you refine your AI's personality and responses.
+                  </p>
+                </div>
                 <MirrorPage />
               </div>
             )}

@@ -401,3 +401,97 @@ a:hover {
 .animate-slide-in-from-right-300 {
   animation: slideInFromRight 0.3s ease-out;
 }
+
+/* ============================================
+   ✅ MOBILE RESPONSIVE FIXES
+   ============================================ */
+@media (max-width: 768px) {
+  /* Dashboard cards stack vertically */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Onboarding quiz full screen */
+  .onboarding-container {
+    padding: 1rem;
+  }
+
+  .onboarding-question {
+    font-size: 1.5rem;
+  }
+
+  /* Public chat input fix */
+  .chat-input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-default);
+  }
+
+  /* Scrollable tables */
+  .data-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Collapsible nav */
+  .nav-menu {
+    display: none;
+  }
+
+  .nav-menu.mobile-open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    padding: 1rem;
+    z-index: 50;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  /* Typography adjustments */
+  h1 {
+    font-size: 32px;
+  }
+
+  h2 {
+    font-size: 24px;
+  }
+
+  h3 {
+    font-size: 20px;
+  }
+
+  /* Card padding adjustments */
+  .card {
+    padding: 1rem;
+  }
+
+  /* Button sizing */
+  .btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 28px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  /* Smaller padding on mobile */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

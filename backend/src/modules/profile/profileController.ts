@@ -112,6 +112,12 @@ export const updateProfile = async (req: Request, res: Response) => {
       bio: z.string().max(300, 'Bio too long').optional(),
       profileImage: z.string().nullable().optional(),
       timeZone: z.string().max(64).optional(),
+      socialLinks: z.object({
+        twitter: z.string().url().nullable().optional(),
+        instagram: z.string().url().nullable().optional(),
+        youtube: z.string().url().nullable().optional(),
+        website: z.string().url().nullable().optional(),
+      }).optional(),
       notificationPreferences: z.object({
         emailNotifications: z.boolean().optional(),
         paymentNotifications: z.boolean().optional(),
@@ -120,7 +126,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     });    
 
     // ✅ FIX: Parse from req.body (multer will parse multipart/form-data)
-    const { name, phone, profileImage, timeZone, notificationPreferences } = updateProfileSchema.parse(req.body);
+    const { name, phone, profileImage, timeZone, socialLinks, notificationPreferences } = updateProfileSchema.parse(req.body);
 
     // Get current user data
     const currentUser = await userQueries.findByEmail(req.user.email);
@@ -147,6 +153,15 @@ export const updateProfile = async (req: Request, res: Response) => {
       finalProfileImage,
       timeZone
     );
+
+    // ✅ Save social links if provided
+    if (socialLinks !== undefined) {
+      await db.query(
+        `UPDATE "User" SET "socialLinks" = $1 WHERE email = $2`,
+        [JSON.stringify(socialLinks), req.user.email]
+      );
+      logger.info(`Social links updated for user: ${req.user.email}`);
+    }
 
     // ✅ Save notification preferences if provided
     if (notificationPreferences !== undefined) {

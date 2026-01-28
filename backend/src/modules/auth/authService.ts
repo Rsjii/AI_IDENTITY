@@ -261,6 +261,173 @@ export class EmailService {
       return false;
     }
   }
+
+  /**
+   * ✅ ADD: Email templates for notifications
+   */
+  async sendWelcomeEmail(userEmail: string, userName: string): Promise<boolean> {
+    const appUrl = (config as any).appUrl || config.frontendUrl || 'https://selflyx.com';
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #8B5CF6;">Welcome to Selflyx, ${userName}!</h1>
+        <p>We're excited to have you on board. Your AI clone is ready to be created.</p>
+        <a href="${appUrl}/onboarding/quiz"
+           style="display: inline-block; background: linear-gradient(135deg, #8B5CF6, #6366F1);
+                  color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;
+                  margin: 16px 0;">
+          Start Building Your AI
+        </a>
+        <p>If you have any questions, reply to this email or visit our <a href="${appUrl}/help">Help Center</a>.</p>
+      </body>
+      </html>
+    `;
+    return this.sendEmail(userEmail, 'Welcome to Selflyx! 🎉', html);
+  }
+
+  async sendAIReadyEmail(userEmail: string, userName: string): Promise<boolean> {
+    const appUrl = (config as any).appUrl || config.frontendUrl || 'https://selflyx.com';
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #10B981;">Your AI is Ready, ${userName}! ✅</h1>
+        <p>Great news! Your AI has finished training and is ready to chat with your audience.</p>
+        <a href="${appUrl}/dashboard"
+           style="display: inline-block; background: linear-gradient(135deg, #8B5CF6, #6366F1);
+                  color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;
+                  margin: 16px 0;">
+          View Dashboard
+        </a>
+        <p><strong>Next steps:</strong></p>
+        <ul>
+          <li>Test your AI in the dashboard</li>
+          <li>Get your embed code to add to your website</li>
+          <li>Share your public chat link with your audience</li>
+        </ul>
+      </body>
+      </html>
+    `;
+    return this.sendEmail(userEmail, '✅ Your AI Clone is Ready!', html);
+  }
+
+  async sendPaymentReceipt(userEmail: string, userName: string, amount: number, transactionId: string): Promise<boolean> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1>Payment Received</h1>
+        <p>Hi ${userName},</p>
+        <p>Thank you for your payment. Here are the details:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+          <tr>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;"><strong>Amount:</strong></td>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;">$${(amount / 100).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;"><strong>Transaction ID:</strong></td>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;">${transactionId}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;"><strong>Date:</strong></td>
+            <td style="padding: 8px; border: 1px solid #E5E7EB;">${new Date().toLocaleString()}</td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+    return this.sendEmail(userEmail, 'Payment Receipt from Selflyx', html);
+  }
+
+  /**
+   * Send weekly summary email to creators
+   */
+  async sendWeeklySummary(
+    userEmail: string,
+    stats: {
+      totalChats: number;
+      newChats: number;
+      revenue: number;
+      earnings: number;
+      avgResponseTime: number;
+      satisfaction: number;
+      topQuestions?: string[];
+    }
+  ): Promise<boolean> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Weekly AI Summary</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Your Weekly AI Summary</h1>
+        </div>
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; margin-bottom: 30px;">Here's how your AI clone performed this week:</p>
+          
+          <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #667eea; font-size: 20px;">📊 Key Metrics</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+              <div>
+                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Total Chats</div>
+                <div style="font-size: 24px; font-weight: bold; color: #111827; margin-top: 5px;">${stats.totalChats.toLocaleString()}</div>
+                <div style="font-size: 12px; color: #10b981; margin-top: 5px;">+${stats.newChats} this week</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Your Earnings</div>
+                <div style="font-size: 24px; font-weight: bold; color: #111827; margin-top: 5px;">$${(stats.earnings / 100).toFixed(2)}</div>
+                <div style="font-size: 12px; color: #10b981; margin-top: 5px;">From ${stats.revenue > 0 ? '$' + (stats.revenue / 100).toFixed(2) : '$0'} revenue</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #667eea; font-size: 20px;">⚡ Performance</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+              <div>
+                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Avg Response Time</div>
+                <div style="font-size: 20px; font-weight: bold; color: #111827; margin-top: 5px;">${(stats.avgResponseTime / 1000).toFixed(1)}s</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Satisfaction</div>
+                <div style="font-size: 20px; font-weight: bold; color: #111827; margin-top: 5px;">${(stats.satisfaction * 100).toFixed(0)}%</div>
+              </div>
+            </div>
+          </div>
+
+          ${stats.topQuestions && stats.topQuestions.length > 0 ? `
+          <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #667eea; font-size: 20px;">🔥 Top Questions This Week</h2>
+            <ul style="margin: 15px 0; padding-left: 20px;">
+              ${stats.topQuestions.slice(0, 5).map((q: string) => `<li style="margin-bottom: 8px; color: #374151;">${q}</li>`).join('')}
+            </ul>
+          </div>
+          ` : ''}
+
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL || 'https://selflyx.com'}/dashboard" 
+               style="display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+              View Full Dashboard →
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #6b7280; margin-top: 30px; text-align: center;">
+            Keep engaging with your audience! 🚀
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+    return this.sendEmail(userEmail, 'Your Weekly AI Summary - Selflyx', html);
+  }
 }
 
 // OTP utilities
