@@ -104,6 +104,44 @@ async function getUserSubscriptionTier(userId: string): Promise<'free' | 'pro' |
   }
 }
 
+/**
+ * ✅ Authenticated chat limiter (higher limits vs anonymous/public chat)
+ * Intended for logged-in usage (e.g. /api/identity/mirror).
+ * Premium bypass: pro/teams users get effectively unlimited.
+ */
+export const authenticatedChatRateLimit = rateLimit({
+  store: createRateLimitStore((RATE_LIMITS as any).authenticatedChat.windowMs),
+  windowMs: (RATE_LIMITS as any).authenticatedChat.windowMs,
+  max: async (req: any) => {
+    const userId = req.user?.id || req.user?.userId;
+    if (userId) {
+      const tier = await getUserSubscriptionTier(String(userId));
+      if (tier === 'pro' || tier === 'teams') return 1000000;
+    }
+    return (RATE_LIMITS as any).authenticatedChat.max;
+  },
+  keyGenerator: (req: any) => rlKey('authenticatedChat', getUserOrIp(req)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  handler: (req, res) => {
+    const key = rlKey('authenticatedChat', getUserOrIp(req));
+    logRateLimitViolation(
+      req,
+      'authenticatedChat',
+      key,
+      (RATE_LIMITS as any).authenticatedChat.max,
+      (RATE_LIMITS as any).authenticatedChat.windowMs
+    );
+    return res.status(429).json({
+      success: false,
+      error: 'You’re sending requests too fast. Please wait a moment and try again.',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: formatRetryAfter((RATE_LIMITS as any).authenticatedChat.windowMs),
+    });
+  },
+});
+
 // Global rate limiter (applied to all routes)
 // ✅ CRITICAL: Uses PostgreSQL store for DDoS protection (persists across restarts, works with horizontal scaling)
 const globalRateLimitStore = createRateLimitStore(RATE_LIMITS.global.windowMs);
@@ -360,15 +398,27 @@ export const publicChatRateLimit = rateLimit({
   max: (RATE_LIMITS as any).publicChat.max,
   keyGenerator: (req: any) => {
     // Use session ID + IP for better tracking
-    const sessionId = (req.body as any)?.sessionId || req.headers['x-session-id'];
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const rawHeader = req.headers['x-session-id'];
+    const headerSessionId = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const sessionIdRaw = (req.body as any)?.sessionId || headerSessionId;
+    const sessionId: string | undefined =
+      typeof sessionIdRaw === 'string' ? sessionIdRaw : Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : undefined;
+    const rawFwd = req.headers['x-forwarded-for'];
+    const fwd = Array.isArray(rawFwd) ? rawFwd[0] : rawFwd;
+    const ip: string = req.ip || fwd || req.socket?.remoteAddress || 'unknown';
     return rlKey('publicChat', sessionId ? `${sessionId}:${ip}` : ip);
   },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    const sessionId = (req.body as any)?.sessionId || req.headers['x-session-id'];
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const rawHeader = req.headers['x-session-id'];
+    const headerSessionId = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const sessionIdRaw = (req.body as any)?.sessionId || headerSessionId;
+    const sessionId: string | undefined =
+      typeof sessionIdRaw === 'string' ? sessionIdRaw : Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : undefined;
+    const rawFwd = req.headers['x-forwarded-for'];
+    const fwd = Array.isArray(rawFwd) ? rawFwd[0] : rawFwd;
+    const ip: string = req.ip || fwd || req.socket?.remoteAddress || 'unknown';
     const key = rlKey('publicChat', sessionId ? `${sessionId}:${ip}` : ip);
     logRateLimitViolation(req, 'publicChat', key, (RATE_LIMITS as any).publicChat.max, (RATE_LIMITS as any).publicChat.windowMs);
     return res.status(429).json({

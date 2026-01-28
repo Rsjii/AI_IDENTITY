@@ -38,6 +38,7 @@ import contentRoutes from './modules/content/contentRoutes';
 import publicRoutes from './modules/public/publicRoutes';
 import creatorRoutes from './modules/creator/creatorRoutes';
 import payPerChatRoutes from './modules/payments/payPerChatRoutes';
+import rateLimitRoutes from './modules/rateLimit/rateLimitRoutes';
 
 
 // Page routes
@@ -463,6 +464,7 @@ app.use('/api/payments/pay-per-chat', payPerChatRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);
+app.use('/api/rate-limit', rateLimitRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

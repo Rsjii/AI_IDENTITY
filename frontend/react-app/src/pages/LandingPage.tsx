@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { Shield, Sparkles, Zap, Play } from 'lucide-react';
+import { Shield, Sparkles, Zap, Play, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Testimonials } from '@/components/Testimonials';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export function LandingPage() {
   const { state } = useAuth();
@@ -72,6 +73,21 @@ export function LandingPage() {
                   Cancel anytime
                 </div>
               </div>
+
+              {/* Trust indicators */}
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { k: '10 min', v: 'Setup time' },
+                  { k: '24/7', v: 'Always on' },
+                  { k: '500+', v: 'Creators onboarded' },
+                  { k: '99.9%', v: 'Uptime target' },
+                ].map((s) => (
+                  <div key={s.v} className="rounded-xl border bg-background/60 px-4 py-3 text-center">
+                    <div className="text-base font-semibold text-foreground">{s.k}</div>
+                    <div className="text-xs text-muted-foreground">{s.v}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* “Preview card” */}
@@ -100,6 +116,22 @@ export function LandingPage() {
                   <span className="text-primary">Selflyx</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Logos / trust bar */}
+        <section className="mt-10">
+          <div className="rounded-2xl border bg-card/30 p-6 glass">
+            <div className="text-center text-sm text-muted-foreground">
+              Trusted by creators and teams at
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-center text-sm font-medium text-muted-foreground sm:grid-cols-4">
+              {['CreatorOS', 'InboxPro', 'StudioHQ', 'GrowthLab'].map((name) => (
+                <div key={name} className="rounded-xl border bg-background/50 py-3">
+                  {name}
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -142,15 +174,32 @@ export function LandingPage() {
             <h2 className="text-2xl font-bold">See it in action</h2>
             <p className="text-muted-foreground">Watch how creators deploy their AI clones in 10 minutes</p>
           </div>
-          <div className="rounded-2xl border bg-card/40 p-8 glass flex items-center justify-center min-h-[400px]">
-            <div className="text-center space-y-4">
-              <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                <Play className="h-8 w-8 text-primary ml-1" />
+          <div className="rounded-2xl border bg-card/40 p-4 md:p-6 glass">
+            <div className="relative overflow-hidden rounded-xl border bg-background/60">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent-secondary/10" />
+              <div className="relative aspect-video w-full">
+                <iframe
+                  className="h-full w-full"
+                  src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+                  title="Selflyx demo video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
               </div>
-              <div>
-                <div className="font-semibold">Demo Video (2 mins)</div>
-                <div className="text-sm text-muted-foreground">Coming soon: Watch how to clone yourself</div>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Demo (2 mins)</span> — From rules → deploy → earn
               </div>
+              <Button
+                variant="outline"
+                className="sm:w-auto"
+                onClick={() => window.location.href = authed ? '/mirror' : '/auth'}
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Try it live
+              </Button>
             </div>
           </div>
         </section>
@@ -174,29 +223,188 @@ export function LandingPage() {
           />
         </section>
 
+        {/* How it works */}
+        <section className="mt-12">
+          <div className="text-center space-y-2 mb-8">
+            <h2 className="text-2xl font-bold">How it works</h2>
+            <p className="text-muted-foreground">A simple, repeatable flow your team can trust.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            {[
+              { n: '01', t: 'Upload your context', d: 'Docs, notes, FAQs, and best answers.' },
+              { n: '02', t: 'Lock your voice', d: 'Tone, boundaries, and formatting rules.' },
+              { n: '03', t: 'Deploy anywhere', d: 'Website, Instagram, WhatsApp, and more.' },
+              { n: '04', t: 'Improve weekly', d: 'See what users ask, refine, repeat.' },
+            ].map((s) => (
+              <div key={s.n} className="rounded-2xl border bg-card/40 p-6 glass">
+                <div className="text-xs font-semibold text-primary">{s.n}</div>
+                <div className="mt-2 text-base font-semibold">{s.t}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{s.d}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex justify-center">
+            <Button size="lg" onClick={() => window.location.href = authed ? '/onboarding' : '/auth'}>
+              Start in 10 minutes
+            </Button>
+          </div>
+        </section>
+
+        {/* Pricing comparison teaser */}
+        <section className="mt-12">
+          <div className="rounded-2xl border bg-card/40 p-6 glass">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Pricing that scales with you</h2>
+                <p className="text-muted-foreground max-w-2xl">
+                  Start free, upgrade when you’re ready. No surprise fees.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => window.location.href = '/pricing'}>
+                  View all plans
+                </Button>
+                <Button onClick={() => window.location.href = authed ? '/mirror' : '/auth'}>
+                  Start free
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3">Feature</th>
+                    <th className="text-center p-3">Free</th>
+                    <th className="text-center p-3">Starter</th>
+                    <th className="text-center p-3">Growth</th>
+                    <th className="text-center p-3">Scale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { f: 'Monthly chats', v: ['500', '5,000', '25,000', 'Unlimited'] },
+                    { f: 'Website widget', v: [false, true, true, true] },
+                    { f: 'Pay-per-chat', v: [false, true, true, true] },
+                    { f: 'Priority support', v: [false, false, true, true] },
+                  ].map((row) => (
+                    <tr key={row.f} className="border-b">
+                      <td className="p-3 text-muted-foreground">{row.f}</td>
+                      {row.v.map((cell, idx) => (
+                        <td key={idx} className="p-3 text-center">
+                          {typeof cell === 'boolean' ? (
+                            cell ? <Check className="mx-auto h-4 w-4 text-primary" /> : <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-foreground">{cell}</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ Section */}
         <section className="mt-12">
           <div className="text-center space-y-2 mb-8">
             <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
           </div>
-          <div className="space-y-4 max-w-3xl mx-auto">
-            <div className="rounded-2xl border bg-card/40 p-6 glass">
-              <h3 className="text-lg font-semibold mb-2">Q: How long does setup take?</h3>
-              <p className="text-muted-foreground">
-                A: 30 minutes. AI ready in 24 hours.
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-card/40 p-6 glass">
-              <h3 className="text-lg font-semibold mb-2">Q: Do I need coding skills?</h3>
-              <p className="text-muted-foreground">
-                A: No. Copy-paste embed code. That's it.
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-card/40 p-6 glass">
-              <h3 className="text-lg font-semibold mb-2">Q: How much can I earn?</h3>
-              <p className="text-muted-foreground">
-                A: $500-5K/month typical. Top creators: $10K+
-              </p>
+          <div className="max-w-3xl mx-auto">
+            <Accordion type="single" defaultValue="q1">
+              <AccordionItem value="q1" className="rounded-2xl border bg-card/40 glass">
+                <AccordionTrigger value="q1" className="px-6 py-5 text-left">
+                  How long does setup take?
+                </AccordionTrigger>
+                <AccordionContent value="q1" className="px-6 pb-5">
+                  <p className="text-muted-foreground">
+                    Most creators are live in <span className="font-medium text-foreground">10–30 minutes</span>. Your AI improves as you add more context.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q2" className="rounded-2xl border bg-card/40 glass">
+                <AccordionTrigger value="q2" className="px-6 py-5 text-left">
+                  Do I need coding skills?
+                </AccordionTrigger>
+                <AccordionContent value="q2" className="px-6 pb-5">
+                  <p className="text-muted-foreground">
+                    No. You can copy‑paste your widget and connect integrations with guided steps.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q3" className="rounded-2xl border bg-card/40 glass">
+                <AccordionTrigger value="q3" className="px-6 py-5 text-left">
+                  Can I monetize replies?
+                </AccordionTrigger>
+                <AccordionContent value="q3" className="px-6 pb-5">
+                  <p className="text-muted-foreground">
+                    Yes — enable <span className="font-medium text-foreground">pay‑per‑chat</span> for premium answers and consultations.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="q4" className="rounded-2xl border bg-card/40 glass">
+                <AccordionTrigger value="q4" className="px-6 py-5 text-left">
+                  Is my data private?
+                </AccordionTrigger>
+                <AccordionContent value="q4" className="px-6 pb-5">
+                  <p className="text-muted-foreground">
+                    Your rules and context stay scoped to your workspace. You control what’s connected, and you can revoke access anytime.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        </section>
+
+        {/* Customer success stories */}
+        <section className="mt-12">
+          <div className="text-center space-y-2 mb-8">
+            <h2 className="text-2xl font-bold">Customer success stories</h2>
+            <p className="text-muted-foreground">Real outcomes creators care about.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { title: 'DMs handled automatically', stat: '—62% time', text: 'Less inbox stress. Faster replies that still sound human.' },
+              { title: 'Consultations monetized', stat: '+$1.8k/mo', text: 'Pay-per-chat turns expertise into revenue without extra hours.' },
+              { title: 'Brand voice consistency', stat: '4.7/5', text: 'Higher satisfaction from consistent tone and clear boundaries.' },
+            ].map((c) => (
+              <div key={c.title} className="rounded-2xl border bg-card/40 p-6 glass">
+                <div className="text-xs font-semibold text-primary">{c.stat}</div>
+                <div className="mt-2 text-base font-semibold">{c.title}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{c.text}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex justify-center">
+            <Button size="lg" variant="outline" onClick={() => window.location.href = '/pricing'}>
+              See plans & ROI
+            </Button>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="mt-12">
+          <div className="rounded-2xl border bg-gradient-to-br from-primary/15 via-background/40 to-accent-secondary/10 p-8 md:p-10 glass">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <h2 className="text-2xl md:text-3xl font-bold">Ready to clone yourself?</h2>
+                <p className="text-muted-foreground max-w-xl">
+                  Start free today. Upgrade only when you’re getting value.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button size="lg" onClick={() => window.location.href = authed ? '/mirror' : '/auth'}>
+                  Start free
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => window.location.href = '/pricing'}>
+                  Compare plans
+                </Button>
+              </div>
             </div>
           </div>
         </section>

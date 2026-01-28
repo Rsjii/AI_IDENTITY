@@ -455,11 +455,11 @@ export function PublicChatPage() {
 
       {/* Payment Modal */}
       {showPaymentModal && paymentData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-bg-secondary rounded-lg max-w-md w-full relative">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
+          <div className="bg-bg-secondary w-full md:max-w-md md:rounded-lg rounded-t-2xl md:rounded-lg relative max-h-[92vh] md:max-h-[80vh] overflow-y-auto">
             <button
               onClick={() => setShowPaymentModal(false)}
-              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary h-11 w-11 inline-flex items-center justify-center rounded-md hover:bg-bg-tertiary"
             >
               <X className="h-5 w-5" />
             </button>
@@ -475,7 +475,10 @@ export function PublicChatPage() {
       )}
 
       {/* Input Area */}
-      <div className="bg-bg-secondary border-t border-border-default px-4 py-4">
+      <div
+        className="bg-bg-secondary border-t border-border-default px-4 py-4 sticky bottom-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+      >
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-2">
             <textarea

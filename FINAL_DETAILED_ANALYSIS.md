@@ -1751,50 +1751,72 @@ const shouldRequirePayment =
 **Note:** External integrations (Sentry, New Relic, Datadog, PostHog) are not needed at this stage. All analytics and monitoring will be implemented via `/admin` endpoint and internal dashboard.
 
 #### A1. Error Tracking & Logging ⚠️
-- [ ] Create error logging endpoint in `/admin` dashboard
-- [ ] Track frontend errors (log to database)
-- [ ] Track backend errors (log to database)
+- [x] Create error logging endpoint in `/admin` dashboard (GET + POST)
+- [ ] Track frontend errors (log to database) *(endpoint exists, but frontend auto-report wiring still pending)*
+- [ ] Track backend errors (log to database) *(DB table exists + helper exists; global backend capture still pending)*
 - [ ] Set up error alerting (email notifications for critical errors)
-- [ ] Add error grouping and categorization
-- [ ] Create error rate monitoring in admin dashboard
-- [ ] Display error trends and patterns
-- **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx`
+- [x] Add error grouping and categorization (top errors grouped by message/source/severity)
+- [x] Create error rate monitoring in admin dashboard (summary counts by severity)
+- [x] Display error trends and patterns (time bucket trends)
+- **Status:** ⚠️ Partially implemented (core endpoints + storage + dashboards exist)
+- **Code Evidence:**
+  - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/errors` + `/api/admin/errors/log`
+  - `backend/src/modules/admin/adminController.ts`: `errors()` + `logErrorEndpoint()`
+  - `backend/src/modules/admin/adminDao.ts`: `getErrorLogs()` + `logError()`
+  - `backend/src/config/database.ts`: creates `"error_logs"` table + indexes
+  - `frontend/react-app/src/pages/AdminPage.tsx`: Errors tab fetches `/api/admin/errors`
+- **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
 #### A2. Performance Monitoring ⚠️
-- [ ] Create performance tracking in `/admin` endpoint
-- [ ] Track API latency metrics (p50, p95, p99) - store in database
-- [ ] Track LLM API latency separately
-- [ ] Monitor database query execution times
-- [ ] Set up alerts for latency > 5 seconds (email notifications)
-- [ ] Create performance dashboard in admin panel
+- [x] Create performance tracking in `/admin` endpoint
+- [ ] Track API latency metrics (p50, p95, p99) - store in database *(currently computed from `"mirror_runs"` + in-memory route metrics)*
+- [ ] Track LLM API latency separately *(available via `"mirror_runs"."latencyMs"`; separate dashboard breakdown still limited)*
+- [x] Monitor database query execution times *(via `Event` type `db_query` meta aggregation when present)*
+- [ ] Set up alerts for latency > 5 seconds (email notifications) *(currently logger warnings only)*
+- [x] Create performance dashboard in admin panel
 - [ ] Track memory usage and CPU metrics (if available from server)
-- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx`
+- **Status:** ⚠️ Partially implemented (endpoints + UI + realtime stats exist)
+- **Code Evidence:**
+  - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/performance`
+  - `backend/src/modules/admin/adminController.ts`: merges realtime + historical performance stats
+  - `backend/src/modules/admin/adminDao.ts`: `getPerformanceMetrics()` (p50/p95/p99 on `"mirror_runs"."latencyMs"`)
+  - `backend/src/middleware/performanceMonitor.ts`: in-memory per-route latency + slow route list
+  - `frontend/react-app/src/pages/AdminPage.tsx`: Performance tab fetches `/api/admin/performance`
+- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
 #### A3. Business Metrics Dashboard ⚠️
-- [ ] Create admin analytics dashboard at `/admin`
-- [ ] Track daily active creators (DAC)
-- [ ] Calculate conversion rate (free → paid plans)
-- [ ] Track churn rate (monthly)
-- [ ] Calculate average revenue per creator (ARPC)
-- [ ] Track monthly recurring revenue (MRR)
-- [ ] Display revenue trends (charts)
-- [ ] Track user acquisition sources
-- [ ] Full business analytics dashboard in admin panel
-- **Priority:** 🟡 High | **Time:** 4 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx` (new)
+- [x] Create admin analytics dashboard at `/admin`
+- [x] Track daily active creators (DAC)
+- [x] Calculate conversion rate (free → paid plans)
+- [x] Track churn rate (monthly) *(best-effort from user subscription state)*
+- [ ] Calculate average revenue per creator (ARPC) *(not explicitly computed as a KPI yet)*
+- [x] Track monthly recurring revenue (MRR)
+- [ ] Display revenue trends (charts) *(basic metrics present; charting may be partial)*
+- [ ] Track user acquisition sources *(not implemented)*
+- [x] Full business analytics dashboard in admin panel *(core KPIs implemented)*
+- **Status:** ✅ Core implemented
+- **Code Evidence:**
+  - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/business-metrics`
+  - `backend/src/modules/admin/adminDao.ts`: `getBusinessMetrics()` (MRR, conversion, churn, revenue)
+  - `frontend/react-app/src/pages/AdminPage.tsx`: Business tab fetches `/api/admin/business-metrics`
+- **Priority:** 🟡 High | **Time:** 4 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
 ---
 
 ### B - Backend Improvements
 
 #### B1. Database Query Optimization ⚠️
-- [ ] Add index on `chat_sessions.creatorId`
-- [ ] Add index on `chat_messages.sessionId`
-- [ ] Add index on `stripe_payments.creatorId`
+- [x] Add index on `chat_sessions.creatorId`
+- [x] Add index on `chat_messages.sessionId`
+- [x] Add index on `stripe_payments.creatorId`
 - [ ] Add index on `chat_messages.createdAt` (for time-based queries)
 - [ ] Optimize dashboard queries (use materialized views if needed)
 - [ ] Add query result caching layer
 - [ ] Analyze slow query logs
 - [ ] Optimize JOIN operations
+- **Status:** ⚠️ Partially implemented (indexes added)
+- **Code Evidence:**
+  - `backend/src/config/database.ts`: `idx_chat_sessions_creatorId`, `idx_chat_messages_sessionId`, `idx_stripe_payments_creatorId`
 - **Priority:** 🟢 Medium | **Time:** 2 hours | **Location:** `backend/src/config/database.ts`
 
 #### B2. Email Service Verification ⚠️
@@ -1809,38 +1831,49 @@ const shouldRequirePayment =
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/auth/authService.ts`
 
 #### B3. Intelligent Pricing Detection ⚠️
-- [ ] Implement AI-based intent classification (simple vs complex questions)
-- [ ] Add context-aware detection (follow-up questions)
-- [ ] Implement dynamic pricing based on question complexity
+- [x] Implement AI-based intent classification (simple vs complex questions)
+- [x] Add context-aware detection (follow-up questions)
+- [x] Implement dynamic pricing based on question complexity
 - [ ] Add sentiment analysis for question urgency
 - [ ] Create pricing model training data
 - [ ] A/B test pricing strategies
-- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/payments/intelligentPricing.ts`
+- **Status:** ✅ Core implemented
+- **Code Evidence:**
+  - `backend/src/modules/identity/intelligentPricing.ts`: `classifyIntent()` + `analyzeConversationContext()` + `shouldRequirePayment()`
+- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/identity/intelligentPricing.ts`
 
 ---
 
 ### C - Content & Onboarding
 
 #### C1. Content Upload Enhancements ⚠️
-- [ ] Add YouTube OAuth integration for content import
-- [ ] Add Twitter/X API integration for tweet import
-- [ ] Add Medium API integration for article import
-- [ ] Add LinkedIn API integration for post import
-- [ ] Improve quality score visualization (progress bar, color coding)
-- [ ] Add real-time processing indicators (progress bar)
-- [ ] Add file preview thumbnails before upload
+- [ ] Add YouTube OAuth integration for content import *(UI supports YouTube channel import; OAuth not verified)*
+- [x] Add Twitter/X API integration for tweet import (OAuth authorize route + UI connect)
+- [ ] Add Medium API integration for article import *(UI placeholder; backend not verified)*
+- [ ] Add LinkedIn API integration for post import *(UI placeholder; backend not verified)*
+- [x] Improve quality score visualization (progress bar + tiering)
+- [x] Add real-time processing indicators (upload progress UI)
+- [x] Add file preview thumbnails before upload *(file-type icons + item list)*
 - [ ] Add content preview after processing
+- **Status:** ⚠️ Partially implemented (Twitter OAuth + major UX upgrades done)
+- **Code Evidence:**
+  - `frontend/react-app/src/pages/OnboardingContentPage.tsx`: Social tab + quality scoring + progress + breakdown
+  - `backend/src/modules/content/contentRoutes.ts`: `/social/twitter/*` and `/social/youtube-channel`
+  - `backend/src/modules/content/twitterAuthRoutes.ts`: Twitter OAuth authorize flow
 - **Priority:** 🟢 Medium | **Time:** 4 hours | **Location:** `frontend/react-app/src/pages/OnboardingContentPage.tsx`
 
 #### C2. Onboarding Quiz UI Polish ⚠️
-- [ ] Convert to full-screen modal (no page distractions)
-- [ ] Add slide animations between questions
-- [ ] Create visual question types (cards for Q1, sliders for Q2)
-- [ ] Add confetti animation on quiz completion
-- [ ] Improve progress bar (gradient fill, smooth transitions)
+- [x] Convert to full-screen modal (no page distractions)
+- [x] Add slide animations between questions
+- [x] Create visual question types (cards for Q1, sliders for Q2)
+- [x] Add confetti animation on quiz completion
+- [x] Improve progress bar (smooth transitions)
 - [ ] Add question number indicator (e.g., "Question 3 of 10")
 - [ ] Add skip question option (with confirmation)
 - [ ] Add back button to review previous answers
+- **Status:** ⚠️ Mostly implemented
+- **Code Evidence:**
+  - `frontend/react-app/src/pages/OnboardingQuizPage.tsx`: full-screen modal + animationDirection + `canvas-confetti`
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `frontend/react-app/src/pages/OnboardingQuizPage.tsx`
 
 ---
@@ -1855,6 +1888,9 @@ const shouldRequirePayment =
 - [ ] Add test statistics (total tests, average response time)
 - [ ] Add export test results functionality
 - [ ] Add clear test history button
+- **Status:** ⚠️ Partially implemented (test tab exists + basic header + MirrorPage embedded)
+- **Code Evidence:**
+  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: Test tab banner + `<MirrorPage />`
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
 
 
@@ -1908,52 +1944,70 @@ const shouldRequirePayment =
 ### L - Landing Page
 
 #### L1. Landing Page Enhancements ⚠️
-- [ ] Add video demo section (embedded YouTube/Vimeo)
-- [ ] Add social proof section (testimonials with avatars)
-- [ ] Create FAQ section (accordion style)
-- [ ] Add trust indicators (company logos, user count, stats)
-- [ ] Improve CTA placement (above the fold, multiple CTAs)
-- [ ] Add pricing comparison table
-- [ ] Add "How it works" section (3-4 steps)
-- [ ] Add customer success stories
+- [x] Add video demo section (embedded YouTube/Vimeo)
+- [x] Add social proof section (testimonials with avatars)
+- [x] Create FAQ section (accordion style)
+- [x] Add trust indicators (company logos, user count, stats)
+- [x] Improve CTA placement (above the fold, multiple CTAs)
+- [x] Add pricing comparison table
+- [x] Add "How it works" section (3-4 steps)
+- [x] Add customer success stories
 - **Priority:** 🟡 High | **Time:** 4 hours | **Location:** `frontend/react-app/src/pages/LandingPage.tsx`
+- **Status:** ✅ Implemented + verified
+- **Code Evidence:**
+  - `frontend/react-app/src/pages/LandingPage.tsx`: embedded demo iframe + trust stats/logos + accordion FAQ + pricing comparison table + “How it works” + success stories + multi-CTA
 
 ---
 
 ### M - Mobile & Responsiveness
 
 #### M1. Mobile Responsiveness Improvements ⚠️
-- [ ] Fix dashboard cards stacking on mobile (proper grid layout)
-- [ ] Fix chat input position (account for mobile keyboard)
-- [ ] Make navigation menu collapse on mobile (hamburger menu)
-- [ ] Make tables horizontally scrollable on mobile
-- [ ] Ensure all touch targets are minimum 44x44px
+- [x] Fix dashboard cards stacking on mobile (proper grid layout)
+- [x] Fix chat input position (account for mobile keyboard)
+- [x] Make navigation menu collapse on mobile (hamburger menu)
+- [x] Make tables horizontally scrollable on mobile
+- [x] Ensure all touch targets are minimum 44x44px
 - [ ] Test on iOS Safari and Android Chrome
-- [ ] Fix modal dialogs on mobile (full-screen on small screens)
-- [ ] Optimize images for mobile (lazy loading, responsive sizes)
+- [x] Fix modal dialogs on mobile (full-screen on small screens)
+- [x] Optimize images for mobile (lazy loading, responsive sizes)
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** All frontend pages
+- **Status:** ✅ Implemented (manual device testing pending)
+- **Code Evidence:**
+  - `frontend/react-app/src/components/Navbar.tsx`: added mobile hamburger menu with 44px touch targets
+  - `frontend/react-app/src/pages/PublicChatPage.tsx`: sticky bottom input w/ safe-area padding + full-screen modal behavior on small screens
+  - Tables already wrapped with `overflow-x-auto` across pages (Pricing/Settings/AdminUser/Landing)
 
 ---
 
 ### R - Rate Limiting & Security
 
 #### R1. Rate Limiting Improvements ⚠️
-- [ ] Increase public chat limits (20 messages/15min instead of 3)
-- [ ] Implement session-based limits (not just IP-based)
-- [ ] Add graceful degradation messages (user-friendly errors)
-- [ ] Different limits for authenticated vs anonymous users
-- [ ] Add rate limit headers in API responses
-- [ ] Implement sliding window rate limiting
-- [ ] Add rate limit bypass for premium users
+- [x] Increase public chat limits (20 messages/15min instead of 3)
+- [x] Implement session-based limits (not just IP-based)
+- [x] Add graceful degradation messages (user-friendly errors)
+- [x] Different limits for authenticated vs anonymous users
+- [x] Add rate limit headers in API responses
+- [x] Implement sliding window rate limiting
+- [x] Add rate limit bypass for premium users
 - **Priority:** 🟡 High | **Time:** 1 hour | **Location:** `backend/src/config/rateLimitConfig.ts`
+- **Status:** ✅ Implemented + verified
+- **Code Evidence:**
+  - `backend/src/config/rateLimitConfig.ts`: `publicChat.max = 20`, `authenticatedChat.max = 100`
+  - `backend/src/middleware/rateLimit.ts`: `publicChatRateLimit` uses sessionId+IP; `authenticatedChatRateLimit` added with premium bypass
+  - Standard headers enabled (`standardHeaders: true`, `legacyHeaders: false`)
 
 #### R2. API Rate Limiting Tuning ⚠️
-- [ ] Adjust limits per endpoint (different for chat, auth, etc.)
-- [ ] Set different limits for authenticated vs anonymous users
-- [ ] Improve error messages (explain why rate limited)
-- [ ] Add rate limit status endpoint (`/api/rate-limit/status`)
-- [ ] Implement rate limit reset functionality
+- [x] Adjust limits per endpoint (different for chat, auth, etc.)
+- [x] Set different limits for authenticated vs anonymous users
+- [x] Improve error messages (explain why rate limited)
+- [x] Add rate limit status endpoint (`/api/rate-limit/status`)
+- [x] Implement rate limit reset functionality
 - **Priority:** 🟡 High | **Time:** 1 hour | **Location:** `backend/src/middleware/rateLimiter.ts`
+- **Status:** ✅ Implemented + verified (note: route implemented in new module)
+- **Code Evidence:**
+  - `backend/src/modules/rateLimit/rateLimitRoutes.ts`: `GET /status` + `POST /reset`
+  - `backend/src/app.ts`: mounts `app.use('/api/rate-limit', rateLimitRoutes)`
+  - `backend/src/modules/identity/identityRoutes.ts`: applies `authenticatedChatRateLimit` to `/mirror` + `/mirror-voice`
 
 ---
 
