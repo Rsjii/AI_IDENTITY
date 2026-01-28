@@ -2,6 +2,7 @@ import { uploadPublicBuffer } from '../../services/s3Service';
 import { knowledgeSourceQueries, knowledgeChunkQueries } from '../../config/database';
 import { logger } from '../../config/logger';
 import { YoutubeTranscript } from 'youtube-transcript';
+import { ragService } from '../../services/ragService';
 
 // PDF parsing
 let pdfParse: any = null;
@@ -120,6 +121,12 @@ export async function createPasteSource(userId: string, title: string | undefine
   const source = await knowledgeSourceQueries.create({ userId, type: 'paste', title, rawText });
   const chunks = chunkText(rawText);
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+
+  // Generate embeddings for RAG (async, don't block)
+  ragService.generateEmbeddingsForUser(userId).catch(err => {
+    logger.warn('[Content] Failed to generate embeddings:', err);
+  });
+
   return source;
 }
 
@@ -141,6 +148,14 @@ export async function createYoutubeSource(userId: string, url: string, title?: s
 
   const chunks = transcribedText ? chunkText(transcribedText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+
+  // Generate embeddings for RAG (async, don't block)
+  if (chunks.length > 0) {
+    ragService.generateEmbeddingsForUser(userId).catch(err => {
+      logger.warn('[Content] Failed to generate embeddings:', err);
+    });
+  }
+
   return source;
 }
 
@@ -181,5 +196,13 @@ export async function createFileSource(userId: string, file: Express.Multer.File
 
   const chunks = extractedText ? chunkText(extractedText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+
+  // Generate embeddings for RAG (async, don't block)
+  if (chunks.length > 0) {
+    ragService.generateEmbeddingsForUser(userId).catch(err => {
+      logger.warn('[Content] Failed to generate embeddings:', err);
+    });
+  }
+
   return source;
 }

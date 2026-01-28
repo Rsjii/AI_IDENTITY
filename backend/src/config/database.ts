@@ -345,8 +345,12 @@ CREATE TABLE IF NOT EXISTS "knowledge_chunks" (
   "sourceId" TEXT NOT NULL,
   "chunkIndex" INTEGER NOT NULL,
   "content" TEXT NOT NULL,
+  "embedding" JSONB,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add embedding column if it doesn't exist (for existing databases)
+ALTER TABLE "knowledge_chunks" ADD COLUMN IF NOT EXISTS "embedding" JSONB;
 
 CREATE INDEX IF NOT EXISTS "idx_knowledge_sources_userId" ON "knowledge_sources"("userId");
 CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_userId" ON "knowledge_chunks"("userId");
