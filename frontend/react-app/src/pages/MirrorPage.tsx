@@ -1,17 +1,38 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
-export function MirrorPage() {
+type MirrorHistoryItem = {
+  id: string;
+  message: string;
+  reply: string;
+  durationMs: number;
+  createdAt: number;
+};
+
+export function MirrorPage({
+  embedded = false,
+  suggestions = [],
+}: {
+  embedded?: boolean;
+  suggestions?: string[];
+} = {}) {
   const [incomingMessage, setIncomingMessage] = useState('');
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<MirrorHistoryItem[]>([]);
+
+  const stats = useMemo(() => {
+    const total = history.length;
+    const avg = total ? Math.round(history.reduce((a, b) => a + b.durationMs, 0) / total) : 0;
+    return { total, avg };
+  }, [history]);
 
   const onMirror = async () => {
     if (!incomingMessage.trim()) {
@@ -24,6 +45,7 @@ export function MirrorPage() {
     setReply('');
     
     try {
+      const t0 = performance.now();
       const result = await apiFetch<any>('/api/identity/mirror', {
         method: 'POST',
         body: JSON.stringify({ 
@@ -31,8 +53,19 @@ export function MirrorPage() {
           incomingMessage 
         }),
       });
+      const t1 = performance.now();
 
       setReply(result?.reply || 'No response generated.');
+      setHistory((prev) => [
+        {
+          id: `test_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          message: incomingMessage,
+          reply: result?.reply || 'No response generated.',
+          durationMs: Math.round(t1 - t0),
+          createdAt: Date.now(),
+        },
+        ...prev,
+      ].slice(0, 50));
     } catch (err: any) {
       const code = err?.errorCode;
       if (code === 'LLM_AUTH_FAILED') {
@@ -49,17 +82,18 @@ export function MirrorPage() {
     }
   };
 
-  return (
-    <Layout>
-      <div className="max-w-3xl mx-auto space-y-6">
+  const content = (
+    <div className={embedded ? 'space-y-6' : 'max-w-3xl mx-auto space-y-6'}>
+      {!embedded && (
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI Response Tester</h1>
           <p className="text-muted-foreground mt-1">
             Test how your AI clone responds to messages. This is a testing tool to preview AI responses.
           </p>
         </div>
+      )}
 
-        <Card className="glass">
+      <Card className={embedded ? 'bg-bg-secondary border-border-default' : 'glass'}>
           <CardHeader>
             <CardTitle>Test Message</CardTitle>
             <CardDescription>Enter a message to see how your AI clone would respond</CardDescription>
@@ -70,6 +104,22 @@ export function MirrorPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {suggestions.slice(0, 8).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="text-xs rounded-full border px-3 py-1 bg-card/60 hover:bg-card transition-colors"
+                    onClick={() => setIncomingMessage(s)}
+                    disabled={loading}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             )}
 
             <div className="space-y-2">
@@ -91,25 +141,38 @@ export function MirrorPage() {
               </p>
             </div>
 
-            <Button 
-              className="w-full" 
-              onClick={onMirror} 
-              disabled={loading || !incomingMessage.trim()}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating response...
-                </>
-              ) : (
-                'Generate Response'
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={onMirror}
+                disabled={loading || !incomingMessage.trim()}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating response...
+                  </>
+                ) : (
+                  'Generate Response'
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIncomingMessage('');
+                  setReply('');
+                  setError('');
+                }}
+                disabled={loading}
+              >
+                Clear
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         {reply && (
-          <Card className="glass">
+          <Card className={embedded ? 'bg-bg-secondary border-border-default' : 'glass'}>
             <CardHeader>
               <CardTitle>AI Response</CardTitle>
               <CardDescription>Your AI clone's response to the test message</CardDescription>
@@ -130,7 +193,57 @@ export function MirrorPage() {
             </CardContent>
           </Card>
         )}
+
+        <Card className={embedded ? 'bg-bg-secondary border-border-default' : 'glass'}>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Test History</CardTitle>
+              <CardDescription>
+                {stats.total} tests · avg {stats.avg}ms
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setHistory([])}
+              disabled={history.length === 0}
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear History
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {history.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No test chats yet.</div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((h) => (
+                  <div key={h.id} className="rounded-lg border bg-card/60 p-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(h.createdAt).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{h.durationMs}ms</div>
+                    </div>
+                    <div className="text-sm font-medium mb-1">You</div>
+                    <div className="text-sm whitespace-pre-wrap mb-3">{h.message}</div>
+                    <div className="text-sm font-medium mb-1">AI</div>
+                    <div className="text-sm whitespace-pre-wrap">{h.reply}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <Layout>
+      {content}
     </Layout>
   );
 }

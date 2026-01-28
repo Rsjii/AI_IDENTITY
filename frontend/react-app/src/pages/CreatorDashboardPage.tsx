@@ -695,7 +695,17 @@ export function CreatorDashboardPage() {
                     </div>
                   </div>
                 </div>
-                <MirrorPage />
+                <MirrorPage
+                  embedded
+                  suggestions={[
+                    'Give me a 30-second intro of who you are.',
+                    'What are your top 3 principles you live by?',
+                    'Explain your biggest failure and what you learned.',
+                    'How would you help a beginner get started in your field?',
+                    'What tools/workflows do you use every day?',
+                    'What do you believe that most people disagree with?',
+                  ]}
+                />
               </div>
             )}
           </CardContent>

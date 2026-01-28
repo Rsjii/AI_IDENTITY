@@ -327,6 +327,59 @@ export async function logError(error: {
 export async function getPerformanceMetrics(range: RangeKey) {
   const since = rangeToSince(range);
 
+  // ✅ A2: API latency metrics from persisted api_latency_events
+  const apiLatencyStats = await db.query(
+    `
+    SELECT
+      COUNT(*)::int AS total_requests,
+      AVG("durationMs")::int AS avg_latency,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "durationMs")::int AS p50,
+      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::int AS p95,
+      PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY "durationMs")::int AS p99,
+      MAX("durationMs")::int AS max_latency,
+      MIN("durationMs")::int AS min_latency,
+      COUNT(CASE WHEN "durationMs" > 2000 THEN 1 END)::int AS slow_requests,
+      COUNT(CASE WHEN "durationMs" > 5000 THEN 1 END)::int AS very_slow_requests
+    FROM "api_latency_events"
+    WHERE "createdAt" >= $1
+    `,
+    [since]
+  );
+
+  const apiLatencyByRoute = await db.query(
+    `
+    SELECT
+      route,
+      method,
+      COUNT(*)::int AS requests,
+      AVG("durationMs")::int AS avg_latency,
+      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::int AS p95,
+      MAX("durationMs")::int AS max_latency
+    FROM "api_latency_events"
+    WHERE "createdAt" >= $1
+    GROUP BY route, method
+    ORDER BY requests DESC
+    LIMIT 50
+    `,
+    [since]
+  );
+
+  const apiLatencyTrends = await db.query(
+    `
+    SELECT
+      DATE_TRUNC('hour', "createdAt") AS time_bucket,
+      COUNT(*)::int AS requests,
+      AVG("durationMs")::int AS avg_latency,
+      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::int AS p95
+    FROM "api_latency_events"
+    WHERE "createdAt" >= $1
+    GROUP BY time_bucket
+    ORDER BY time_bucket DESC
+    LIMIT 168
+    `,
+    [since]
+  );
+
   // Get aggregate metrics from mirror_runs (which tracks latency)
   const latencyStats = await db.query(
     `
@@ -406,24 +459,42 @@ export async function getPerformanceMetrics(range: RangeKey) {
   );
 
   const stats = latencyStats.rows[0] || {};
+  const apiStats = apiLatencyStats.rows[0] || {};
   const errors = errorRate.rows[0] || { total: 0, errors: 0 };
 
   return {
     range,
     since,
-    latency: {
-      total: stats.total_requests || 0,
-      avg: stats.avg_latency || 0,
-      p50: stats.p50 || 0,
-      p95: stats.p95 || 0,
-      p99: stats.p99 || 0,
-      max: stats.max_latency || 0,
-      min: stats.min_latency || 0,
-      slowRequests: stats.slow_requests || 0,
-      verySlowRequests: stats.very_slow_requests || 0,
+    api: {
+      latency: {
+        total: apiStats.total_requests || 0,
+        avg: apiStats.avg_latency || 0,
+        p50: apiStats.p50 || 0,
+        p95: apiStats.p95 || 0,
+        p99: apiStats.p99 || 0,
+        max: apiStats.max_latency || 0,
+        min: apiStats.min_latency || 0,
+        slowRequests: apiStats.slow_requests || 0,
+        verySlowRequests: apiStats.very_slow_requests || 0,
+      },
+      byRoute: apiLatencyByRoute.rows,
+      trends: apiLatencyTrends.rows,
     },
-    byModel: latencyByModel.rows,
-    trends: latencyTrends.rows,
+    llm: {
+      latency: {
+        total: stats.total_requests || 0,
+        avg: stats.avg_latency || 0,
+        p50: stats.p50 || 0,
+        p95: stats.p95 || 0,
+        p99: stats.p99 || 0,
+        max: stats.max_latency || 0,
+        min: stats.min_latency || 0,
+        slowRequests: stats.slow_requests || 0,
+        verySlowRequests: stats.very_slow_requests || 0,
+      },
+      byModel: latencyByModel.rows,
+      trends: latencyTrends.rows,
+    },
     database: {
       totalQueries: dbPerformance.rows[0]?.total_queries || 0,
       avgQueryTime: dbPerformance.rows[0]?.avg_query_time || 0,

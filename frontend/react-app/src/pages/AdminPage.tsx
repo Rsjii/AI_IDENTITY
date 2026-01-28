@@ -428,7 +428,7 @@ export function AdminPage() {
                         <div key={idx} className="flex items-center justify-between rounded-lg border bg-card/60 p-3">
                           <code className="text-xs">{route.route}</code>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{route.avg?.toFixed(0)}ms</span>
+                            <span className="text-sm font-medium">{route.avgDuration?.toFixed(0) || 0}ms</span>
                             <Badge variant="outline" className="text-xs">{route.count} req</Badge>
                           </div>
                         </div>
@@ -453,22 +453,61 @@ export function AdminPage() {
                   <CardDescription>Performance over selected period</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="rounded-lg border bg-card/60 p-4">
-                      <div className="text-xs text-muted-foreground mb-1">Avg Response Time</div>
-                      <div className="text-2xl font-bold">{performance.historical.avgResponseTime?.toFixed(0) || 0}ms</div>
+                      <div className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-blue-500" />
+                        API Latency (All /api routes)
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Avg</div>
+                          <div className="text-xl font-bold">{performance.historical.api?.latency?.avg || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p50</div>
+                          <div className="text-xl font-bold">{performance.historical.api?.latency?.p50 || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p95</div>
+                          <div className="text-xl font-bold">{performance.historical.api?.latency?.p95 || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p99</div>
+                          <div className="text-xl font-bold">{performance.historical.api?.latency?.p99 || 0}ms</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        {performance.historical.api?.latency?.total || 0} requests · {performance.historical.api?.latency?.verySlowRequests || 0} &gt; 5s
+                      </div>
                     </div>
+
                     <div className="rounded-lg border bg-card/60 p-4">
-                      <div className="text-xs text-muted-foreground mb-1">p50 Latency</div>
-                      <div className="text-2xl font-bold">{performance.historical.p50?.toFixed(0) || 0}ms</div>
-                    </div>
-                    <div className="rounded-lg border bg-card/60 p-4">
-                      <div className="text-xs text-muted-foreground mb-1">p95 Latency</div>
-                      <div className="text-2xl font-bold">{performance.historical.p95?.toFixed(0) || 0}ms</div>
-                    </div>
-                    <div className="rounded-lg border bg-card/60 p-4">
-                      <div className="text-xs text-muted-foreground mb-1">p99 Latency</div>
-                      <div className="text-2xl font-bold">{performance.historical.p99?.toFixed(0) || 0}ms</div>
+                      <div className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-purple-500" />
+                        LLM Latency (mirror_runs)
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Avg</div>
+                          <div className="text-xl font-bold">{performance.historical.llm?.latency?.avg || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p50</div>
+                          <div className="text-xl font-bold">{performance.historical.llm?.latency?.p50 || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p95</div>
+                          <div className="text-xl font-bold">{performance.historical.llm?.latency?.p95 || 0}ms</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">p99</div>
+                          <div className="text-xl font-bold">{performance.historical.llm?.latency?.p99 || 0}ms</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        {performance.historical.llm?.latency?.total || 0} requests · {performance.historical.llm?.latency?.verySlowRequests || 0} &gt; 5s
+                      </div>
                     </div>
                   </div>
                 </CardContent>

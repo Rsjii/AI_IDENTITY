@@ -1770,21 +1770,22 @@ const shouldRequirePayment =
   - `frontend/react-app/src/main.tsx`: Global error handlers for unhandled errors and promise rejections
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
-#### A2. Performance Monitoring ⚠️
+#### A2. Performance Monitoring ✅
 - [x] Create performance tracking in `/admin` endpoint
-- [ ] Track API latency metrics (p50, p95, p99) - store in database *(currently computed from `"mirror_runs"` + in-memory route metrics)*
-- [ ] Track LLM API latency separately *(available via `"mirror_runs"."latencyMs"`; separate dashboard breakdown still limited)*
+- [x] Track API latency metrics (p50, p95, p99) - store in database *(stored in `"api_latency_events"`; computed in admin API)*
+- [x] Track LLM API latency separately *(dashboard now shows `historical.api` vs `historical.llm`)*
 - [x] Monitor database query execution times *(via `Event` type `db_query` meta aggregation when present)*
-- [ ] Set up alerts for latency > 5 seconds (email notifications) *(currently logger warnings only)*
+- [x] Set up alerts for latency > 5 seconds (email notifications) *(throttled email alerts via `ADMIN_EMAIL` / `SUPPORT_EMAIL`)*
 - [x] Create performance dashboard in admin panel
-- [ ] Track memory usage and CPU metrics (if available from server)
-- **Status:** ⚠️ Partially implemented (endpoints + UI + realtime stats exist)
+- [x] Track memory usage and CPU metrics (if available from server) *(added node + OS stats)*
+- **Status:** ✅ Implemented (historical API+LLM latency + realtime route stats + system stats + alerts)
 - **Code Evidence:**
   - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/performance`
   - `backend/src/modules/admin/adminController.ts`: merges realtime + historical performance stats
-  - `backend/src/modules/admin/adminDao.ts`: `getPerformanceMetrics()` (p50/p95/p99 on `"mirror_runs"."latencyMs"`)
-  - `backend/src/middleware/performanceMonitor.ts`: in-memory per-route latency + slow route list
-  - `frontend/react-app/src/pages/AdminPage.tsx`: Performance tab fetches `/api/admin/performance`
+  - `backend/src/modules/admin/adminDao.ts`: `getPerformanceMetrics()` (splits `api` vs `llm` + p50/p95/p99)
+  - `backend/src/middleware/performanceMonitor.ts`: in-memory per-route latency + persists `"api_latency_events"` + email alerts + system stats
+  - `backend/src/config/database.ts`: creates `"api_latency_events"` table + indexes
+  - `frontend/react-app/src/pages/AdminPage.tsx`: Performance tab renders API latency vs LLM latency
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
 #### A3. Business Metrics Dashboard ✅
@@ -1885,15 +1886,16 @@ const shouldRequirePayment =
 
 #### D1. Dashboard Test Tab Polish ✅
 - [x] Better integration with dashboard styling (consistent colors, spacing) *(Polished styling with gradient banner)*
-- [ ] Add test chat history display *(MirrorPage handles this)*
+- [x] Add test chat history display *(embedded tester now includes history)*
 - [x] Add "Test chats don't count toward limit" message *(Added to test tab banner)*
-- [ ] Add quick test questions (pre-filled suggestions) *(Can be added later)*
-- [ ] Add test statistics (total tests, average response time) *(Can be added later)*
+- [x] Add quick test questions (pre-filled suggestions) *(added suggestion chips)*
+- [x] Add test statistics (total tests, average response time) *(shown in history header)*
 - [ ] Add export test results functionality *(Can be added later)*
-- [ ] Add clear test history button *(Can be added later)*
-- **Status:** ✅ Core polish implemented (styling + message added)
+- [x] Add clear test history button *(added "Clear History")*
+- **Status:** ✅ Implemented (history + stats + suggestions + clear history)
 - **Code Evidence:**
-  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: Polished test tab with gradient banner + "Test chats don't count" message + `<MirrorPage />`
+  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: passes `embedded` + `suggestions` to `<MirrorPage />`
+  - `frontend/react-app/src/pages/MirrorPage.tsx`: embedded tester supports history + stats + clear history + suggestions
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
 
 

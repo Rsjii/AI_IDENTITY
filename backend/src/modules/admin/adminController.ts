@@ -8,11 +8,11 @@ import {
   getBusinessMetrics,
   logError
 } from './adminDao';
-import { getPerformanceStats, getSlowestRoutes } from '../../middleware/performanceMonitor';
+import { getPerformanceStats, getSlowestRoutes, getSystemPerformanceStats } from '../../middleware/performanceMonitor';
 
 function parseRange(req: Request) {
   const r = String(req.query.range || '7d');
-  if (r === 'today' || r === '7d' || r === '30d' || r === '90d') return r;
+  if (r === 'today' || r === '7d' || r === '30d') return r;
   return '7d';
 }
 
@@ -82,6 +82,7 @@ export async function performance(req: Request, res: Response) {
   // Get in-memory performance stats
   const realtimeStats = getPerformanceStats(route);
   const slowestRoutes = getSlowestRoutes(10);
+  const system = getSystemPerformanceStats();
 
   // Get historical performance from database
   const historicalStats = await getPerformanceMetrics(range);
@@ -91,7 +92,8 @@ export async function performance(req: Request, res: Response) {
     data: {
       realtime: {
         overall: realtimeStats,
-        slowestRoutes
+        slowestRoutes,
+        system
       },
       historical: historicalStats
     }

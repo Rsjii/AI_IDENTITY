@@ -170,6 +170,24 @@ CREATE INDEX IF NOT EXISTS "idx_mirror_runs_createdAt" ON "mirror_runs"("created
 CREATE INDEX IF NOT EXISTS "idx_trust_events_mirrorRunId" ON "trust_events"("mirrorRunId");
 CREATE INDEX IF NOT EXISTS "idx_trust_events_identityVersionId" ON "trust_events"("identityVersionId");
 
+-- ========== PERFORMANCE METRICS ==========
+
+-- Tracks API route latency (non-LLM). Used by /api/admin/performance.
+-- Note: We intentionally keep this simple (append-only + retention cleanup in middleware).
+CREATE TABLE IF NOT EXISTS "api_latency_events" (
+  "id" TEXT NOT NULL,
+  "route" TEXT NOT NULL,
+  "method" TEXT NOT NULL,
+  "statusCode" INTEGER NOT NULL,
+  "durationMs" INTEGER NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "api_latency_events_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "idx_api_latency_events_createdAt" ON "api_latency_events"("createdAt");
+CREATE INDEX IF NOT EXISTS "idx_api_latency_events_route_method_createdAt"
+  ON "api_latency_events"("route", "method", "createdAt");
+
 -- ========== FOREIGN KEYS ==========
 
 ALTER TABLE "identities" DROP CONSTRAINT IF EXISTS "identities_userId_fkey";
