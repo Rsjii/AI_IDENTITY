@@ -871,32 +871,13 @@ useEffect(() => {
 
 ### 3.5 Real-Time Dashboard Updates (WebSocket) ❌
 
-**Status:** ❌ **NOT IMPLEMENTED**
+**Status:** ❌ **MOVED TO can_do.md - Not needed at this stage**
 
 **Current State:**
 - Dashboard polls every 5 seconds ✅
-- But not true real-time (WebSocket)
+- Polling works fine for current needs
 
-**Location:**
-- `frontend/react-app/src/pages/CreatorDashboardPage.tsx:91-163`
-
-**Current Code:**
-```typescript
-// Current: Polling
-const interval = setInterval(fetchData, 5000);
-```
-
-**Required Implementation:**
-- [ ] WebSocket connection for real-time updates
-- [ ] Toast notifications for new chats
-- [ ] Live counter updates
-- [ ] Revenue updates without refresh
-
-**Phase 1 Requirement:** Not explicitly in spec but mentioned in PHASE1_FINAL_TODO.md (UI-2)
-
-**Priority:** 🟢 Medium (nice-to-have, polling works fine)
-
-**Estimated Time:** 4 hours
+**Note:** WebSocket implementation moved to `can_do.md` as it's a high-level feature not needed for MVP launch. Current polling solution is sufficient.
 
 ---
 
@@ -1290,18 +1271,23 @@ const shouldRequirePayment =
 
 ## 📊 SECTION 8: ANALYTICS & MONITORING
 
-### 8.1 Error Tracking ❌
+### 8.1 Error Tracking ⚠️
 
-**Status:** ❌ **NOT IMPLEMENTED**
+**Status:** ⚠️ **NOT IMPLEMENTED - Will use /admin endpoint**
 
 **Missing:**
-- [ ] No Sentry or error tracking service
+- [ ] No error tracking service (external tools not needed)
 - [ ] Errors only logged to console
 
 **Required:**
-- [ ] Integrate Sentry (frontend + backend)
-- [ ] Set up error alerting
-- [ ] Add breadcrumbs for debugging
+- [ ] Create error logging endpoint in `/admin` dashboard
+- [ ] Track frontend errors (log to database)
+- [ ] Track backend errors (log to database)
+- [ ] Set up error alerting (email notifications)
+- [ ] Add error grouping and categorization
+- [ ] Create error monitoring dashboard in admin panel
+
+**Note:** External integrations (Sentry, New Relic, Datadog) not needed at this stage. All tracking via `/admin` endpoint.
 
 **Priority:** 🟡 High (production readiness)
 
@@ -1309,20 +1295,24 @@ const shouldRequirePayment =
 
 ---
 
-### 8.2 Performance Monitoring ❌
+### 8.2 Performance Monitoring ⚠️
 
-**Status:** ❌ **NOT IMPLEMENTED**
+**Status:** ⚠️ **NOT IMPLEMENTED - Will use /admin endpoint**
 
 **Missing:**
-- [ ] No APM tool (New Relic, Datadog)
+- [ ] No performance monitoring (external tools not needed)
 - [ ] No real-time performance dashboards
 - [ ] No latency tracking per endpoint
 
 **Required:**
-- [ ] Track API latency (p50, p95, p99)
+- [ ] Create performance tracking in `/admin` endpoint
+- [ ] Track API latency (p50, p95, p99) - store in database
 - [ ] Track LLM latency separately
 - [ ] Database query time monitoring
-- [ ] Set up alerts (latency > 5s)
+- [ ] Set up alerts (latency > 5s) via email
+- [ ] Create performance dashboard in admin panel
+
+**Note:** External APM tools (New Relic, Datadog) not needed at this stage. All monitoring via `/admin` endpoint.
 
 **Priority:** 🟡 High (production readiness)
 
@@ -1380,14 +1370,14 @@ const shouldRequirePayment =
    - End-to-end tests for signup → chat flow
 
 2. **Error Tracking** (2 hours)
-   - Integrate Sentry
-   - Set up error alerting
+   - Create error logging in `/admin` endpoint
+   - Set up error alerting (email notifications)
 
 3. **Input Sanitization** (2 hours)
    - XSS prevention for chat messages
    - HTML sanitization
 
-#### 🟡 HIGH PRIORITY (Should Fix Soon) - 20 hours
+#### 🟡 HIGH PRIORITY (Should Fix Soon) - 28 hours
 
 4. **UI/UX Polish** (16 hours)
    - Color scheme consistency
@@ -1401,8 +1391,8 @@ const shouldRequirePayment =
    - Verify email delivery
 
 6. **Performance Monitoring** (3 hours)
-   - Set up APM
-   - Track latency metrics
+   - Create performance tracking in `/admin` endpoint
+   - Track latency metrics (store in database)
 
 #### 🟢 MEDIUM PRIORITY (Nice-to-Have) - 15 hours
 
@@ -1412,8 +1402,6 @@ const shouldRequirePayment =
 8. **Session Timeout Warning** (1 hour)
    - Warn users before session expires
 
-9. **Real-Time Dashboard Updates** (4 hours)
-   - WebSocket implementation (optional, polling works)
 
 10. **Business Metrics Dashboard** (4 hours)
     - Admin analytics page
@@ -1534,17 +1522,15 @@ const shouldRequirePayment =
 2. **Session Timeout Warning** ❌
    - No warning before expiry
 
-3. **Real-Time Dashboard (WebSocket)** ❌
-   - Currently polling (works but not real-time)
 
 4. **Testing Suite** ❌
    - No unit/integration tests
 
-5. **Error Tracking** ❌
-   - No Sentry integration
+5. **Error Tracking** ⚠️
+   - Will implement via `/admin` endpoint (external tools not needed)
 
-6. **Performance Monitoring** ❌
-   - No APM tool
+6. **Performance Monitoring** ⚠️
+   - Will implement via `/admin` endpoint (external tools not needed)
 
 7. **Business Metrics Dashboard** ❌
    - No admin analytics
@@ -1762,27 +1748,30 @@ const shouldRequirePayment =
 
 ### A - Analytics & Monitoring
 
-#### A1. Error Tracking ❌
-- [ ] Integrate Sentry for frontend error tracking
-- [ ] Integrate Sentry for backend error tracking
-- [ ] Set up error alerting (email/Slack notifications)
-- [ ] Add breadcrumbs for debugging context
-- [ ] Configure error grouping and deduplication
-- [ ] Set up error rate monitoring dashboard
-- **Priority:** 🔴 Critical | **Time:** 2 hours | **Location:** `backend/src/config/`, `frontend/react-app/src/`
+**Note:** External integrations (Sentry, New Relic, Datadog, PostHog) are not needed at this stage. All analytics and monitoring will be implemented via `/admin` endpoint and internal dashboard.
 
-#### A2. Performance Monitoring ❌
-- [ ] Set up APM tool (New Relic, Datadog, or similar)
-- [ ] Track API latency metrics (p50, p95, p99)
+#### A1. Error Tracking & Logging ⚠️
+- [ ] Create error logging endpoint in `/admin` dashboard
+- [ ] Track frontend errors (log to database)
+- [ ] Track backend errors (log to database)
+- [ ] Set up error alerting (email notifications for critical errors)
+- [ ] Add error grouping and categorization
+- [ ] Create error rate monitoring in admin dashboard
+- [ ] Display error trends and patterns
+- **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx`
+
+#### A2. Performance Monitoring ⚠️
+- [ ] Create performance tracking in `/admin` endpoint
+- [ ] Track API latency metrics (p50, p95, p99) - store in database
 - [ ] Track LLM API latency separately
 - [ ] Monitor database query execution times
-- [ ] Set up alerts for latency > 5 seconds
-- [ ] Create real-time performance dashboard
-- [ ] Track memory usage and CPU metrics
-- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/middleware/`
+- [ ] Set up alerts for latency > 5 seconds (email notifications)
+- [ ] Create performance dashboard in admin panel
+- [ ] Track memory usage and CPU metrics (if available from server)
+- **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx`
 
-#### A3. Business Metrics Dashboard ❌
-- [ ] Create admin analytics dashboard
+#### A3. Business Metrics Dashboard ⚠️
+- [ ] Create admin analytics dashboard at `/admin`
 - [ ] Track daily active creators (DAC)
 - [ ] Calculate conversion rate (free → paid plans)
 - [ ] Track churn rate (monthly)
@@ -1790,7 +1779,8 @@ const shouldRequirePayment =
 - [ ] Track monthly recurring revenue (MRR)
 - [ ] Display revenue trends (charts)
 - [ ] Track user acquisition sources
-- **Priority:** 🟢 Medium | **Time:** 4 hours | **Location:** `frontend/react-app/src/pages/AdminDashboardPage.tsx` (new)
+- [ ] Full business analytics dashboard in admin panel
+- **Priority:** 🟡 High | **Time:** 4 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminDashboardPage.tsx` (new)
 
 ---
 
@@ -1867,16 +1857,6 @@ const shouldRequirePayment =
 - [ ] Add clear test history button
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
 
-#### D2. Real-Time Dashboard Updates (WebSocket) ❌
-- [ ] Set up WebSocket server (Socket.io or native WebSocket)
-- [ ] Create WebSocket connection in dashboard
-- [ ] Implement real-time chat counter updates
-- [ ] Add toast notifications for new chats
-- [ ] Implement live revenue updates
-- [ ] Add real-time satisfaction score updates
-- [ ] Handle WebSocket reconnection logic
-- [ ] Add connection status indicator
-- **Priority:** 🟢 Medium | **Time:** 4 hours | **Location:** `backend/src/websocket/`, `frontend/react-app/src/hooks/useWebSocket.ts`
 
 ---
 
@@ -2021,7 +2001,6 @@ const shouldRequirePayment =
 - [ ] Test with 100 concurrent users (use k6 or Artillery)
 - [ ] Test database performance under load
 - [ ] Test LLM API rate limits (Groq, OpenAI)
-- [ ] Test WebSocket connections under load
 - [ ] Identify bottlenecks and optimize
 - [ ] Test payment processing under load
 - [ ] Create load testing report
@@ -2081,7 +2060,7 @@ const shouldRequirePayment =
 - [ ] Add loading states on all async operations
 - [ ] Add success toasts after actions (save, update, delete)
 - [ ] Implement React Error Boundaries
-- [ ] Add error logging to console (dev) and Sentry (prod)
+- [ ] Add error logging to console (dev) and database (prod)
 - [ ] Create error message component library
 - [ ] Add offline detection and messaging
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `frontend/react-app/src/components/ErrorBoundary.tsx` (new), all pages
@@ -2095,25 +2074,24 @@ const shouldRequirePayment =
 2. **S1. Input Sanitization** (2 hours)
 3. **A1. Error Tracking** (2 hours)
 
-### 🟡 HIGH PRIORITY (Should Fix Soon) - 32 hours
+### 🟡 HIGH PRIORITY (Should Fix Soon) - 28 hours
 4. **T2. Integration Tests** (6 hours)
 5. **U1. Animation & Micro-interactions** (4 hours)
 6. **L1. Landing Page Enhancements** (4 hours)
 7. **C1. Content Upload Enhancements** (4 hours)
-8. **D2. Real-Time Dashboard Updates** (4 hours)
-9. **U2. Color Scheme Consistency** (3 hours)
-10. **C2. Onboarding Quiz UI Polish** (3 hours)
-11. **M1. Mobile Responsiveness** (3 hours)
-12. **A2. Performance Monitoring** (3 hours)
-13. **B3. Intelligent Pricing Detection** (3 hours)
-14. **U5. Error Handling & User Feedback** (3 hours)
-15. **D1. Dashboard Test Tab Polish** (2 hours)
-16. **B2. Email Service Verification** (2 hours)
-17. **B1. Database Query Optimization** (2 hours)
-18. **R1. Rate Limiting Improvements** (1 hour)
-19. **R2. API Rate Limiting Tuning** (1 hour)
-20. **S2. CORS Configuration Verification** (1 hour)
-21. **E1. Email Receipt Testing** (1 hour)
+8. **U2. Color Scheme Consistency** (3 hours)
+9. **C2. Onboarding Quiz UI Polish** (3 hours)
+10. **M1. Mobile Responsiveness** (3 hours)
+11. **A2. Performance Monitoring** (3 hours)
+12. **B3. Intelligent Pricing Detection** (3 hours)
+13. **U5. Error Handling & User Feedback** (3 hours)
+14. **D1. Dashboard Test Tab Polish** (2 hours)
+15. **B2. Email Service Verification** (2 hours)
+16. **B1. Database Query Optimization** (2 hours)
+17. **R1. Rate Limiting Improvements** (1 hour)
+18. **R2. API Rate Limiting Tuning** (1 hour)
+19. **S2. CORS Configuration Verification** (1 hour)
+20. **E1. Email Receipt Testing** (1 hour)
 
 ### 🟢 MEDIUM/LOW PRIORITY (Nice-to-Have) - 15 hours
 22. **T3. Load Testing** (4 hours)
@@ -2128,9 +2106,9 @@ const shouldRequirePayment =
 ## 🎯 TOTAL ESTIMATED TIME
 
 - **Critical:** 12 hours
-- **High Priority:** 32 hours
+- **High Priority:** 28 hours
 - **Medium/Low Priority:** 15 hours
-- **TOTAL:** **59 hours** (~7-8 days of focused work)
+- **TOTAL:** **55 hours** (~7 days of focused work)
 
 ---
 
@@ -2140,32 +2118,35 @@ const shouldRequirePayment =
 
 ```
 Critical Items:     [ ] [ ] [ ] (0/3)
-High Priority:      [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] (0/21)
+High Priority:      [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] [ ] (0/20)
 Medium Priority:    [ ] [ ] [ ] [ ] [ ] [ ] (0/6)
 ```
 
 ---
 
 **Last Updated:** 2026-01-28  
-**Total Remaining Items:** 30 tasks  
-**Estimated Completion Time:** 59 hours
+**Total Remaining Items:** 29 tasks  
+**Estimated Completion Time:** 55 hours
 
 ---
 
 > **Purpose:** Complete A-Z list of all remaining tasks, improvements, and missing features  
-> **Total Items:** 87 tasks across 8 categories  
-> **Estimated Total Time:** ~47 hours
+> **Total Items:** 83 tasks across 8 categories  
+> **Estimated Total Time:** ~55 hours
 
 ---
 
 ### 🔴 CRITICAL PRIORITY (Must Fix Before Launch) - 12 hours
 
-#### A. **Error Tracking & Monitoring**
-- [ ] **A1.** Integrate Sentry for frontend error tracking
-- [ ] **A2.** Integrate Sentry for backend error tracking
-- [ ] **A3.** Set up error alerting (email/Slack notifications)
-- [ ] **A4.** Add breadcrumbs for debugging context
-- [ ] **A5.** Configure error grouping and deduplication
+#### A. **Error Tracking & Monitoring** (via /admin endpoint)
+- [ ] **A1.** Create error logging endpoint in `/admin` dashboard
+- [ ] **A2.** Track frontend errors (log to database)
+- [ ] **A3.** Track backend errors (log to database)
+- [ ] **A4.** Set up error alerting (email notifications for critical errors)
+- [ ] **A5.** Add error grouping and categorization
+- [ ] **A6.** Create error rate monitoring in admin dashboard
+
+**Note:** External integrations (Sentry, New Relic, Datadog, PostHog) not needed at this stage. All analytics via `/admin` endpoint.
 
 #### B. **Input Sanitization & Security**
 - [ ] **B1.** Sanitize HTML in chat messages (prevent XSS)
@@ -2274,13 +2255,15 @@ Medium Priority:    [ ] [ ] [ ] [ ] [ ] [ ] (0/6)
 - [ ] **L6.** Add question number indicators
 - [ ] **L7.** Add skip question option (with confirmation)
 
-#### M. **Performance Monitoring**
-- [ ] **M1.** Set up APM tool (New Relic or Datadog)
-- [ ] **M2.** Track API latency (p50, p95, p99 percentiles)
+#### M. **Performance Monitoring** (via /admin endpoint)
+- [ ] **M1.** Create performance tracking in `/admin` endpoint
+- [ ] **M2.** Track API latency (p50, p95, p99 percentiles) - store in database
 - [ ] **M3.** Track LLM latency separately
 - [ ] **M4.** Monitor database query times
-- [ ] **M5.** Set up alerts (latency > 5s)
-- [ ] **M6.** Create performance dashboard
+- [ ] **M5.** Set up alerts (latency > 5s) via email notifications
+- [ ] **M6.** Create performance dashboard in admin panel
+
+**Note:** External APM tools (New Relic, Datadog) not needed at this stage. All monitoring via `/admin` endpoint.
 
 ---
 
@@ -2332,12 +2315,6 @@ Medium Priority:    [ ] [ ] [ ] [ ] [ ] [ ] (0/6)
 - [ ] **T3.** Show session expiry countdown
 - [ ] **T4.** Add "Extend session" option
 
-#### U. **Real-Time Features (WebSocket)**
-- [ ] **U1.** Implement WebSocket connection for real-time updates
-- [ ] **U2.** Add toast notifications for new chats
-- [ ] **U3.** Add live counter updates
-- [ ] **U4.** Add revenue updates without refresh
-- [ ] **U5.** Add real-time typing indicators
 
 #### V. **Business Metrics Dashboard**
 - [ ] **V1.** Create admin analytics dashboard

@@ -556,6 +556,85 @@ Week 4: Onboard 5 more users, repeat
 
 ---
 
+## 18. External Monitoring & Analytics Integrations
+
+**Description:** Professional-grade error tracking and performance monitoring tools for production environments with thousands of users.
+
+**Note:** Not needed for MVP launch. All analytics and monitoring will be implemented via `/admin` endpoint initially. These external tools should be considered when scaling to production-grade infrastructure.
+
+### A. Error Tracking (Sentry)
+
+**Description:** Integrate Sentry for comprehensive error tracking across frontend and backend.
+
+**Implementation:**
+- Install Sentry SDK for frontend (`@sentry/react`)
+- Install Sentry SDK for backend (`@sentry/node`)
+- Configure error boundaries in React
+- Set up error alerting (email/Slack notifications)
+- Add breadcrumbs for debugging context
+- Configure error grouping and deduplication
+- Set up error rate monitoring dashboard
+
+**When to Implement:**
+- When user base grows to 1000+ active users
+- When you need advanced error tracking and debugging
+- When you need automatic error notifications
+
+**Files to create/modify:**
+- `frontend/react-app/src/config/sentry.ts` - Frontend Sentry config
+- `backend/src/config/sentry.ts` - Backend Sentry config
+- `frontend/react-app/src/components/ErrorBoundary.tsx` - React error boundary
+
+---
+
+### B. Performance Monitoring (New Relic / Datadog)
+
+**Description:** Set up APM (Application Performance Monitoring) tools for real-time performance tracking.
+
+**Implementation:**
+- Choose APM tool (New Relic, Datadog, or similar)
+- Install APM agent in backend
+- Configure performance tracking
+- Set up dashboards for:
+  - API latency metrics (p50, p95, p99)
+  - LLM API latency separately
+  - Database query execution times
+  - Memory usage and CPU metrics
+- Set up alerts for latency > 5 seconds
+- Create real-time performance dashboard
+
+**When to Implement:**
+- When you need advanced performance monitoring
+- When scaling to handle high traffic
+- When you need detailed performance analytics
+
+**Files to create/modify:**
+- `backend/src/config/apm.ts` - APM configuration
+- `backend/src/middleware/performance.ts` - Performance middleware
+
+---
+
+### C. Advanced Analytics (PostHog)
+
+**Description:** Full-featured product analytics platform for user behavior tracking and insights.
+
+**Implementation:**
+- Install PostHog SDK
+- Configure event tracking
+- Set up user funnels
+- Create custom dashboards
+- Set up feature flags
+- Configure session recordings
+
+**When to Implement:**
+- When you need advanced product analytics
+- When you want user behavior insights
+- When implementing A/B testing
+
+**Note:** PostHog is already partially integrated but full implementation can be done later when needed.
+
+---
+
 ## Notes
 
 - All items are optional and not required for immediate launch
@@ -564,4 +643,5 @@ Week 4: Onboard 5 more users, repeat
 - Consider GDPR/compliance implications for data export and account deletion
 - **Accessibility, Performance, Beta Testing, Legal, and Launch Checklist** can be done incrementally post-launch
 - Platform is functionally complete - these are polish and operational tasks
+- **External integrations (Sentry, New Relic, Datadog, PostHog) are not needed for MVP** - use `/admin` endpoint for analytics initially
 
