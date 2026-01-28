@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { EmptyState } from '@/components/EmptyState';
+import { Skeleton } from '@/components/Skeleton';
 import {
   MessageSquare, DollarSign, Clock, Star, TrendingUp, TrendingDown,
   Settings, Database, BarChart3, Zap, 
-  FileText, AlertCircle, CheckCircle2, Loader2
+  FileText, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
@@ -184,6 +186,31 @@ export function CreatorDashboardPage() {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
+  const recentConversations = [
+    { user: 'User 1', preview: 'How do I optimize React performance?', time: '2 mins ago', rating: '👍' },
+    { user: 'User 2', preview: "What's the best way to...", time: '15 mins ago', rating: null },
+    { user: 'User 3', preview: 'Can you explain...', time: '1 hour ago', rating: '👎' },
+  ];
+
+  const handleExportChatCSV = async () => {
+    try {
+      const res = await fetch('/api/creator/chats/export');
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-history-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('Chat history exported', 'success');
+    } catch {
+      showToast('Failed to export chat history', 'error');
+    }
+  };
+
   // Generate sparkline data (last 7 days) - mock data if not available
   const sparklineData = data?.analytics?.conversationsOverTime?.slice(-7) || 
     Array.from({ length: 7 }, (_, i) => ({
@@ -218,8 +245,22 @@ export function CreatorDashboardPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
+        <div className="max-w-7xl mx-auto space-y-6 px-6 py-8">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-bg-secondary border border-border-default rounded-lg p-6 space-y-4">
+                <Skeleton className="h-8 w-8" />
+                <Skeleton className="h-12 w-32" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-bg-secondary border border-border-default rounded-lg p-6 space-y-4">
+            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-64 w-full" />
+          </div>
         </div>
       </Layout>
     );
@@ -292,7 +333,7 @@ export function CreatorDashboardPage() {
                   </div>
                 )}
               </div>
-              <div className="text-4xl font-bold text-text-primary mb-2" style={{ fontSize: '48px' }}>
+              <div className="text-4xl md:text-5xl font-bold text-text-primary mb-2">
                 {data?.chats?.total?.toLocaleString() || 0}
               </div>
               <div className="text-sm text-text-secondary mb-4">Total Conversations</div>
@@ -330,7 +371,7 @@ export function CreatorDashboardPage() {
                   <span className="text-xs text-text-tertiary">Live</span>
                 </div>
               </div>
-              <div className="text-4xl font-bold text-text-primary mb-2" style={{ fontSize: '48px' }}>
+              <div className="text-4xl md:text-5xl font-bold text-text-primary mb-2">
                 {messagesToday.toLocaleString()}
               </div>
               <div className="text-sm text-text-secondary mb-2">Messages Today</div>
@@ -349,7 +390,7 @@ export function CreatorDashboardPage() {
                   {responseTimeStatus(data?.analytics?.responseTime?.avg || 0).text}
                 </span>
               </div>
-              <div className="text-4xl font-bold text-text-primary mb-2" style={{ fontSize: '48px' }}>
+              <div className="text-4xl md:text-5xl font-bold text-text-primary mb-2">
                 {formatTime(data?.analytics?.responseTime?.avg || 0)}
               </div>
               <div className="text-sm text-text-secondary mb-2">Avg Response Time</div>
@@ -365,7 +406,7 @@ export function CreatorDashboardPage() {
               <div className="flex items-start justify-between mb-4">
                 <Star className="h-8 w-8 text-accent-primary" />
               </div>
-              <div className="text-4xl font-bold text-text-primary mb-2" style={{ fontSize: '48px' }}>
+              <div className="text-4xl md:text-5xl font-bold text-text-primary mb-2">
                 {satisfactionRating}/5
               </div>
               <div className="text-sm text-text-secondary mb-2">User Satisfaction</div>
@@ -411,7 +452,12 @@ export function CreatorDashboardPage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-semibold text-text-primary">Conversations Over Time</h3>
-                  <Button variant="outline" size="sm" className="border-border-default text-text-secondary">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-border-default text-text-secondary"
+                    onClick={handleExportChatCSV}
+                  >
                     Export CSV
                   </Button>
                 </div>
@@ -626,11 +672,12 @@ export function CreatorDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { user: 'User 1', preview: 'How do I optimize React performance?', time: '2 mins ago', rating: '👍' },
-                  { user: 'User 2', preview: 'What\'s the best way to...', time: '15 mins ago', rating: null },
-                  { user: 'User 3', preview: 'Can you explain...', time: '1 hour ago', rating: '👎' },
-                ].map((conv, i) => (
+                {recentConversations.length === 0 ? (
+                  <EmptyState
+                    title="No conversations yet"
+                    description="Once visitors chat with your AI, recent conversations will show up here."
+                  />
+                ) : recentConversations.map((conv, i) => (
                   <div key={i} className="p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">

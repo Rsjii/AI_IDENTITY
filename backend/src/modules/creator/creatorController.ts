@@ -7,6 +7,83 @@ function getUserId(req: Request): string | null {
   return u?.id || u?.userId || null;
 }
 
+export async function exportChatsCSV(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Optional date filtering (?from=...&to=...)
+  const from = typeof req.query.from === 'string' ? req.query.from : null;
+  const to = typeof req.query.to === 'string' ? req.query.to : null;
+
+  const params: any[] = [userId];
+  let where = `cs."creatorId" = $1`;
+  if (from) {
+    params.push(from);
+    where += ` AND cs."createdAt" >= $${params.length}::timestamptz`;
+  }
+  if (to) {
+    params.push(to);
+    where += ` AND cs."createdAt" <= $${params.length}::timestamptz`;
+  }
+
+  // Flattened export (one row per message)
+  const r = await db.query(
+    `
+    SELECT
+      cs.id as "sessionId",
+      cs."createdAt" as "sessionCreatedAt",
+      cs."platform",
+      cs."visitorId",
+      cs."userId" as "viewerUserId",
+      cm.id as "messageId",
+      cm."createdAt" as "messageCreatedAt",
+      cm."role",
+      cm."content"
+    FROM "chat_sessions" cs
+    JOIN "chat_messages" cm ON cm."sessionId" = cs.id
+    WHERE ${where}
+    ORDER BY cs."createdAt" DESC, cm."createdAt" ASC
+    `,
+    params
+  );
+
+  const headers = [
+    'sessionId',
+    'sessionCreatedAt',
+    'platform',
+    'visitorId',
+    'viewerUserId',
+    'messageId',
+    'messageCreatedAt',
+    'role',
+    'content',
+  ];
+
+  const rows = r.rows.map((x: any) => [
+    x.sessionId,
+    new Date(x.sessionCreatedAt).toISOString(),
+    x.platform || '',
+    x.visitorId || '',
+    x.viewerUserId || '',
+    x.messageId,
+    new Date(x.messageCreatedAt).toISOString(),
+    x.role,
+    x.content ?? '',
+  ]);
+
+  const csv = [
+    headers.join(','),
+    ...rows.map((row: any[]) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+  ].join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="chat-history-${new Date().toISOString().split('T')[0]}.csv"`
+  );
+  return res.send(csv);
+}
+
 export async function dashboard(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
