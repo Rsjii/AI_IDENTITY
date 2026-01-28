@@ -326,13 +326,15 @@ ALTER TABLE "widget_chat_logs" ADD CONSTRAINT "widget_chat_logs_userId_fkey"
 CREATE TABLE IF NOT EXISTS "knowledge_sources" (
   "id" TEXT PRIMARY KEY,
   "userId" TEXT NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('paste','file','youtube','url')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('paste','file','youtube','url','twitter','linkedin','medium')),
   "title" TEXT,
   "originalUrl" TEXT,
   "storageUrl" TEXT,
   "rawText" TEXT,
   "status" TEXT NOT NULL DEFAULT 'processed' CHECK ("status" IN ('pending','processing','processed','failed')),
-  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "lastFetchedAt" TIMESTAMPTZ,
+  "fetchMetadata" JSONB
 );
 
 CREATE TABLE IF NOT EXISTS "knowledge_chunks" (
@@ -483,13 +485,18 @@ CREATE TABLE IF NOT EXISTS "auth_sessions" (
   "lastActiveAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "expiresAt" TIMESTAMPTZ NOT NULL,
-  "revokedAt" TIMESTAMPTZ
+  "revokedAt" TIMESTAMPTZ,
+  "refreshToken" TEXT UNIQUE,
+  "refreshTokenExpiresAt" TIMESTAMPTZ,
+  "previousRefreshToken" TEXT
 );
 
 CREATE INDEX IF NOT EXISTS "idx_auth_sessions_userId" ON "auth_sessions"("userId");
 CREATE INDEX IF NOT EXISTS "idx_auth_sessions_lastActiveAt" ON "auth_sessions"("lastActiveAt");
 CREATE INDEX IF NOT EXISTS "idx_auth_sessions_expiresAt" ON "auth_sessions"("expiresAt");
 CREATE INDEX IF NOT EXISTS "idx_auth_sessions_revokedAt" ON "auth_sessions"("revokedAt") WHERE "revokedAt" IS NULL;
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_refreshToken" ON "auth_sessions"("refreshToken") WHERE "refreshToken" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_refreshTokenExpiresAt" ON "auth_sessions"("refreshTokenExpiresAt");
 
 CREATE TABLE IF NOT EXISTS "blocked_topics" (
   "id" TEXT PRIMARY KEY,
@@ -1070,12 +1077,38 @@ export const knowledgeSourceQueries = {
   create: async (params: { userId: string; type: string; title?: string; originalUrl?: string; storageUrl?: string; rawText?: string }) => {
     const id = `ks_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const r = await db.query(
-      `INSERT INTO "knowledge_sources" (id,"userId","type","title","originalUrl","storageUrl","rawText","status")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'processed')
+      `INSERT INTO "knowledge_sources" (id,"userId","type","title","originalUrl","storageUrl","rawText","status","lastFetchedAt","fetchMetadata")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'processed',NOW(),$8)
        RETURNING *`,
-      [id, params.userId, params.type, params.title || null, params.originalUrl || null, params.storageUrl || null, params.rawText || null]
+      [id, params.userId, params.type, params.title || null, params.originalUrl || null, params.storageUrl || null, params.rawText || null, JSON.stringify({})]
     );
     return r.rows[0];
+  },
+  update: async (id: string, updates: { rawText?: string; lastFetchedAt?: Date; fetchMetadata?: any }) => {
+    const updatesList: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (updates.rawText !== undefined) {
+      updatesList.push(`"rawText" = $${paramIndex++}`);
+      values.push(updates.rawText);
+    }
+    if (updates.lastFetchedAt !== undefined) {
+      updatesList.push(`"lastFetchedAt" = $${paramIndex++}`);
+      values.push(updates.lastFetchedAt);
+    }
+    if (updates.fetchMetadata !== undefined) {
+      updatesList.push(`"fetchMetadata" = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.fetchMetadata));
+    }
+
+    if (updatesList.length === 0) return;
+
+    values.push(id);
+    await db.query(
+      `UPDATE "knowledge_sources" SET ${updatesList.join(', ')} WHERE id = $${paramIndex}`,
+      values
+    );
   },
   listByUserId: async (userId: string) => {
     const r = await db.query(`SELECT * FROM "knowledge_sources" WHERE "userId"=$1 ORDER BY "createdAt" DESC`, [userId]);

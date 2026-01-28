@@ -13,7 +13,12 @@ if (!JWT_SECRET) {
   }
 }
 const JWT_SECRET_FINAL = JWT_SECRET || 'dev-fallback-secret-change-me';
-const JWT_EXPIRES_IN = '7d';
+const JWT_EXPIRES_IN = '7d'; // Legacy - will be replaced with short-lived tokens
+const JWT_ACCESS_TOKEN_EXPIRES_IN = '15m'; // Short-lived access token
+const JWT_REFRESH_TOKEN_EXPIRES_IN = '30d'; // Long-lived refresh token
+
+// Refresh token secret (should be different from access token secret)
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET_FINAL + '-refresh';
 
 export interface JWTPayload {
   userId: string;
@@ -58,4 +63,50 @@ export const extractTokenFromHeader = (authHeader: string | undefined): string |
   }
   
   return parts[1];
+};
+
+/**
+ * Generate short-lived access token (15 minutes)
+ */
+export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
+  try {
+    const token = jwt.sign(payload, JWT_SECRET_FINAL, { 
+      expiresIn: JWT_ACCESS_TOKEN_EXPIRES_IN,
+      issuer: 'ai-twin-app'
+    });
+    logger.debug(`Access token generated for user: ${payload.email}`);
+    return token;
+  } catch (error) {
+    logger.error('Access token generation error:', error);
+    throw new Error('Failed to generate access token');
+  }
+};
+
+/**
+ * Generate refresh token (30 days) - stored in DB, not in JWT
+ */
+export const generateRefreshToken = (): string => {
+  const crypto = require('crypto');
+  return crypto.randomBytes(32).toString('hex');
+};
+
+/**
+ * Verify refresh token (checks if it exists in DB and is valid)
+ */
+export const verifyRefreshToken = async (refreshToken: string, userId: string): Promise<boolean> => {
+  try {
+    const { db } = await import('../config/database');
+    const result = await db.query(
+      `SELECT id FROM "auth_sessions"
+       WHERE "refreshToken" = $1 
+         AND "userId" = $2
+         AND "revokedAt" IS NULL
+         AND "refreshTokenExpiresAt" > NOW()`,
+      [refreshToken, userId]
+    );
+    return result.rows.length > 0;
+  } catch (error) {
+    logger.error('Refresh token verification error:', error);
+    return false;
+  }
 };

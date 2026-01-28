@@ -8,6 +8,8 @@ export interface AuthSessionData {
   ipAddress?: string;
   userAgent?: string;
   expiresAt: Date;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: Date;
 }
 
 /**
@@ -47,9 +49,9 @@ export async function createOrUpdateAuthSession(data: AuthSessionData): Promise<
 
     // Create new session
     await db.query(
-      `INSERT INTO "auth_sessions" (id, "userId", "deviceInfo", "ipAddress", "userAgent", "expiresAt", "createdAt", "lastActiveAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
-      [sessionId, data.userId, data.deviceInfo || null, data.ipAddress || null, data.userAgent || null, data.expiresAt, now]
+      `INSERT INTO "auth_sessions" (id, "userId", "deviceInfo", "ipAddress", "userAgent", "expiresAt", "createdAt", "lastActiveAt", "refreshToken", "refreshTokenExpiresAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9)`,
+      [sessionId, data.userId, data.deviceInfo || null, data.ipAddress || null, data.userAgent || null, data.expiresAt, now, data.refreshToken || null, data.refreshTokenExpiresAt || null]
     );
 
     return sessionId;
@@ -108,12 +110,74 @@ export async function getUserAuthSessions(userId: string): Promise<any[]> {
 }
 
 /**
+ * Get session by refresh token
+ */
+export async function getSessionByRefreshToken(refreshToken: string): Promise<any | null> {
+  try {
+    const result = await db.query(
+      `SELECT * FROM "auth_sessions"
+       WHERE "refreshToken" = $1
+         AND "revokedAt" IS NULL
+         AND "refreshTokenExpiresAt" > NOW()`,
+      [refreshToken]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.error('Failed to get session by refresh token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Rotate refresh token (generate new, revoke old)
+ */
+export async function rotateRefreshToken(sessionId: string, newRefreshToken: string, newRefreshTokenExpiresAt: Date): Promise<void> {
+  try {
+    // Get old refresh token to store as previous
+    const oldSession = await db.query(`SELECT "refreshToken" FROM "auth_sessions" WHERE id = $1`, [sessionId]);
+    const oldRefreshToken = oldSession.rows[0]?.refreshToken;
+
+    await db.query(
+      `UPDATE "auth_sessions"
+       SET "refreshToken" = $1,
+           "refreshTokenExpiresAt" = $2,
+           "previousRefreshToken" = $3,
+           "lastActiveAt" = NOW()
+       WHERE id = $4`,
+      [newRefreshToken, newRefreshTokenExpiresAt, oldRefreshToken || null, sessionId]
+    );
+  } catch (error) {
+    logger.error('Failed to rotate refresh token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Check if session is revoked
+ */
+export async function isSessionRevoked(sessionId: string, userId: string): Promise<boolean> {
+  try {
+    const result = await db.query(
+      `SELECT "revokedAt" FROM "auth_sessions"
+       WHERE id = $1 AND "userId" = $2`,
+      [sessionId, userId]
+    );
+    return result.rows[0]?.revokedAt !== null;
+  } catch (error) {
+    logger.error('Failed to check session revocation:', error);
+    return true; // Fail safe - assume revoked if check fails
+  }
+}
+
+/**
  * Clean up expired sessions (can be called by a cron job)
  */
 export async function cleanupExpiredSessions(): Promise<number> {
   try {
     const result = await db.query(
-      `DELETE FROM "auth_sessions" WHERE "expiresAt" < NOW() OR "revokedAt" IS NOT NULL`
+      `DELETE FROM "auth_sessions" 
+       WHERE ("expiresAt" < NOW() AND "refreshTokenExpiresAt" < NOW()) 
+          OR "revokedAt" IS NOT NULL`
     );
     return result.rowCount || 0;
   } catch (error) {

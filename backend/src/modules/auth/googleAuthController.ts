@@ -205,25 +205,27 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
   
         logger.info(`Processing Google OAuth for user: ${user.email}`);
   
-        // Generate JWT token
-        const token = generateJWT({
+        // ✅ NEW: Generate access + refresh tokens
+        const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
+        const accessToken = generateAccessToken({
           userId: user.id,
           email: user.email,
           handle: user.handle || ''
         });
+        const refreshToken = generateRefreshToken();
+        const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
+        const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        const expiresAt = new Date(Date.now() + accessTokenMaxAge);
         
-        logger.info('JWT token generated successfully');
+        logger.info('Access token generated successfully');
   
-        const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-        const expiresAt = new Date(Date.now() + maxAge);
-  
-        // Set JWT token in cookie
-        res.cookie('jwtToken', token, {
+        // Set access token in cookie
+        res.cookie('jwtToken', accessToken, {
           httpOnly: true,
           secure: config.nodeEnv === 'production',
           sameSite: 'lax',
           path: '/',
-          maxAge
+          maxAge: accessTokenMaxAge
         });
         
         logger.info('JWT cookie set');
@@ -236,7 +238,7 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
           logger.info('Session created');
         }
 
-        // Create auth session
+        // Create auth session with refresh token
         try {
           const { createOrUpdateAuthSession } = await import('../../services/authSessionService');
           const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
@@ -247,6 +249,8 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
             ipAddress,
             userAgent,
             expiresAt,
+            refreshToken,
+            refreshTokenExpiresAt,
           });
           logger.info('Auth session created for Google OAuth user');
         } catch (sessionError) {

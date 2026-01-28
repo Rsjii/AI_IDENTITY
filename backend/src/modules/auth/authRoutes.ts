@@ -43,6 +43,64 @@ router.get('/me', requireJWTFromCookie, me);
 // Logout
 router.post('/logout', logout);
 
+// Refresh token endpoint
+router.post('/refresh', sanitizeInput, async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Refresh token required' });
+  }
+
+  try {
+    const { getSessionByRefreshToken, rotateRefreshToken } = await import('../../services/authSessionService');
+    const { generateAccessToken, generateRefreshToken: genRefreshToken } = await import('../../services/jwtService');
+    const { userQueries } = await import('../../config/database');
+    const { isProd } = await import('../../config/env');
+
+    // Get session by refresh token
+    const session = await getSessionByRefreshToken(refreshToken);
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    // Get user
+    const user = await userQueries.findById(session.userId);
+    if (!user || !user.active) {
+      return res.status(401).json({ error: 'User not found or inactive' });
+    }
+
+    // Generate new access token (15 min)
+    const newAccessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      handle: user.handle || ''
+    });
+
+    // Rotate refresh token (generate new, revoke old)
+    const newRefreshToken = genRefreshToken();
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await rotateRefreshToken(session.id, newRefreshToken, refreshTokenExpiresAt);
+
+    // Set new access token in cookie
+    res.cookie('jwtToken', newAccessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'lax' : 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: '/'
+    });
+
+    return res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken, // Client should store this securely
+      expiresIn: 15 * 60 // 15 minutes in seconds
+    });
+  } catch (error: any) {
+    console.error('Refresh token error:', error);
+    return res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
 // Resend OTP
 router.post('/resend-otp', sanitizeInput, otpRequestRateLimit, resendOTP);
 

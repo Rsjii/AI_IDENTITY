@@ -435,18 +435,23 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     // ✅ IMPORTANT: Issue JWT cookie so user can access ProtectedRoute onboarding
     const user = await userQueries.findByEmail(email.toLowerCase());
     if (user) {
-      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-      const expiresAt = new Date(Date.now() + maxAge);
-      const token = generateJWT({
+      // ✅ NEW: Generate access + refresh tokens
+      const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
+      const accessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
         handle: user.handle || '',
       });
-      res.cookie('jwtToken', token, {
+      const refreshToken = generateRefreshToken();
+      const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
+      const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const expiresAt = new Date(Date.now() + accessTokenMaxAge);
+
+      res.cookie('jwtToken', accessToken, {
         httpOnly: true,
         secure: isProd,
         sameSite: isProd ? 'lax' : 'strict',
-        maxAge,
+        maxAge: accessTokenMaxAge,
         path: '/',
       });
       if (req.session) {
@@ -455,7 +460,7 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
         req.session.userHandle = user.handle;
       }
 
-      // Create auth session
+      // Create auth session with refresh token
       try {
         const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
         const userAgent = req.headers['user-agent'] || '';
@@ -465,6 +470,8 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
           ipAddress,
           userAgent,
           expiresAt,
+          refreshToken,
+          refreshTokenExpiresAt,
         });
       } catch (sessionError) {
         logger.warn('Failed to create auth session:', sessionError);
@@ -864,26 +871,29 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       });
     }
     
-    // Generate JWT token
-    const token = generateJWT({
+    // ✅ NEW: Generate short-lived access token (15 min) + refresh token (30 days)
+    const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
+    const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
       handle: user.handle || ''
     });
+    const refreshToken = generateRefreshToken();
     
-    const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
-    const expiresAt = new Date(Date.now() + maxAge);
+    const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + accessTokenMaxAge);
     
-    // Set JWT token in cookie
-    res.cookie('jwtToken', token, {
+    // Set access token in cookie
+    res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'lax' : 'strict',
-      maxAge,
-      path: '/' // ✅ ADD: Explicit path      
+      maxAge: accessTokenMaxAge,
+      path: '/'
     });
 
-    // Create auth session
+    // Create auth session with refresh token
     try {
       const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
       const userAgent = req.headers['user-agent'] || '';
@@ -893,6 +903,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         ipAddress,
         userAgent,
         expiresAt,
+        refreshToken,
+        refreshTokenExpiresAt,
       });
     } catch (sessionError) {
       logger.warn('Failed to create auth session:', sessionError);
@@ -1011,23 +1023,25 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       user = await userQueries.create(email.toLowerCase());
     }
     
-    // Generate JWT token
-    const token = generateJWT({
+    // ✅ NEW: Generate access + refresh tokens
+    const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
+    const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
       handle: user.handle || ''
     });
+    const refreshToken = generateRefreshToken();
+    const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + accessTokenMaxAge);
     
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-    const expiresAt = new Date(Date.now() + maxAge);
-    
-    // Set JWT token in cookie
-    res.cookie('jwtToken', token, {
+    // Set access token in cookie
+    res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'lax' : 'strict',
-      maxAge,
-      path: '/' // ✅ ADD: Explicit path      
+      maxAge: accessTokenMaxAge,
+      path: '/'
     });
     
     // Also create session for backward compatibility
@@ -1035,7 +1049,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     req.session!.userEmail = user.email;
     req.session!.userHandle = user.handle;
 
-    // Create auth session
+    // Create auth session with refresh token
     try {
       const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
       const userAgent = req.headers['user-agent'] || '';
@@ -1045,6 +1059,8 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
         ipAddress,
         userAgent,
         expiresAt,
+        refreshToken,
+        refreshTokenExpiresAt,
       });
     } catch (sessionError) {
       logger.warn('Failed to create auth session:', sessionError);
