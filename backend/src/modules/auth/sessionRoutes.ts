@@ -46,9 +46,9 @@ router.get('/', asyncHandler(async (req: any, res) => {
       device: `${deviceType} - ${browser}`,
       deviceInfo: s.deviceInfo || `${deviceType} - ${browser}`,
       ipAddress: s.ipAddress || 'Unknown',
-      lastActiveAt: s.lastActiveAt,
-      createdAt: s.createdAt,
-      expiresAt: s.expiresAt,
+      lastActiveAt: s.lastActiveAt ? new Date(s.lastActiveAt).toISOString() : null,
+      createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : null,
+      expiresAt: s.expiresAt ? new Date(s.expiresAt).toISOString() : null,
       isCurrent,
     };
   });

@@ -247,6 +247,7 @@ app.use(async (req, res, next) => {
       '/api/payments',
       '/api/billing',
       '/api/public',
+      '/api/widget', // ✅ NEW: Allow widget endpoints (embed code, chat)
       '/identity',
       '/mirror',
     ];

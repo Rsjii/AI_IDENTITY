@@ -101,9 +101,15 @@ export function SettingsPage() {
       setLoadingSessions(true);
       try {
         const res = await apiFetch<{ success: boolean; sessions: any[] }>('/api/auth/sessions');
-        setActiveSessions(res.sessions || []);
+        if (res.success && Array.isArray(res.sessions)) {
+          setActiveSessions(res.sessions);
+        } else {
+          console.error('Invalid sessions response:', res);
+          setActiveSessions([]);
+        }
       } catch (e) {
         console.error('Failed to load active sessions:', e);
+        setActiveSessions([]);
       } finally {
         setLoadingSessions(false);
       }
@@ -906,7 +912,7 @@ export function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Loading active sessions…</p>
                 ) : activeSessions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No active chat sessions right now. When visitors are talking to your AI, they will appear here.
+                    No active login sessions found.
                   </p>
                 ) : (
                   <div className="space-y-2">

@@ -131,6 +131,24 @@ export async function widgetChat(req: Request, res: Response) {
 
 export async function widgetCode(req: Request, res: Response) {
   const creatorId = String(req.params.creatorId || '');
+  
+  if (!creatorId) {
+    return res.status(400).json({ error: 'Creator ID required' });
+  }
+
+  // ✅ Optional: Verify creator exists (graceful if fails)
+  try {
+    const { userQueries } = await import('../../config/database');
+    const creator = await userQueries.findById(creatorId);
+    
+    if (!creator || !creator.active) {
+      return res.status(404).json({ error: 'Creator not found or inactive' });
+    }
+  } catch (error) {
+    // Graceful degradation - still return code if check fails
+    logger.warn('Failed to verify creator for widget code:', error);
+  }
+
   const apiBase = `${req.protocol}://${req.get('host')}`;
 
   // Returns copy-paste snippet

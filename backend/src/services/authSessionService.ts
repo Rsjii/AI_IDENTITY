@@ -40,9 +40,11 @@ export async function createOrUpdateAuthSession(data: AuthSessionData): Promise<
       await db.query(
         `UPDATE "auth_sessions"
          SET "lastActiveAt" = NOW(),
-             "expiresAt" = $1
-         WHERE id = $2`,
-        [data.expiresAt, existingId]
+             "expiresAt" = $1,
+             "refreshToken" = COALESCE($2, "refreshToken"),
+             "refreshTokenExpiresAt" = COALESCE($3, "refreshTokenExpiresAt")
+         WHERE id = $4`,
+        [data.expiresAt, data.refreshToken || null, data.refreshTokenExpiresAt || null, existingId]
       );
       return existingId;
     }

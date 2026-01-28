@@ -105,6 +105,15 @@ export function OnboardingContentPage() {
         });
       }, 200);
 
+      // ✅ Get CSRF token and add to FormData
+      try {
+        const csrfRes = await fetch('/api/csrf', { credentials: 'include' });
+        const csrfData = await csrfRes.json();
+        fd.append('_csrf', csrfData.token);
+      } catch (e) {
+        console.warn('CSRF token fetch failed, continuing anyway');
+      }
+
       await apiFetchForm('/api/content/upload', { method: 'POST', body: fd });
       setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
       
@@ -396,20 +405,14 @@ export function OnboardingContentPage() {
                                 setLoading(false);
                               }
                             } else if (platform.type === 'twitter') {
-                              const handle = window.prompt('Enter your Twitter/X handle (without @)');
-                              if (!handle) return;
+                              // ✅ NEW: Use OAuth flow instead of handle input
                               try {
                                 setLoading(true);
-                                await apiFetch('/api/content/social/twitter', {
-                                  method: 'POST',
-                                  body: JSON.stringify({ handle }),
-                                });
-                                await refresh();
-                                alert('Twitter profile saved! Full auto-import will come in the next phase.');
+                                // Redirect to Twitter OAuth
+                                window.location.href = '/api/content/social/twitter/authorize';
                               } catch (err) {
                                 console.error(err);
-                                alert('Failed to save Twitter profile.');
-                              } finally {
+                                alert('Failed to connect Twitter.');
                                 setLoading(false);
                               }
                             } else {

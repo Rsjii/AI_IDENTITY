@@ -7,6 +7,7 @@ const router = Router();
 
 // Public endpoints
 router.post('/chat', widgetChatRateLimit, widgetChat);
+// ✅ Public endpoint - no auth required for embed code
 router.get('/code/:creatorId', widgetCode);
 
 // Authenticated endpoint for analytics
