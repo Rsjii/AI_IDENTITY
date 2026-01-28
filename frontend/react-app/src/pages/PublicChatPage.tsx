@@ -270,13 +270,38 @@ export function PublicChatPage() {
       >
         <div className="max-w-4xl mx-auto space-y-4">
           {msgs.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-2xl font-bold text-text-primary mb-2">
+            <div className="text-center py-12 animate-fade-in">
+              <div className="mb-6">
+                {creator?.avatarUrl && (
+                  <img 
+                    src={creator.avatarUrl} 
+                    alt={creator.displayName} 
+                    className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-accent-primary/20 shadow-lg"
+                  />
+                )}
+              </div>
+              <div className="text-3xl font-bold text-text-primary mb-3 bg-gradient-to-r from-accent-primary to-accent-secondary bg-clip-text text-transparent">
                 Hi! I'm {creator?.displayName || slug}'s AI clone
               </div>
-              <div className="text-text-secondary">
+              <div className="text-text-secondary text-lg mb-6">
                 Ask me anything about {creator?.meta?.topics || 'my expertise'}!
               </div>
+              {creator?.popularQuestions && creator.popularQuestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-center max-w-2xl mx-auto">
+                  {creator.popularQuestions.slice(0, 4).map((q: string, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setText(q);
+                        setTimeout(() => send(), 100);
+                      }}
+                      className="px-4 py-2 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/30 rounded-full text-sm text-text-primary transition-all hover:scale-105 active:scale-95"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -392,17 +417,17 @@ export function PublicChatPage() {
 
           {/* Typing Indicator */}
           {typing && (
-            <div className="flex gap-3 justify-start">
-              <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0">
+            <div className="flex gap-3 justify-start animate-fade-in">
+              <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0 animate-pulse">
                 <span className="text-xs font-semibold text-accent-primary">AI</span>
               </div>
-              <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-xl rounded-tl-sm px-4 py-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-text-secondary text-sm">AI is typing</span>
-                  <div className="flex gap-1 ml-2">
-                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-xl rounded-tl-sm px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-text-secondary text-sm font-medium">AI is thinking</span>
+                  <div className="flex gap-1.5">
+                    <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>

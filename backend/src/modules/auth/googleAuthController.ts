@@ -214,13 +214,16 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
         
         logger.info('JWT token generated successfully');
   
+        const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const expiresAt = new Date(Date.now() + maxAge);
+  
         // Set JWT token in cookie
         res.cookie('jwtToken', token, {
           httpOnly: true,
           secure: config.nodeEnv === 'production',
           sameSite: 'lax',
           path: '/',
-          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+          maxAge
         });
         
         logger.info('JWT cookie set');
@@ -231,6 +234,23 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
           req.session.userEmail = user.email;
           req.session.userHandle = user.handle;
           logger.info('Session created');
+        }
+
+        // Create auth session
+        try {
+          const { createOrUpdateAuthSession } = await import('../../services/authSessionService');
+          const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+          const userAgent = req.headers['user-agent'] || '';
+          await createOrUpdateAuthSession({
+            userId: user.id,
+            deviceInfo: userAgent,
+            ipAddress,
+            userAgent,
+            expiresAt,
+          });
+          logger.info('Auth session created for Google OAuth user');
+        } catch (sessionError) {
+          logger.warn('Failed to create auth session:', sessionError);
         }
   
         logger.info(`Google OAuth: User logged in successfully: ${user.email}`);

@@ -367,22 +367,61 @@ export function OnboardingContentPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     {[
-                      { name: 'YouTube', icon: Youtube, color: 'bg-red-600', connected: false },
-                      { name: 'Twitter/X', icon: Twitter, color: 'bg-black', connected: false },
-                      { name: 'Medium', icon: FileText, color: 'bg-black', connected: false },
-                      { name: 'LinkedIn', icon: Linkedin, color: 'bg-blue-600', connected: false },
+                      { name: 'YouTube Channel', icon: Youtube, color: 'bg-red-600', type: 'youtube' as const },
+                      { name: 'Twitter/X', icon: Twitter, color: 'bg-black', type: 'twitter' as const },
+                      { name: 'Medium', icon: FileText, color: 'bg-black', type: 'medium' as const },
+                      { name: 'LinkedIn', icon: Linkedin, color: 'bg-blue-600', type: 'linkedin' as const },
                     ].map((platform) => {
                       const Icon = platform.icon;
                       return (
                         <button
                           key={platform.name}
                           className={`p-6 rounded-xl border-2 border-border-default bg-bg-secondary hover:border-accent-primary transition-all flex items-center gap-3 ${platform.color} text-white`}
+                          onClick={async () => {
+                            if (platform.type === 'youtube') {
+                              const url = window.prompt('Enter your YouTube channel URL');
+                              if (!url) return;
+                              try {
+                                setLoading(true);
+                                await apiFetch('/api/content/social/youtube-channel', {
+                                  method: 'POST',
+                                  body: JSON.stringify({ channelUrl: url }),
+                                });
+                                await refresh();
+                                alert('YouTube channel saved! Full auto-import will come in the next phase.');
+                              } catch (err) {
+                                console.error(err);
+                                alert('Failed to save YouTube channel.');
+                              } finally {
+                                setLoading(false);
+                              }
+                            } else if (platform.type === 'twitter') {
+                              const handle = window.prompt('Enter your Twitter/X handle (without @)');
+                              if (!handle) return;
+                              try {
+                                setLoading(true);
+                                await apiFetch('/api/content/social/twitter', {
+                                  method: 'POST',
+                                  body: JSON.stringify({ handle }),
+                                });
+                                await refresh();
+                                alert('Twitter profile saved! Full auto-import will come in the next phase.');
+                              } catch (err) {
+                                console.error(err);
+                                alert('Failed to save Twitter profile.');
+                              } finally {
+                                setLoading(false);
+                              }
+                            } else {
+                              alert('Medium/LinkedIn import will be added in the next phase.');
+                            }
+                          }}
                         >
                           <Icon className="h-6 w-6" />
                           <div className="flex-1 text-left">
                             <div className="font-semibold">{platform.name}</div>
                             <div className="text-sm opacity-90">
-                              {platform.connected ? 'Connected ✓' : 'Connect'}
+                              Connect
                             </div>
                           </div>
                         </button>

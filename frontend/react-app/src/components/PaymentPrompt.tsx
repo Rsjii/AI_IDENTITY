@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -36,6 +36,7 @@ const CheckoutForm: React.FC<{
   const [selectedTier, setSelectedTier] = useState<'premium' | 'vip'>('premium');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
     // Get visitor ID from localStorage
@@ -110,10 +111,11 @@ const CheckoutForm: React.FC<{
               tier: selectedTier,
             }),
           });
-          setMessage('Payment succeeded!');
+          setPaymentSuccess(true);
+          setMessage('Payment succeeded! Your full answer is ready 🎉');
           setTimeout(() => {
             onSuccess();
-          }, 1000);
+          }, 2000);
         } catch (err: any) {
           setMessage(err.message || 'Payment succeeded but confirmation failed.');
           setLoading(false);
@@ -128,10 +130,35 @@ const CheckoutForm: React.FC<{
     }
   };
 
+  if (paymentSuccess) {
+    return (
+      <div className="space-y-4 text-center py-8 animate-fade-in">
+        <div className="flex justify-center mb-4">
+          <div className="relative">
+            <CheckCircle2 className="h-16 w-16 text-green-500 animate-scale-in" />
+            <Sparkles className="h-8 w-8 text-yellow-400 absolute -top-2 -right-2 animate-pulse" />
+          </div>
+        </div>
+        <h3 className="text-2xl font-bold text-text-primary">Payment Successful!</h3>
+        <p className="text-text-secondary">
+          Your full answer is being prepared. You'll receive it in the chat and via email.
+        </p>
+        <div className="pt-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-full">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+              Unlocked: {selectedTier === 'premium' ? paymentOptions.premium.label : paymentOptions.vip.label}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="tier-select">Choose your tier:</Label>
+        <Label htmlFor="tier-select" className="text-base font-semibold">Choose your tier:</Label>
         <Select
           value={selectedTier}
           onValueChange={(value: 'premium' | 'vip') => {
@@ -140,45 +167,73 @@ const CheckoutForm: React.FC<{
             onClientSecretChange(null);
           }}
         >
-          <SelectTrigger id="tier-select">
+          <SelectTrigger id="tier-select" className="h-12">
             <SelectValue placeholder="Select a tier" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="premium">
-              {paymentOptions.premium.label} - ${(paymentOptions.premium.amount / 100).toFixed(2)}
+            <SelectItem value="premium" className="py-3">
+              <div className="flex items-center justify-between w-full">
+                <span>{paymentOptions.premium.label}</span>
+                <span className="font-semibold ml-4">${(paymentOptions.premium.amount / 100).toFixed(2)}</span>
+              </div>
             </SelectItem>
-            <SelectItem value="vip">
-              {paymentOptions.vip.label} - ${(paymentOptions.vip.amount / 100).toFixed(2)}
+            <SelectItem value="vip" className="py-3">
+              <div className="flex items-center justify-between w-full">
+                <span>{paymentOptions.vip.label}</span>
+                <span className="font-semibold ml-4">${(paymentOptions.vip.amount / 100).toFixed(2)}</span>
+              </div>
             </SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {clientSecret ? (
-        <PaymentElement options={{ layout: 'tabs' }} />
+        <div className="space-y-3">
+          <div className="bg-bg-tertiary/50 p-4 rounded-lg border border-border-default">
+            <PaymentElement options={{ layout: 'tabs' }} />
+          </div>
+        </div>
       ) : (
-        <div className="text-sm text-muted-foreground text-center py-4">
-          {loading ? 'Loading payment form...' : 'Select a tier to continue'}
+        <div className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border-default rounded-lg">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading payment form...</span>
+            </div>
+          ) : (
+            'Select a tier to continue'
+          )}
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" className="flex-1" disabled={loading || !stripe || !elements || !clientSecret}>
+      <div className="flex gap-2 pt-2">
+        <Button 
+          type="submit" 
+          className="flex-1 h-12 bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-90 transition-all font-semibold" 
+          disabled={loading || !stripe || !elements || !clientSecret || paymentSuccess}
+        >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
+              Processing Payment...
             </>
           ) : (
-            'Pay Now'
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Pay ${selectedTier === 'premium' ? (paymentOptions.premium.amount / 100).toFixed(2) : (paymentOptions.vip.amount / 100).toFixed(2)}
+            </>
           )}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading || paymentSuccess} className="h-12">
           Cancel
         </Button>
       </div>
       {message && (
-        <div className={`text-sm text-center ${message.includes('succeeded') ? 'text-green-600' : 'text-red-500'}`}>
+        <div className={`text-sm text-center p-3 rounded-lg ${
+          message.includes('succeeded') 
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' 
+            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+        }`}>
           {message}
         </div>
       )}

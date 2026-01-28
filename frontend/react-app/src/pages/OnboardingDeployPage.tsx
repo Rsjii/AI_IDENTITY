@@ -75,7 +75,9 @@ export function OnboardingDeployPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Deploy Your AI</h1>
-          <p className="text-muted-foreground mt-1">Choose where your AI clone should live</p>
+          <p className="text-muted-foreground mt-1">
+            Turn your AI into a 24/7 assistant your audience can DM, text, or chat with on your site
+          </p>
         </div>
 
         {/* Progress indicator */}
@@ -176,15 +178,24 @@ export function OnboardingDeployPage() {
               <div>
                 <label className="text-sm font-medium">Your Chat Link</label>
                 <div className="flex gap-2 mt-1">
-                  <Input value={standaloneLink} readOnly className="flex-1" />
+                  <Input
+                    value={standaloneLink || 'Set your public handle in Settings → Profile first'}
+                    readOnly
+                    className="flex-1"
+                  />
                   <Button
                     variant="outline"
-                    onClick={() => copyToClipboard(standaloneLink, 'link')}
+                    onClick={() => standaloneLink && copyToClipboard(standaloneLink, 'link')}
                     disabled={!standaloneLink}
                   >
                     {copied === 'link' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
+                {!slug && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Go to <strong>Settings → Profile</strong> to set your public handle before sharing this link.
+                  </p>
+                )}
               </div>
 
               {/* QR Code */}

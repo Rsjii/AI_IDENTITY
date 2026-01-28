@@ -473,6 +473,24 @@ CREATE TABLE IF NOT EXISTS "active_sessions" (
 CREATE INDEX IF NOT EXISTS "idx_active_sessions_creatorId" ON "active_sessions"("creatorId");
 CREATE INDEX IF NOT EXISTS "idx_active_sessions_lastActiveAt" ON "active_sessions"("lastActiveAt");
 
+-- Auth sessions table (for tracking user login sessions across devices)
+CREATE TABLE IF NOT EXISTS "auth_sessions" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "deviceInfo" TEXT,
+  "ipAddress" TEXT,
+  "userAgent" TEXT,
+  "lastActiveAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "revokedAt" TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_userId" ON "auth_sessions"("userId");
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_lastActiveAt" ON "auth_sessions"("lastActiveAt");
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_expiresAt" ON "auth_sessions"("expiresAt");
+CREATE INDEX IF NOT EXISTS "idx_auth_sessions_revokedAt" ON "auth_sessions"("revokedAt") WHERE "revokedAt" IS NULL;
+
 CREATE TABLE IF NOT EXISTS "blocked_topics" (
   "id" TEXT PRIMARY KEY,
   "userId" TEXT NOT NULL,

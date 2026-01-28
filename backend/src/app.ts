@@ -20,6 +20,7 @@ import { generateCSRFToken } from './middleware/csrf';
 
 // API routes
 import authRoutes from './modules/auth/authRoutes';
+import sessionRoutes from './modules/auth/sessionRoutes';
 import googleAuthRoutes from './modules/auth/googleAuthRoutes';
 import identityRoutes from './modules/identity/identityRoutes';
 import profileRoutes from './modules/profile/profileRoutes';
@@ -443,6 +444,7 @@ if (!isProd) {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/sessions', sessionRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/identity', identityRoutes);
 app.use('/api/profile', profileRoutes);

@@ -58,6 +58,10 @@ export function SettingsPage() {
   } | null>(null);
   const [requestingPayout, setRequestingPayout] = useState(false);
 
+  // Active sessions (chat sessions) for Security tab
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
   // Password management
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -87,6 +91,26 @@ export function SettingsPage() {
       loadBillingHistory();
     }
   }, [state]);
+
+  // Load active sessions when user is authenticated and Security tab is opened
+  useEffect(() => {
+    if (state.status !== 'authenticated') return;
+    if (activeTab !== 'security') return;
+
+    const loadSessions = async () => {
+      setLoadingSessions(true);
+      try {
+        const res = await apiFetch<{ success: boolean; sessions: any[] }>('/api/auth/sessions');
+        setActiveSessions(res.sessions || []);
+      } catch (e) {
+        console.error('Failed to load active sessions:', e);
+      } finally {
+        setLoadingSessions(false);
+      }
+    };
+
+    loadSessions().catch(() => {});
+  }, [state.status, activeTab]);
 
   const loadBillingHistory = async () => {
     if (state.status !== 'authenticated') return;
@@ -877,8 +901,49 @@ export function SettingsPage() {
                 <CardTitle>Active Sessions</CardTitle>
                 <CardDescription>Manage your active login sessions</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Session management coming soon.</p>
+              <CardContent className="space-y-3">
+                {loadingSessions ? (
+                  <p className="text-sm text-muted-foreground">Loading active sessions…</p>
+                ) : activeSessions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No active chat sessions right now. When visitors are talking to your AI, they will appear here.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {activeSessions.map((s: any) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between p-3 border rounded-lg bg-bg-secondary"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-text-primary">
+                            Visitor {s.visitorId || 'Anonymous'}
+                          </div>
+                          <div className="text-xs text-text-tertiary">
+                            Session: {s.sessionId || 'N/A'}
+                          </div>
+                          <div className="text-xs text-text-tertiary">
+                            Last active: {s.lastActiveAt ? new Date(s.lastActiveAt).toLocaleString() : 'Unknown'}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await apiFetch(`/api/auth/sessions/${s.id}`, { method: 'DELETE' });
+                              setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
+                            } catch (e) {
+                              console.error('Failed to end session:', e);
+                            }
+                          }}
+                        >
+                          End Session
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -32,8 +32,10 @@ const updateIdentitySchema = z.object({
   identityJson: z.object({}).passthrough(),
 });
 
+// Contexts where the AI clone can be tested/used.
+// 'web' is used by the dashboard Test AI tab (MirrorPage).
 const mirrorSchema = z.object({
-  context: z.enum(['linkedin_dm', 'email', 'sales', 'intro', 'support', 'personal']),
+  context: z.enum(['linkedin_dm', 'email', 'sales', 'intro', 'support', 'personal', 'web']),
   incomingMessage: z.string().min(1),
 });
 

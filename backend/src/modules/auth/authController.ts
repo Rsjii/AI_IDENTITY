@@ -13,6 +13,7 @@ import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES, ADMIN_EMAILS } from '../../config/constants';
 import { identifyPostHogUser } from '../../services/posthogService';
 import { tokenizeId } from '../../utils/idTokenization';
+import { createOrUpdateAuthSession } from '../../services/authSessionService';
 
 const emailService = new EmailService();
 
@@ -434,6 +435,8 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     // ✅ IMPORTANT: Issue JWT cookie so user can access ProtectedRoute onboarding
     const user = await userQueries.findByEmail(email.toLowerCase());
     if (user) {
+      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+      const expiresAt = new Date(Date.now() + maxAge);
       const token = generateJWT({
         userId: user.id,
         email: user.email,
@@ -443,13 +446,28 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
         httpOnly: true,
         secure: isProd,
         sameSite: isProd ? 'lax' : 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge,
         path: '/',
       });
       if (req.session) {
         req.session.userId = user.id;
         req.session.userEmail = user.email;
         req.session.userHandle = user.handle;
+      }
+
+      // Create auth session
+      try {
+        const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+        const userAgent = req.headers['user-agent'] || '';
+        await createOrUpdateAuthSession({
+          userId: user.id,
+          deviceInfo: userAgent,
+          ipAddress,
+          userAgent,
+          expiresAt,
+        });
+      } catch (sessionError) {
+        logger.warn('Failed to create auth session:', sessionError);
       }
     }
     
@@ -853,14 +871,32 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       handle: user.handle || ''
     });
     
+    const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + maxAge);
+    
     // Set JWT token in cookie
     res.cookie('jwtToken', token, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'lax' : 'strict',
-      maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000, // 30 days if rememberMe, else 7 days
+      maxAge,
       path: '/' // ✅ ADD: Explicit path      
     });
+
+    // Create auth session
+    try {
+      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+      const userAgent = req.headers['user-agent'] || '';
+      await createOrUpdateAuthSession({
+        userId: user.id,
+        deviceInfo: userAgent,
+        ipAddress,
+        userAgent,
+        expiresAt,
+      });
+    } catch (sessionError) {
+      logger.warn('Failed to create auth session:', sessionError);
+    }
 
     // Log login event
     try {
@@ -982,12 +1018,15 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       handle: user.handle || ''
     });
     
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const expiresAt = new Date(Date.now() + maxAge);
+    
     // Set JWT token in cookie
     res.cookie('jwtToken', token, {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'lax' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge,
       path: '/' // ✅ ADD: Explicit path      
     });
     
@@ -995,6 +1034,21 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     req.session!.userId = user.id;
     req.session!.userEmail = user.email;
     req.session!.userHandle = user.handle;
+
+    // Create auth session
+    try {
+      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+      const userAgent = req.headers['user-agent'] || '';
+      await createOrUpdateAuthSession({
+        userId: user.id,
+        deviceInfo: userAgent,
+        ipAddress,
+        userAgent,
+        expiresAt,
+      });
+    } catch (sessionError) {
+      logger.warn('Failed to create auth session:', sessionError);
+    }
 
     // Log login event (for OTP-based login)
     try {
