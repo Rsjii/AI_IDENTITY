@@ -165,9 +165,70 @@ export function LandingPage() {
           />
         </section>
 
+        {/* FAQ Section */}
+        <section className="mt-12">
+          <div className="text-center space-y-2 mb-8">
+            <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
+          </div>
+          <div className="space-y-4 max-w-3xl mx-auto">
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <h3 className="text-lg font-semibold mb-2">Q: How long does setup take?</h3>
+              <p className="text-muted-foreground">
+                A: 30 minutes. AI ready in 24 hours.
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <h3 className="text-lg font-semibold mb-2">Q: Do I need coding skills?</h3>
+              <p className="text-muted-foreground">
+                A: No. Copy-paste embed code. That's it.
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-card/40 p-6 glass">
+              <h3 className="text-lg font-semibold mb-2">Q: How much can I earn?</h3>
+              <p className="text-muted-foreground">
+                A: $500-5K/month typical. Top creators: $10K+
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Footer */}
-        <footer className="mt-14 pb-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Selflyx • Built for a premium modern experience
+        <footer className="mt-14 pb-6 border-t pt-8">
+          <div className="grid md:grid-cols-4 gap-8 mb-6">
+            <div>
+              <h3 className="font-semibold mb-3">Product</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="/pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
+                <li><a href="/#features" className="hover:text-foreground transition-colors">Features</a></li>
+                <li><a href="/docs" className="hover:text-foreground transition-colors">Docs</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Company</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="/about" className="hover:text-foreground transition-colors">About</a></li>
+                <li><a href="/blog" className="hover:text-foreground transition-colors">Blog</a></li>
+                <li><a href="/careers" className="hover:text-foreground transition-colors">Careers</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Legal</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a></li>
+                <li><a href="/terms" className="hover:text-foreground transition-colors">Terms</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Support</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="/help" className="hover:text-foreground transition-colors">Help Center</a></li>
+                <li><a href="mailto:support@selflyx.com" className="hover:text-foreground transition-colors">Contact</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="text-center text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Selflyx. All rights reserved.
+          </div>
         </footer>
       </div>
     </Layout>

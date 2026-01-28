@@ -147,11 +147,11 @@ export async function publicChat(req: Request, res: Response) {
       // No payment, show paywall (Option A: don't generate reply before payment)
       const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
 
-      // ✅ Generate teaser reply (limited preview)
+      // ✅ Generate teaser reply (limited tokens, AI-generated preview)
       let previewReply = 'This answer requires payment to unlock the full response. Click below to proceed.';
       
       try {
-        // Generate a short teaser by calling AI with truncated context
+        // Generate a short teaser with limited tokens (no validation, single attempt)
         const teaserResult = await generateMirrorReplyWithLogging(
           u.id, 
           'public_chat', 
@@ -160,17 +160,13 @@ export async function publicChat(req: Request, res: Response) {
             platform: 'web',
             sessionId: sid,
             visitorId,
+            teaserOnly: true, // Flag for limited response
+            maxTokens: 100, // Short teaser only
           }
         );
         
         if (teaserResult.reply) {
-          // Truncate to first 200 characters as teaser
-          const teaser = teaserResult.reply.substring(0, 200);
-          // If truncated, add ellipsis
-          previewReply = teaserResult.reply.length > 200 
-            ? teaser + '...' 
-            : teaser;
-          
+          previewReply = teaserResult.reply;
           // Don't save this teaser as a message - it's just for preview
           // The full reply will be generated after payment
         }

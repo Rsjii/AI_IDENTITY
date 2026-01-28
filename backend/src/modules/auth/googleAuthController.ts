@@ -207,15 +207,31 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
   
         // ✅ NEW: Generate access + refresh tokens
         const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
-        const accessToken = generateAccessToken({
-          userId: user.id,
-          email: user.email,
-          handle: user.handle || ''
-        });
         const refreshToken = generateRefreshToken();
         const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
         const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
         const expiresAt = new Date(Date.now() + accessTokenMaxAge);
+        
+        // Create auth session first to get sessionId
+        const { createOrUpdateAuthSession } = await import('../../services/authSessionService');
+        const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+        const userAgent = req.headers['user-agent'] || '';
+        const sessionId = await createOrUpdateAuthSession({
+          userId: user.id,
+          deviceInfo: userAgent,
+          ipAddress,
+          userAgent,
+          expiresAt,
+          refreshToken,
+          refreshTokenExpiresAt,
+        });
+        
+        const accessToken = generateAccessToken({
+          userId: user.id,
+          email: user.email,
+          handle: user.handle || '',
+          sessionId: sessionId
+        });
         
         logger.info('Access token generated successfully');
   
@@ -237,25 +253,8 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
           req.session.userHandle = user.handle;
           logger.info('Session created');
         }
-
-        // Create auth session with refresh token
-        try {
-          const { createOrUpdateAuthSession } = await import('../../services/authSessionService');
-          const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
-          const userAgent = req.headers['user-agent'] || '';
-          await createOrUpdateAuthSession({
-            userId: user.id,
-            deviceInfo: userAgent,
-            ipAddress,
-            userAgent,
-            expiresAt,
-            refreshToken,
-            refreshTokenExpiresAt,
-          });
-          logger.info('Auth session created for Google OAuth user');
-        } catch (sessionError) {
-          logger.warn('Failed to create auth session:', sessionError);
-        }
+        
+        logger.info('Auth session created for Google OAuth user');
   
         logger.info(`Google OAuth: User logged in successfully: ${user.email}`);
         

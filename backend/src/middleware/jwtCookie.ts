@@ -54,39 +54,47 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
     try {
       const decoded = verifyJWT(tokenFromCookie);
       
-      // ✅ NEW: Check if user has any active non-revoked sessions
-      // Note: We check if user has at least one active session, not if current session is revoked
-      // This is because JWT doesn't contain session ID, so we validate based on user having active sessions
-      try {
-        const { db } = await import('../config/database');
-        const sessionCheck = await db.query(
-          `SELECT COUNT(*) as count FROM "auth_sessions"
-           WHERE "userId" = $1
-             AND "revokedAt" IS NULL
-             AND ("expiresAt" > NOW() OR "refreshTokenExpiresAt" > NOW())`,
-          [decoded.userId]
-        );
-        const hasActiveSession = parseInt(sessionCheck.rows[0]?.count || '0') > 0;
-        
-        // Only reject if we're enforcing session checks AND user has no active sessions
-        // For now, we'll be lenient - if no active sessions found, allow the request
-        // (This handles cases where session creation failed but token is valid)
-        if (false && !hasActiveSession) {
-          logger.warn({ userId: decoded.userId }, 'No active sessions found');
-          res.clearCookie('jwtToken', {
-            httpOnly: true,
-            secure: isProd,
-            sameSite: isProd ? 'lax' : 'strict',
-            path: '/',
+      // ✅ NEW: Update session activity (non-blocking)
+      if (decoded.sessionId) {
+        try {
+          const { updateAuthSessionActivity } = await import('../services/authSessionService');
+          updateAuthSessionActivity(decoded.sessionId).catch((err) => {
+            logger.warn('Failed to update session activity:', err);
           });
-          if (isApiRequest) {
-            return res.status(401).json({ error: 'Session expired or revoked', errorCode: 'SESSION_REVOKED' });
-          }
-          return res.redirect('/auth');
+        } catch (sessionError) {
+          // Non-blocking - don't fail request if activity update fails
+          logger.warn('Session activity update failed:', sessionError);
         }
-      } catch (sessionError) {
-        // If session check fails, log but don't block the request
-        logger.warn('Session check failed, allowing request:', sessionError);
+      }
+      
+      // ✅ NEW: Check if current session is revoked
+      if (decoded.sessionId) {
+        try {
+          const { db } = await import('../config/database');
+          const sessionCheck = await db.query(
+            `SELECT "revokedAt" FROM "auth_sessions"
+             WHERE id = $1 AND "userId" = $2`,
+            [decoded.sessionId, decoded.userId]
+          );
+          const isRevoked = sessionCheck.rows[0]?.revokedAt !== null;
+          
+          if (isRevoked) {
+            logger.warn({ userId: decoded.userId, sessionId: decoded.sessionId }, 'Session revoked');
+            res.clearCookie('jwtToken', {
+              httpOnly: true,
+              secure: isProd,
+              sameSite: isProd ? 'lax' : 'strict',
+              path: '/',
+            });
+            if (isApiRequest) {
+              return res.status(401).json({ error: 'Session expired or revoked', errorCode: 'SESSION_REVOKED' });
+            }
+            return res.redirect('/auth');
+          }
+        } catch (sessionError) {
+          // If session check fails, log but don't block the request
+          logger.warn('Session revocation check failed, allowing request:', sessionError);
+        }
       }
 
       // ✅ NEW: Auto-refresh if token expires in < 5 minutes (non-blocking)
@@ -137,6 +145,7 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
         email: decoded.email,
         handle: decoded.handle,
         id: decoded.userId,
+        sessionId: decoded.sessionId, // ✅ Add sessionId for session management
       };
       return next();
     } catch (error) {

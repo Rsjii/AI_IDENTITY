@@ -24,6 +24,7 @@ export interface JWTPayload {
   userId: string;
   email: string;
   handle: string;
+  sessionId?: string; // ✅ Add sessionId for session tracking
   id?: string; // Added for compatibility with middleware
   iat?: number;
   exp?: number;
@@ -67,6 +68,7 @@ export const extractTokenFromHeader = (authHeader: string | undefined): string |
 
 /**
  * Generate short-lived access token (15 minutes)
+ * ✅ Now includes sessionId for session tracking
  */
 export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
   try {
@@ -74,7 +76,7 @@ export const generateAccessToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): s
       expiresIn: JWT_ACCESS_TOKEN_EXPIRES_IN,
       issuer: 'ai-twin-app'
     });
-    logger.debug(`Access token generated for user: ${payload.email}`);
+    logger.debug(`Access token generated for user: ${payload.email}, sessionId: ${payload.sessionId || 'none'}`);
     return token;
   } catch (error) {
     logger.error('Access token generation error:', error);

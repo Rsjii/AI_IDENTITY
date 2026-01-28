@@ -130,18 +130,37 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
       });
     }
     if (existingUser) {
-      // ✅ NEW: If user exists but NOT active (not verified), allow signup again (delete incomplete user)
+      // ✅ IMPROVED: If user exists but NOT active, allow resend OTP instead of deleting
       if (!existingUser.active) {
-        logger.info(`User ${email} exists but not verified. Deleting incomplete user and allowing fresh signup.`);
+        logger.info(`User ${email} exists but not verified. Allowing OTP resend.`);
         
-        // Delete incomplete user (cascade will delete related data)
-        await db.query(`DELETE FROM "User" WHERE id = $1`, [existingUser.id]);
+        // Generate new OTP (don't delete user)
+        const otp = generateOTP(config.otp.codeLength);
+        const hashedOTP = await hashOTP(otp);
+        const expiryMinutes = Number.isFinite(config.otp.expiryMinutes) ? config.otp.expiryMinutes : 10;
+        const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
         
-        // Also delete any pending OTP for this email
+        // Delete old OTP and create new one
         await otpQueries.deleteByEmail(email.toLowerCase(), 'signup');
+        await otpQueries.create(email.toLowerCase(), hashedOTP, expiresAt, 'signup');
         
-        logger.info(`Incomplete user deleted. Proceeding with fresh signup.`);
-        // Continue to create new user below
+        const emailSent = await emailService.sendOTP(email, otp, 'signup');
+        
+        if (isProd) {
+          if (!emailSent) {
+            return res.status(500).json({
+              error: 'Failed to send verification email. Please check your email configuration or try again later.',
+              errorCode: 'EMAIL_SEND_FAILED',
+            });
+          }
+        } else {
+          logger.info(`📧 [SIGNUP] Development mode: OTP ${otp} generated (not sent via email)`);
+        }
+        
+        return res.json({ 
+          message: 'OTP resent to your email',
+          redirect: '/signup/verify?email=' + encodeURIComponent(email)
+        });
       } else {
         // User exists and is active (verified)
         // ✅ FIX: If OAuth account exists, allow password linking
@@ -437,15 +456,30 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     if (user) {
       // ✅ NEW: Generate access + refresh tokens
       const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
-      const accessToken = generateAccessToken({
-        userId: user.id,
-        email: user.email,
-        handle: user.handle || '',
-      });
       const refreshToken = generateRefreshToken();
       const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
       const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
       const expiresAt = new Date(Date.now() + accessTokenMaxAge);
+
+      // Create auth session first to get sessionId
+      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+      const userAgent = req.headers['user-agent'] || '';
+      const sessionId = await createOrUpdateAuthSession({
+        userId: user.id,
+        deviceInfo: userAgent,
+        ipAddress,
+        userAgent,
+        expiresAt,
+        refreshToken,
+        refreshTokenExpiresAt,
+      });
+      
+      const accessToken = generateAccessToken({
+        userId: user.id,
+        email: user.email,
+        handle: user.handle || '',
+        sessionId: sessionId
+      });
 
       res.cookie('jwtToken', accessToken, {
         httpOnly: true,
@@ -458,23 +492,6 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
         req.session.userId = user.id;
         req.session.userEmail = user.email;
         req.session.userHandle = user.handle;
-      }
-
-      // Create auth session with refresh token
-      try {
-        const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
-        const userAgent = req.headers['user-agent'] || '';
-        await createOrUpdateAuthSession({
-          userId: user.id,
-          deviceInfo: userAgent,
-          ipAddress,
-          userAgent,
-          expiresAt,
-          refreshToken,
-          refreshTokenExpiresAt,
-        });
-      } catch (sessionError) {
-        logger.warn('Failed to create auth session:', sessionError);
       }
     }
     
@@ -873,16 +890,31 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     
     // ✅ NEW: Generate short-lived access token (15 min) + refresh token (30 days)
     const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-      handle: user.handle || ''
-    });
     const refreshToken = generateRefreshToken();
     
     const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
     const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
     const expiresAt = new Date(Date.now() + accessTokenMaxAge);
+    
+    // Create auth session first to get sessionId
+    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+    const userAgent = req.headers['user-agent'] || '';
+    const sessionId = await createOrUpdateAuthSession({
+      userId: user.id,
+      deviceInfo: userAgent,
+      ipAddress,
+      userAgent,
+      expiresAt,
+      refreshToken,
+      refreshTokenExpiresAt,
+    });
+    
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      handle: user.handle || '',
+      sessionId: sessionId
+    });
     
     // Set access token in cookie
     res.cookie('jwtToken', accessToken, {
@@ -892,23 +924,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       maxAge: accessTokenMaxAge,
       path: '/'
     });
-
-    // Create auth session with refresh token
-    try {
-      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
-      const userAgent = req.headers['user-agent'] || '';
-      await createOrUpdateAuthSession({
-        userId: user.id,
-        deviceInfo: userAgent,
-        ipAddress,
-        userAgent,
-        expiresAt,
-        refreshToken,
-        refreshTokenExpiresAt,
-      });
-    } catch (sessionError) {
-      logger.warn('Failed to create auth session:', sessionError);
-    }
 
     // Log login event
     try {
@@ -941,7 +956,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   res.json({ 
     message: 'Login successful', 
     redirect: nextRedirect,
-    token: token,
+    token: accessToken,
     user: {
       id: user.id,
       email: user.email,
@@ -1016,25 +1031,52 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     // Mark OTP as used
     await otpQueries.markAsUsed(otpRecord.id);
     
-    // Find or create user
+    // ✅ FIX: Find user - DO NOT CREATE IF NOT FOUND (security fix)
     let user = await userQueries.findByEmail(email.toLowerCase());
     
     if (!user) {
-      user = await userQueries.create(email.toLowerCase());
+      return res.status(404).json({
+        error: 'User not found. Please signup first.',
+        errorCode: 'USER_NOT_FOUND'
+      });
+    }
+    
+    // Check if user is active
+    if (!user.active) {
+      return res.status(403).json({
+        error: 'Account not activated. Please complete signup first.',
+        errorCode: 'ACCOUNT_NOT_VERIFIED'
+      });
     }
     
     // ✅ NEW: Generate access + refresh tokens
     const { generateAccessToken, generateRefreshToken } = await import('../../services/jwtService');
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-      handle: user.handle || ''
-    });
-    const refreshToken = generateRefreshToken();
+    
+    // Create auth session first to get sessionId
+    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+    const userAgent = req.headers['user-agent'] || '';
     const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutes
     const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
     const expiresAt = new Date(Date.now() + accessTokenMaxAge);
+    const refreshToken = generateRefreshToken();
     
+    // Create session to get sessionId
+    const sessionId = await createOrUpdateAuthSession({
+      userId: user.id,
+      deviceInfo: userAgent,
+      ipAddress,
+      userAgent,
+      expiresAt,
+      refreshToken,
+      refreshTokenExpiresAt,
+    });
+    
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      handle: user.handle || '',
+      sessionId: sessionId
+    });
     // Set access token in cookie
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
@@ -1048,23 +1090,6 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     req.session!.userId = user.id;
     req.session!.userEmail = user.email;
     req.session!.userHandle = user.handle;
-
-    // Create auth session with refresh token
-    try {
-      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
-      const userAgent = req.headers['user-agent'] || '';
-      await createOrUpdateAuthSession({
-        userId: user.id,
-        deviceInfo: userAgent,
-        ipAddress,
-        userAgent,
-        expiresAt,
-        refreshToken,
-        refreshTokenExpiresAt,
-      });
-    } catch (sessionError) {
-      logger.warn('Failed to create auth session:', sessionError);
-    }
 
     // Log login event (for OTP-based login)
     try {
@@ -1092,7 +1117,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
   res.json({ 
     message: 'Login successful', 
     redirect: nextRedirect,
-    token: token,
+    token: accessToken,
     user: {
       id: user.id,
       email: user.email,

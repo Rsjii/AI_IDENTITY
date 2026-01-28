@@ -484,7 +484,7 @@ export async function generateMirrorReplyWithLogging(
   userId: string,
   context: string,
   incomingMessage: string,
-  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api'; sessionId?: string; visitorId?: string }
+  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api'; sessionId?: string; visitorId?: string; maxTokens?: number; teaserOnly?: boolean }
 ) {
   const platform = opts?.platform || 'web';
 
@@ -588,7 +588,11 @@ export async function generateMirrorReplyWithLogging(
   let validatorStatus: 'pass' | 'fail' = 'fail';
   let validatorViolations: string[] = [];
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // For teaser, use limited tokens and skip validation
+  const maxTokens = opts?.maxTokens || opts?.teaserOnly ? 100 : 350;
+  const isTeaser = opts?.teaserOnly === true;
+
+  for (let attempt = 0; attempt < (isTeaser ? 1 : 3); attempt++) {
     const gen = await llmClient.generateResponse(
       [
         { role: 'system', content: identityPrompt },
@@ -596,13 +600,15 @@ export async function generateMirrorReplyWithLogging(
           role: 'user',
           content:
             attempt === 0
-              ? `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nWrite the reply this identity would send:`
+              ? isTeaser
+                ? `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nWrite a brief teaser/preview (max ${maxTokens} tokens) of how you would reply. Keep it short and engaging:`
+                : `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nWrite the reply this identity would send:`
               : `Context: ${context}\n\nIncoming message:\n${incomingMessage}\n\nYour last draft violated rules:\n- ${validatorViolations.join(
                   '\n- '
                 )}\n\nRewrite the reply to fix all violations. Output ONLY the reply text.`,
         },
       ],
-      { maxTokens: 350, temperature: 0.2 }
+      { maxTokens, temperature: 0.2 }
     );
 
     finalReply = (gen.content || '').trim();
@@ -617,6 +623,13 @@ export async function generateMirrorReplyWithLogging(
     }
     if (identityJson.hardRules?.never) {
       rulesApplied.push(...identityJson.hardRules.never.map((r: string) => `never: ${String(r).substring(0, 50)}`));
+    }
+
+    // Skip validation for teaser
+    if (isTeaser) {
+      validatorStatus = 'pass';
+      validatorViolations = [];
+      break;
     }
 
     const val = await validateMirrorOutput({

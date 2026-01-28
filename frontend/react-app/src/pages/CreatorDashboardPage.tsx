@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import {
   MessageSquare, DollarSign, Clock, Star, TrendingUp, TrendingDown,
-  Settings, Database, Tag, ExternalLink, BarChart3, Zap, 
-  Users, FileText, AlertCircle, CheckCircle2, Loader2
+  Settings, Database, BarChart3, Zap, 
+  FileText, AlertCircle, CheckCircle2, Loader2
 } from 'lucide-react';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
@@ -53,19 +53,30 @@ export function CreatorDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'engagement' | 'revenue' | 'content' | 'ai-health' | 'test'>('engagement');
   const [messagesToday, setMessagesToday] = useState(0);
+  const [aiStatus, setAiStatus] = useState<'active' | 'training' | 'inactive' | 'not_setup'>('not_setup');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardRes, earningsRes] = await Promise.all([
+        const [dashboardRes, earningsRes, identityRes] = await Promise.all([
           apiFetch('/api/creator/dashboard'),
-          apiFetch('/api/creator/earnings').catch(() => ({ items: [] }))
+          apiFetch('/api/creator/earnings').catch(() => ({ items: [] })),
+          apiFetch('/api/identity/active').catch(() => ({ identity: null }))
         ]);
         setData({
           ...dashboardRes,
           earnings: earningsRes?.items || []
         });
         setMessagesToday(dashboardRes?.chats?.today || 0);
+        
+        // Determine AI status
+        if (identityRes?.identity?.activeVersionId) {
+          setAiStatus('active');
+        } else if (identityRes?.identity) {
+          setAiStatus('training');
+        } else {
+          setAiStatus('not_setup');
+        }
       } catch (e) {
         console.error('Dashboard fetch error:', e);
       } finally {
@@ -155,7 +166,26 @@ export function CreatorDashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">Creator Dashboard</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-text-primary">Creator Dashboard</h1>
+              {/* AI Status Indicator */}
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+                aiStatus === 'active' 
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                  : aiStatus === 'training'
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                  : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  aiStatus === 'active' ? 'bg-green-400 animate-pulse' 
+                  : aiStatus === 'training' ? 'bg-yellow-400 animate-pulse'
+                  : 'bg-gray-400'
+                }`} />
+                {aiStatus === 'active' ? 'AI Active' 
+                  : aiStatus === 'training' ? 'Training...' 
+                  : 'Not Setup'}
+              </div>
+            </div>
             <p className="text-text-secondary mt-1">Monitor your AI clone's performance</p>
           </div>
           <div className="flex gap-2">

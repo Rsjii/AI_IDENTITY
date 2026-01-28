@@ -17,6 +17,7 @@ declare global {
       userId?: string;
       email: string;
       handle?: string;
+      sessionId?: string; // ✅ Add sessionId for session management
     }
   }
 }

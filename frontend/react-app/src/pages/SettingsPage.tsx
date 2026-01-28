@@ -5,23 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, Copy, FileText, Info, Chrome } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 
-type Tab = 'profile' | 'payment' | 'billing' | 'security';
+type Tab = 'profile' | 'payment' | 'billing' | 'security' | 'notifications';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const [activeTab, setActiveTab] = useState<Tab>(tabParam && ['profile', 'payment', 'billing', 'security'].includes(tabParam) ? tabParam : 'profile');
+  const [activeTab, setActiveTab] = useState<Tab>(tabParam && ['profile', 'payment', 'billing', 'security', 'notifications'].includes(tabParam) ? tabParam : 'profile');
   
   useEffect(() => {
-    if (tabParam && ['profile', 'payment', 'billing', 'security'].includes(tabParam)) {
+    if (tabParam && ['profile', 'payment', 'billing', 'security', 'notifications'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -34,7 +35,6 @@ export function SettingsPage() {
   const [error, setError] = useState('');
 
   // Payment settings
-  const [priceConfig, setPriceConfig] = useState<any>(null);
   const [premiumPrice, setPremiumPrice] = useState(500);
   const [vipPrice, setVipPrice] = useState(5000);
   const [enablePayments, setEnablePayments] = useState(false);
@@ -71,6 +71,12 @@ export function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
+  // Notification preferences
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [paymentNotifications, setPaymentNotifications] = useState(true);
+  const [weeklySummary, setWeeklySummary] = useState(false);
+  const [savingNotifications, setSavingNotifications] = useState(false);
+
   useEffect(() => {
     if (state.status === 'authenticated') {
       setName(state.user.name || '');
@@ -80,7 +86,6 @@ export function SettingsPage() {
       setTrialEndsAt((state.user as any).trialEndsAt || null);
       
       const config = (state.user as any).priceConfig || {};
-      setPriceConfig(config);
       setPremiumPrice(config.premium?.amountCents || 500);
       setVipPrice(config.vip?.amountCents || 5000);
       setEnablePayments(config.enablePayments || false);
@@ -353,6 +358,7 @@ export function SettingsPage() {
             { id: 'payment' as Tab, label: 'Payment', icon: DollarSign },
             { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
             { id: 'security' as Tab, label: 'Security', icon: Shield },
+            { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
           ]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -908,6 +914,28 @@ export function SettingsPage() {
                 <CardDescription>Manage your active login sessions</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
+                {activeSessions.length > 1 && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await apiFetch('/api/auth/sessions/all-other', { method: 'DELETE' });
+                          // Reload sessions
+                          const res = await apiFetch<{ success: boolean; sessions: any[] }>('/api/auth/sessions');
+                          if (res.success && Array.isArray(res.sessions)) {
+                            setActiveSessions(res.sessions);
+                          }
+                        } catch (e) {
+                          console.error('Failed to logout all other sessions:', e);
+                        }
+                      }}
+                    >
+                      Logout All Other Sessions
+                    </Button>
+                  </div>
+                )}
                 {loadingSessions ? (
                   <p className="text-sm text-muted-foreground">Loading active sessions…</p>
                 ) : activeSessions.length === 0 ? (
@@ -919,33 +947,51 @@ export function SettingsPage() {
                     {activeSessions.map((s: any) => (
                       <div
                         key={s.id}
-                        className="flex items-center justify-between p-3 border rounded-lg bg-bg-secondary"
+                        className={`flex items-center justify-between p-3 border rounded-lg bg-bg-secondary ${
+                          s.isCurrent ? 'border-primary' : ''
+                        }`}
                       >
-                        <div>
-                          <div className="text-sm font-medium text-text-primary">
-                            Visitor {s.visitorId || 'Anonymous'}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-text-primary">
+                              {s.device || s.deviceInfo || 'Unknown Device'}
+                            </div>
+                            {s.isCurrent && (
+                              <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded">
+                                Current Session
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-text-tertiary mt-1">
+                            IP: {s.ipAddress || 'Unknown'}
                           </div>
                           <div className="text-xs text-text-tertiary">
-                            Session: {s.sessionId || 'N/A'}
+                            Last active: {s.lastActiveAt 
+                              ? new Date(s.lastActiveAt).toLocaleString() 
+                              : 'Unknown'}
                           </div>
                           <div className="text-xs text-text-tertiary">
-                            Last active: {s.lastActiveAt ? new Date(s.lastActiveAt).toLocaleString() : 'Unknown'}
+                            Logged in: {s.createdAt 
+                              ? new Date(s.createdAt).toLocaleString() 
+                              : 'Unknown'}
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              await apiFetch(`/api/auth/sessions/${s.id}`, { method: 'DELETE' });
-                              setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
-                            } catch (e) {
-                              console.error('Failed to end session:', e);
-                            }
-                          }}
-                        >
-                          End Session
-                        </Button>
+                        {!s.isCurrent && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await apiFetch(`/api/auth/sessions/${s.id}`, { method: 'DELETE' });
+                                setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
+                              } catch (e) {
+                                console.error('Failed to end session:', e);
+                              }
+                            }}
+                          >
+                            End Session
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -953,6 +999,74 @@ export function SettingsPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Notification Preferences</CardTitle>
+              <CardDescription>Choose how you want to be notified</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">New Chat Notifications</div>
+                  <div className="text-sm text-muted-foreground">Get notified when someone starts a chat</div>
+                </div>
+                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">Payment Notifications</div>
+                  <div className="text-sm text-muted-foreground">Get notified when you receive a payment</div>
+                </div>
+                <Switch checked={paymentNotifications} onCheckedChange={setPaymentNotifications} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">Weekly Summary</div>
+                  <div className="text-sm text-muted-foreground">Receive weekly stats and insights</div>
+                </div>
+                <Switch checked={weeklySummary} onCheckedChange={setWeeklySummary} />
+              </div>
+              <Button 
+                onClick={async () => {
+                  setSavingNotifications(true);
+                  setError('');
+                  try {
+                    await apiFetch('/api/profile/update', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        notificationPreferences: {
+                          emailNotifications,
+                          paymentNotifications,
+                          weeklySummary,
+                        }
+                      }),
+                    });
+                    await refresh();
+                    setError('');
+                  } catch (e: any) {
+                    setError(e.message || 'Failed to save notification preferences.');
+                  } finally {
+                    setSavingNotifications(false);
+                  }
+                }}
+                disabled={savingNotifications}
+                className="w-full"
+              >
+                {savingNotifications ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save Preferences'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
         )}
       </div>
     </Layout>
