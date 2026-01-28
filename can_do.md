@@ -184,6 +184,32 @@ This document contains low priority features and improvements that can be implem
 
 ---
 
+## 11. Cost Tracking & Analytics (Low Priority)
+
+**Description:** Advanced cost monitoring and optimization features.
+
+**Features:**
+- Daily cost alerts (email when cost exceeds threshold)
+- Cost breakdown by model (Groq vs OpenAI)
+- Cost optimization suggestions (e.g., "Switch to Groq for simple queries")
+- Cost aggregation queries (daily/weekly/monthly costs per user)
+- Cost dashboard metrics (show in creator dashboard)
+- Cost per conversation tracking
+- Model usage analytics (which models cost most)
+
+**Implementation:**
+- Create cost aggregation service
+- Add cost alerts (cron job or scheduled task)
+- Add cost metrics to dashboard API
+- Create cost optimization recommendations engine
+
+**Files to create/modify:**
+- `backend/src/services/costAggregationService.ts` - New service
+- `backend/src/modules/creator/costController.ts` - Cost analytics endpoints
+- `frontend/react-app/src/pages/CreatorDashboardPage.tsx` - Add cost metrics
+
+---
+
 ## Priority Ranking
 
 1. **WebSocket for Real-Time Updates** - High impact on UX
@@ -196,6 +222,7 @@ This document contains low priority features and improvements that can be implem
 8. **Multi-Language Support** - International expansion
 9. **Advanced Payment Options** - Monetization flexibility
 10. **Team/Collaboration** - Enterprise feature
+11. **Cost Tracking & Analytics** - Cost optimization (low priority)
 
 ---
 

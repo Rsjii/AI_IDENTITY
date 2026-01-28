@@ -8,8 +8,10 @@ import {
   chatSessionQueries,
   chatMessageQueries,
 } from '../../config/database';
-import { TOKEN_QUOTAS } from '../../config/constants';
+import { TOKEN_QUOTAS, EVENT_TYPES } from '../../config/constants';
 import { IdentityJson } from '../../types/identity';
+import { EventLogger } from '../../services/eventLogger';
+import { calculateCost, costToCents } from '../../services/costCalculator';
 
 /**
  * Compute decision (reply/ignore/defer/clarify) from identity + message
@@ -543,6 +545,7 @@ export async function generateMirrorReplyWithLogging(
   // ✅ If not reply: log + return early
   if (decision.action !== 'reply') {
     const reply = templates[decision.action];
+    const costCents = 0; // No cost for non-reply actions
     const mirrorRun = await mirrorRunQueries.create(
       version.id,
       context,
@@ -552,6 +555,7 @@ export async function generateMirrorReplyWithLogging(
       'n/a',       // model
       0,
       0,
+      costCents,
       {
         platform,
         decisionAction: decision.action,
@@ -561,6 +565,19 @@ export async function generateMirrorReplyWithLogging(
         latencyMs: Date.now() - startTime,
       }
     );
+
+    // Log AI_RUN_CREATED event for non-reply actions
+    EventLogger.logUserEvent(userId, EVENT_TYPES.AI_RUN_CREATED, {
+      mirrorRunId: mirrorRun.id,
+      model: 'n/a',
+      tokensIn: 0,
+      tokensOut: 0,
+      costCents: 0,
+      platform,
+      decisionAction: decision.action,
+    }).catch((err) => {
+      logger.warn('Failed to log AI_RUN_CREATED event:', err);
+    });
 
     if (sessionId && reply) {
       await chatMessageQueries.add({ sessionId, role: 'assistant', content: reply });
@@ -655,6 +672,10 @@ export async function generateMirrorReplyWithLogging(
 
   const latencyMs = Date.now() - startTime;
 
+  // ✅ Calculate cost
+  const costUsd = calculateCost(tokensInTotal, tokensOutTotal, genModel);
+  const costCents = costToCents(costUsd);
+
   const mirrorRun = await mirrorRunQueries.create(
     version.id,
     context,
@@ -664,6 +685,7 @@ export async function generateMirrorReplyWithLogging(
     genModel,
     tokensInTotal,
     tokensOutTotal,
+    costCents,
     {
       platform,
       decisionAction: decision.action,
@@ -674,7 +696,35 @@ export async function generateMirrorReplyWithLogging(
     }
   );
 
-  logger.info(`Mirror run created: ${mirrorRun.id} (decision: ${decision.action}, validator: ${validatorStatus})`);
+  logger.info(`Mirror run created: ${mirrorRun.id} (decision: ${decision.action}, validator: ${validatorStatus}, cost: $${(costCents / 100).toFixed(4)})`);
+
+  // ✅ Log AI_RUN_CREATED event
+  EventLogger.logUserEvent(userId, EVENT_TYPES.AI_RUN_CREATED, {
+    mirrorRunId: mirrorRun.id,
+    model: genModel,
+    tokensIn: tokensInTotal,
+    tokensOut: tokensOutTotal,
+    totalTokens: tokensInTotal + tokensOutTotal,
+    costCents: costCents,
+    platform,
+    decisionAction: decision.action,
+    validatorStatus,
+  }).catch((err) => {
+    logger.warn('Failed to log AI_RUN_CREATED event:', err);
+  });
+
+  // ✅ Log LLM_USAGE event
+  EventLogger.logUserEvent(userId, EVENT_TYPES.LLM_USAGE, {
+    mirrorRunId: mirrorRun.id,
+    model: genModel,
+    tokensIn: tokensInTotal,
+    tokensOut: tokensOutTotal,
+    totalTokens: tokensInTotal + tokensOutTotal,
+    costCents: costCents,
+    platform,
+  }).catch((err) => {
+    logger.warn('Failed to log LLM_USAGE event:', err);
+  });
 
   // after final mirrorRun created:
   if (sessionId && finalReply) {

@@ -132,6 +132,8 @@ export const EVENT_TYPES = {
   PAYMENT_ORDER_CREATED: 'payment_order_created',
   SUBSCRIPTION_CREATED: 'subscription_created',
   SUBSCRIPTION_CANCELLED: 'subscription_cancelled',
+  PAYMENT_REQUIRED: 'payment_required', // When paywall is shown
+  PAYMENT_COMPLETED: 'payment_completed', // When pay-per-chat payment succeeds
 } as const;
 
 // Token Quotas - Daily limits for LLM usage

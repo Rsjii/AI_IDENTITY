@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { userQueries, chatSessionQueries, chatMessageQueries, db, mirrorRunQueries, identityVersionQueries, identityQueries, trustEventQueries } from '../../config/database';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
 import { logger } from '../../config/logger';
+import { EventLogger } from '../../services/eventLogger';
+import { EVENT_TYPES } from '../../config/constants';
 
 const chatSchema = z.object({
   slug: z.string().min(1),
@@ -144,8 +146,30 @@ export async function publicChat(req: Request, res: Response) {
         });
       }
 
-      // No payment, show paywall (Option A: don't generate reply before payment)
+      // No payment, show paywall
       const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
+      
+      // ✅ Log PAYMENT_REQUIRED event
+      const triggerReason = sessionMessages >= FREE_MESSAGE_LIMIT 
+        ? 'free_limit_exceeded'
+        : triggerRules.alwaysRequire 
+        ? 'always_require'
+        : triggerRules.keywords?.some((kw: string) => message.toLowerCase().includes(kw.toLowerCase()))
+        ? 'keyword_match'
+        : triggerRules.minLength > 0 && message.length >= triggerRules.minLength
+        ? 'min_length_exceeded'
+        : 'unknown';
+      
+      EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_REQUIRED, {
+        creatorId: u.id,
+        sessionId: sid,
+        visitorId: visitorId || null,
+        messageLength: message.length,
+        sessionMessages,
+        triggerReason,
+      }).catch((err) => {
+        logger.warn('Failed to log PAYMENT_REQUIRED event:', err);
+      });
 
       // ✅ Generate teaser reply (limited tokens, AI-generated preview)
       let previewReply = 'This answer requires payment to unlock the full response. Click below to proceed.';

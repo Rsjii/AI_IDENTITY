@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS "mirror_runs" (
     "model" TEXT,
     "tokensIn" INTEGER,
     "tokensOut" INTEGER,
+    "costCents" INTEGER,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "mirror_runs_pkey" PRIMARY KEY ("id")
 );
@@ -208,6 +209,7 @@ ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "decisionReason" TEXT;
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "validatorStatus" TEXT;
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "validatorViolations" JSONB;
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "latencyMs" INTEGER;
+ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "costCents" INTEGER;
 
 -- ✅ Extension tokens (Phase 3, but safe to create now)
 CREATE TABLE IF NOT EXISTS "extension_tokens" (
@@ -811,6 +813,7 @@ export const mirrorRunQueries = {
     model?: string,
     tokensIn?: number,
     tokensOut?: number,
+    costCents?: number,
     meta?: {
       platform?: 'web' | 'gmail' | 'linkedin' | 'api';
       decisionAction?: 'reply' | 'ignore' | 'defer' | 'clarify';
@@ -826,10 +829,10 @@ export const mirrorRunQueries = {
       `
       INSERT INTO "mirror_runs"
         (id, "identityVersionId", context, "incomingMessage", "outputReply", "rulesApplied",
-         model, "tokensIn", "tokensOut",
+         model, "tokensIn", "tokensOut", "costCents",
          "platform", "decisionAction", "decisionReason", "validatorStatus", "validatorViolations", "latencyMs")
       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       RETURNING *
       `,
       [
@@ -842,6 +845,7 @@ export const mirrorRunQueries = {
         model || null,
         tokensIn ?? null,
         tokensOut ?? null,
+        costCents ?? null,
         meta?.platform || 'web',
         meta?.decisionAction || null,
         meta?.decisionReason || null,

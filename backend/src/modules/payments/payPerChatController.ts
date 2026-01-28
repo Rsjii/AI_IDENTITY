@@ -5,6 +5,8 @@ import Stripe from 'stripe';
 import { logger } from '../../config/logger';
 import { EmailService } from '../auth/authService';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
+import { EventLogger } from '../../services/eventLogger';
+import { EVENT_TYPES } from '../../config/constants';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecret) {
@@ -98,6 +100,20 @@ export async function confirmPayment(req: Request, res: Response) {
       platformFeeCents: platformFee,
       creatorEarningsCents: creatorEarnings,
       type: 'pay_per_chat',
+    });
+
+    // ✅ Log PAYMENT_COMPLETED event
+    EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_COMPLETED, {
+      creatorId,
+      sessionId: sessionId || null,
+      visitorId: paymentIntent.metadata?.visitorId || null,
+      amountCents: amount,
+      tier,
+      platformFeeCents: platformFee,
+      creatorEarningsCents: creatorEarnings,
+      paymentIntentId,
+    }).catch((err) => {
+      logger.warn('Failed to log PAYMENT_COMPLETED event:', err);
     });
 
     // Get payer email from payment intent metadata
