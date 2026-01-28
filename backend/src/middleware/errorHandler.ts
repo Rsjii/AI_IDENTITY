@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { EventLogger } from '../services/eventLogger';
 import { EVENT_TYPES } from '../config/constants';
 import { isProd, config } from '../config/env';
+import { logError } from '../modules/admin/adminDao';
 
 /**
  * Async wrapper utility to catch errors from async route handlers
@@ -20,7 +21,7 @@ export const errorHandlerMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): void | Response => {
   const isApiRequest = req.originalUrl.startsWith('/api/');
   const requestId = req.requestId || null;
 
@@ -42,6 +43,32 @@ export const errorHandlerMiddleware = (
       userAgent: req.get('user-agent'),
       ...(err.details && { details: err.details }), // ✅ Always log details (not exposed to user)
     }, '⚠️ APP_ERROR caught:');
+
+    // ✅ A1: Log to database error_logs table
+    try {
+      const severity = err.statusCode >= 500 ? 'critical' : err.statusCode >= 400 ? 'error' : 'warning';
+      logError({
+        message: err.message,
+        stack: err.stack,
+        source: 'backend',
+        severity,
+        userId: userId || undefined,
+        meta: {
+          errorCode: err.errorCode,
+          statusCode: err.statusCode,
+          path: req.path,
+          method: req.method,
+          requestId,
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+          ...(err.details && { details: err.details }),
+        },
+      }).catch(() => {
+        // Silently fail if DB logging fails
+      });
+    } catch {
+      // swallow logging errors
+    }
 
     // ✅ Event logging - include details for debugging
     try {
@@ -88,11 +115,12 @@ export const errorHandlerMiddleware = (
       if (requestId) {
         res.setHeader('X-Request-Id', requestId);
       }
-      return res.status(err.statusCode).json({
+      res.status(err.statusCode).json({
         error: err.message,
         errorCode: err.errorCode,
         frontend: config.frontendUrl || 'https://selflyx.com'
       });
+      return;
     }
 
     // ✅ Only render views in development
@@ -142,6 +170,31 @@ export const errorHandlerMiddleware = (
     query: isProd ? undefined : req.query, // Only in dev
   }, '❌ UNHANDLED ERROR - Full stack trace:');
 
+  // ✅ A1: Log to database error_logs table (critical severity for unhandled errors)
+  try {
+    logError({
+      message: err.message || 'Unhandled error',
+      stack: err.stack,
+      source: 'backend',
+      severity: 'critical',
+      userId: userId || undefined,
+      meta: {
+        name: err.name,
+        path: req.path,
+        method: req.method,
+        requestId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        body: isProd ? undefined : req.body,
+        query: isProd ? undefined : req.query,
+      },
+    }).catch(() => {
+      // Silently fail if DB logging fails
+    });
+  } catch {
+    // ignore logging failures
+  }
+
   // ✅ Event logging for unhandled errors
   try {
     const meta = {
@@ -178,10 +231,11 @@ export const errorHandlerMiddleware = (
     if (requestId) {
       res.setHeader('X-Request-Id', requestId);
     }
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Internal server error',
       errorCode: ErrorCodes.INTERNAL_ERROR,
     });
+    return;
   }
 
   return res.status(500).render('errors/error', {

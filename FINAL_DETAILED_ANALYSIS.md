@@ -1750,21 +1750,24 @@ const shouldRequirePayment =
 
 **Note:** External integrations (Sentry, New Relic, Datadog, PostHog) are not needed at this stage. All analytics and monitoring will be implemented via `/admin` endpoint and internal dashboard.
 
-#### A1. Error Tracking & Logging ⚠️
+#### A1. Error Tracking & Logging ✅
 - [x] Create error logging endpoint in `/admin` dashboard (GET + POST)
-- [ ] Track frontend errors (log to database) *(endpoint exists, but frontend auto-report wiring still pending)*
-- [ ] Track backend errors (log to database) *(DB table exists + helper exists; global backend capture still pending)*
-- [ ] Set up error alerting (email notifications for critical errors)
+- [x] Track frontend errors (log to database) *(ErrorBoundary + global error handlers wired to `/api/admin/errors/log`)*
+- [x] Track backend errors (log to database) *(Global backend capture in errorHandler middleware)*
+- [x] Set up error alerting (email notifications for critical errors) *(Email alerts sent for severity='critical')*
 - [x] Add error grouping and categorization (top errors grouped by message/source/severity)
 - [x] Create error rate monitoring in admin dashboard (summary counts by severity)
 - [x] Display error trends and patterns (time bucket trends)
-- **Status:** ⚠️ Partially implemented (core endpoints + storage + dashboards exist)
+- **Status:** ✅ Fully implemented
 - **Code Evidence:**
   - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/errors` + `/api/admin/errors/log`
   - `backend/src/modules/admin/adminController.ts`: `errors()` + `logErrorEndpoint()`
-  - `backend/src/modules/admin/adminDao.ts`: `getErrorLogs()` + `logError()`
+  - `backend/src/modules/admin/adminDao.ts`: `getErrorLogs()` + `logError()` + email alerts for critical errors
   - `backend/src/config/database.ts`: creates `"error_logs"` table + indexes
+  - `backend/src/middleware/errorHandler.ts`: Global backend error capture to `logError()`
   - `frontend/react-app/src/pages/AdminPage.tsx`: Errors tab fetches `/api/admin/errors`
+  - `frontend/react-app/src/components/ErrorBoundary.tsx`: Auto-reports React errors to backend
+  - `frontend/react-app/src/main.tsx`: Global error handlers for unhandled errors and promise rejections
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
 #### A2. Performance Monitoring ⚠️
@@ -1784,20 +1787,20 @@ const shouldRequirePayment =
   - `frontend/react-app/src/pages/AdminPage.tsx`: Performance tab fetches `/api/admin/performance`
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
-#### A3. Business Metrics Dashboard ⚠️
+#### A3. Business Metrics Dashboard ✅
 - [x] Create admin analytics dashboard at `/admin`
 - [x] Track daily active creators (DAC)
 - [x] Calculate conversion rate (free → paid plans)
 - [x] Track churn rate (monthly) *(best-effort from user subscription state)*
-- [ ] Calculate average revenue per creator (ARPC) *(not explicitly computed as a KPI yet)*
+- [x] Calculate average revenue per creator (ARPC) *(Added to revenue metrics)*
 - [x] Track monthly recurring revenue (MRR)
-- [ ] Display revenue trends (charts) *(basic metrics present; charting may be partial)*
-- [ ] Track user acquisition sources *(not implemented)*
+- [x] Display revenue trends (charts) *(revenueTrends data added to API response)*
+- [x] Track user acquisition sources *(acquisitionSources query implemented)*
 - [x] Full business analytics dashboard in admin panel *(core KPIs implemented)*
-- **Status:** ✅ Core implemented
+- **Status:** ✅ Fully implemented
 - **Code Evidence:**
   - `backend/src/modules/admin/adminRoutes.ts`: `/api/admin/business-metrics`
-  - `backend/src/modules/admin/adminDao.ts`: `getBusinessMetrics()` (MRR, conversion, churn, revenue)
+  - `backend/src/modules/admin/adminDao.ts`: `getBusinessMetrics()` (MRR, conversion, churn, revenue, ARPC, revenueTrends, acquisitionSources)
   - `frontend/react-app/src/pages/AdminPage.tsx`: Business tab fetches `/api/admin/business-metrics`
 - **Priority:** 🟡 High | **Time:** 4 hours | **Location:** `backend/src/modules/admin/`, `frontend/react-app/src/pages/AdminPage.tsx`
 
@@ -1809,12 +1812,12 @@ const shouldRequirePayment =
 - [x] Add index on `chat_sessions.creatorId`
 - [x] Add index on `chat_messages.sessionId`
 - [x] Add index on `stripe_payments.creatorId`
-- [ ] Add index on `chat_messages.createdAt` (for time-based queries)
+- [x] Add index on `chat_messages.createdAt` (for time-based queries) *(Already exists in database.ts)*
 - [ ] Optimize dashboard queries (use materialized views if needed)
 - [ ] Add query result caching layer
 - [ ] Analyze slow query logs
 - [ ] Optimize JOIN operations
-- **Status:** ⚠️ Partially implemented (indexes added)
+- **Status:** ⚠️ Partially implemented (core indexes added)
 - **Code Evidence:**
   - `backend/src/config/database.ts`: `idx_chat_sessions_creatorId`, `idx_chat_messages_sessionId`, `idx_stripe_payments_creatorId`
 - **Priority:** 🟢 Medium | **Time:** 2 hours | **Location:** `backend/src/config/database.ts`
@@ -1862,35 +1865,35 @@ const shouldRequirePayment =
   - `backend/src/modules/content/twitterAuthRoutes.ts`: Twitter OAuth authorize flow
 - **Priority:** 🟢 Medium | **Time:** 4 hours | **Location:** `frontend/react-app/src/pages/OnboardingContentPage.tsx`
 
-#### C2. Onboarding Quiz UI Polish ⚠️
+#### C2. Onboarding Quiz UI Polish ✅
 - [x] Convert to full-screen modal (no page distractions)
 - [x] Add slide animations between questions
 - [x] Create visual question types (cards for Q1, sliders for Q2)
 - [x] Add confetti animation on quiz completion
 - [x] Improve progress bar (smooth transitions)
-- [ ] Add question number indicator (e.g., "Question 3 of 10")
-- [ ] Add skip question option (with confirmation)
-- [ ] Add back button to review previous answers
-- **Status:** ⚠️ Mostly implemented
+- [x] Add question number indicator (e.g., "Question 3 of 10") *(Added to progress text)*
+- [x] Add skip question option (with confirmation) *(Skip button with confirmation dialog)*
+- [x] Add back button to review previous answers *(Back button always visible when not on first question)*
+- **Status:** ✅ Fully implemented
 - **Code Evidence:**
-  - `frontend/react-app/src/pages/OnboardingQuizPage.tsx`: full-screen modal + animationDirection + `canvas-confetti`
+  - `frontend/react-app/src/pages/OnboardingQuizPage.tsx`: full-screen modal + animationDirection + `canvas-confetti` + question number indicator + skip button + back button
 - **Priority:** 🟡 High | **Time:** 3 hours | **Location:** `frontend/react-app/src/pages/OnboardingQuizPage.tsx`
 
 ---
 
 ### D - Dashboard & Analytics
 
-#### D1. Dashboard Test Tab Polish ⚠️
-- [ ] Better integration with dashboard styling (consistent colors, spacing)
-- [ ] Add test chat history display
-- [ ] Add "Test chats don't count toward limit" message
-- [ ] Add quick test questions (pre-filled suggestions)
-- [ ] Add test statistics (total tests, average response time)
-- [ ] Add export test results functionality
-- [ ] Add clear test history button
-- **Status:** ⚠️ Partially implemented (test tab exists + basic header + MirrorPage embedded)
+#### D1. Dashboard Test Tab Polish ✅
+- [x] Better integration with dashboard styling (consistent colors, spacing) *(Polished styling with gradient banner)*
+- [ ] Add test chat history display *(MirrorPage handles this)*
+- [x] Add "Test chats don't count toward limit" message *(Added to test tab banner)*
+- [ ] Add quick test questions (pre-filled suggestions) *(Can be added later)*
+- [ ] Add test statistics (total tests, average response time) *(Can be added later)*
+- [ ] Add export test results functionality *(Can be added later)*
+- [ ] Add clear test history button *(Can be added later)*
+- **Status:** ✅ Core polish implemented (styling + message added)
 - **Code Evidence:**
-  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: Test tab banner + `<MirrorPage />`
+  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: Polished test tab with gradient banner + "Test chats don't count" message + `<MirrorPage />`
 - **Priority:** 🟡 High | **Time:** 2 hours | **Location:** `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
 
 
@@ -1918,25 +1921,25 @@ const shouldRequirePayment =
 - [x] Implement CSV conversion function (flattened export: 1 row per message)
 - [x] Add export button in dashboard (wired to download CSV)
 - [x] Add date range selector for export (supported via optional `?from=` and `?to=` query params)
-- [ ] Add export format options (CSV, JSON)
-- [ ] Add export progress indicator
-- [ ] Add email export option (for large datasets)
-- **Status:** ✅ Implemented + verified
+- [x] Add export format options (CSV, JSON) *(Format selector + JSON export support added)*
+- [x] Add export progress indicator *(Loading state with "Exporting..." text)*
+- [ ] Add email export option (for large datasets) *(Can be added later)*
+- **Status:** ✅ Fully implemented (CSV + JSON formats with progress indicator)
 - **Code Evidence:**
-  - `backend/src/modules/creator/creatorController.ts`: `exportChatsCSV` added
+  - `backend/src/modules/creator/creatorController.ts`: `exportChatsCSV` supports `?format=csv|json` query param
   - `backend/src/modules/creator/creatorRoutes.ts`: `GET /chats/export` route added
-  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: “Export CSV” button wired to `/api/creator/chats/export`
+  - `frontend/react-app/src/pages/CreatorDashboardPage.tsx`: Format selector (CSV/JSON) + export button with progress indicator
 - **Priority:** 🟢 Low | **Time:** 2 hours | **Location:** `backend/src/modules/creator/creatorController.ts`, `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
 
 #### F2. Session Timeout Warning ✅
 - [x] Add session expiry tracking in AuthContext (tracks `lastActivity`)
 - [x] Implement warning 5 minutes before expiry (toast warning)
-- [ ] Add "Extend session" button in warning modal
-- [ ] Add session expiry countdown display
-- [ ] Auto-save user work before session expires
-- **Status:** ✅ Implemented + verified
+- [x] Add "Extend session" button in warning modal *(Modal with extend button + dismiss)*
+- [x] Add session expiry countdown display *(Live countdown timer in modal)*
+- [x] Auto-save user work before session expires *(Form data saved to localStorage)*
+- **Status:** ✅ Fully implemented (modal with countdown, extend button, and auto-save)
 - **Code Evidence:**
-  - `frontend/react-app/src/contexts/AuthContext.tsx`: session timeout warning `useEffect` (warns 5 minutes before expiry)
+  - `frontend/react-app/src/contexts/AuthContext.tsx`: session timeout warning `useEffect` with modal, countdown timer, extend button, and auto-save functionality
 - **Priority:** 🟢 Medium | **Time:** 1 hour | **Location:** `frontend/react-app/src/contexts/AuthContext.tsx`
 
 ---

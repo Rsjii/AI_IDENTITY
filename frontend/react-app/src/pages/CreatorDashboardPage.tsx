@@ -59,6 +59,8 @@ export function CreatorDashboardPage() {
   const [aiStatus, setAiStatus] = useState<'active' | 'training' | 'inactive' | 'not_setup'>('not_setup');
   const [lastChatCount, setLastChatCount] = useState(0);
   const [lastRevenue, setLastRevenue] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -192,22 +194,25 @@ export function CreatorDashboardPage() {
     { user: 'User 3', preview: 'Can you explain...', time: '1 hour ago', rating: '👎' },
   ];
 
-  const handleExportChatCSV = async () => {
+  const handleExportChat = async (format: 'csv' | 'json' = 'csv') => {
+    setExporting(true);
     try {
-      const res = await fetch('/api/creator/chats/export');
+      const res = await fetch(`/api/creator/chats/export?format=${format}`);
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `chat-history-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `chat-history-${new Date().toISOString().split('T')[0]}.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      showToast('Chat history exported', 'success');
+      showToast(`Chat history exported as ${format.toUpperCase()}`, 'success');
     } catch {
       showToast('Failed to export chat history', 'error');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -452,14 +457,26 @@ export function CreatorDashboardPage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-semibold text-text-primary">Conversations Over Time</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-border-default text-text-secondary"
-                    onClick={handleExportChatCSV}
-                  >
-                    Export CSV
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={exportFormat}
+                      onChange={(e) => setExportFormat(e.target.value as 'csv' | 'json')}
+                      className="px-3 py-1.5 text-sm border border-border-default rounded bg-bg-secondary text-text-primary"
+                      disabled={exporting}
+                    >
+                      <option value="csv">CSV</option>
+                      <option value="json">JSON</option>
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-border-default text-text-secondary"
+                      onClick={() => handleExportChat(exportFormat)}
+                      disabled={exporting}
+                    >
+                      {exporting ? 'Exporting...' : `Export ${exportFormat.toUpperCase()}`}
+                    </Button>
+                  </div>
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -660,6 +677,27 @@ export function CreatorDashboardPage() {
                 </div>
               </div>
             )}
+
+            {/* ✅ D1: Test AI Tab - Polished */}
+            {activeTab === 'test' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-accent-primary/10 to-accent-secondary/10 rounded-lg p-6 border border-accent-primary/20">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-text-primary mb-2">Test Your AI Clone</h3>
+                      <p className="text-text-secondary text-sm">
+                        Send test messages to see how your AI clone responds. This helps you refine your AI's personality and responses.
+                      </p>
+                      <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        Test chats don't count toward your message limit
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <MirrorPage />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -722,21 +760,8 @@ export function CreatorDashboardPage() {
               <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary">
                 Generate Report
               </Button>
-
-            {/* Test AI Tab */}
-            {activeTab === 'test' && (
-              <div className="space-y-6">
-                <div className="bg-gradient-to-r from-accent-primary/10 to-accent-secondary/10 rounded-lg p-6 mb-6 border border-accent-primary/20">
-                  <h3 className="text-xl font-semibold text-text-primary mb-2">Test Your AI Clone</h3>
-                  <p className="text-text-secondary text-sm mb-4">
-                    Send test messages to see how your AI clone responds. This helps you refine your AI's personality and responses.
-                  </p>
-                </div>
-                <MirrorPage />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
           {/* Action Items */}
           <Card className="bg-bg-secondary border-border-default">

@@ -11,6 +11,9 @@ export async function exportChatsCSV(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  // ✅ F1: Support format query param (csv or json)
+  const format = (req.query.format === 'json' ? 'json' : 'csv') as 'csv' | 'json';
+
   // Optional date filtering (?from=...&to=...)
   const from = typeof req.query.from === 'string' ? req.query.from : null;
   const to = typeof req.query.to === 'string' ? req.query.to : null;
@@ -47,6 +50,29 @@ export async function exportChatsCSV(req: Request, res: Response) {
     params
   );
 
+  if (format === 'json') {
+    // ✅ F1: JSON export format
+    const data = r.rows.map((x: any) => ({
+      sessionId: x.sessionId,
+      sessionCreatedAt: new Date(x.sessionCreatedAt).toISOString(),
+      platform: x.platform || '',
+      visitorId: x.visitorId || '',
+      viewerUserId: x.viewerUserId || '',
+      messageId: x.messageId,
+      messageCreatedAt: new Date(x.messageCreatedAt).toISOString(),
+      role: x.role,
+      content: x.content ?? '',
+    }));
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="chat-history-${new Date().toISOString().split('T')[0]}.json"`
+    );
+    return res.json(data);
+  }
+
+  // CSV export (default)
   const headers = [
     'sessionId',
     'sessionCreatedAt',

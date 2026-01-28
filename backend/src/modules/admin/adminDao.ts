@@ -281,6 +281,44 @@ export async function logError(error: {
     `,
     [error.message, error.stack, error.source, error.severity, error.userId, JSON.stringify(error.meta || {})]
   );
+
+  // ✅ A1: Send email alert for critical errors
+  if (error.severity === 'critical') {
+    try {
+      const { EmailService } = await import('../auth/authService');
+      const emailService = new EmailService();
+      const adminEmail = process.env['ADMIN_EMAIL'] || process.env['SUPPORT_EMAIL'];
+      
+      if (adminEmail) {
+        const errorDetails = {
+          message: error.message,
+          source: error.source,
+          userId: error.userId || 'N/A',
+          path: error.meta?.path || 'N/A',
+          method: error.meta?.method || 'N/A',
+          timestamp: new Date().toISOString(),
+        };
+
+        await emailService.sendEmail(
+          adminEmail,
+          `🚨 Critical Error Alert: ${error.message.substring(0, 50)}`,
+          `
+            <h2>Critical Error Alert</h2>
+            <p><strong>Message:</strong> ${error.message}</p>
+            <p><strong>Source:</strong> ${error.source}</p>
+            <p><strong>User ID:</strong> ${errorDetails.userId}</p>
+            <p><strong>Path:</strong> ${errorDetails.path}</p>
+            <p><strong>Method:</strong> ${errorDetails.method}</p>
+            <p><strong>Time:</strong> ${errorDetails.timestamp}</p>
+            ${error.stack ? `<pre style="background: #f5f5f5; padding: 10px; overflow-x: auto;">${error.stack}</pre>` : ''}
+            <p><a href="${process.env['APP_URL'] || 'https://selflyx.com'}/admin">View in Admin Dashboard</a></p>
+          `
+        );
+      }
+    } catch {
+      // Silently fail if email sending fails
+    }
+  }
 }
 
 /**
@@ -551,6 +589,21 @@ export async function getBusinessMetrics(range: RangeKey) {
     `
   );
 
+  // ✅ A3: Get revenue trends over time (for charts)
+  const revenueTrends = await db.query(
+    `
+    SELECT
+      DATE_TRUNC('day', "createdAt") AS date,
+      COALESCE(SUM(amount), 0)::int AS revenue,
+      COUNT(*)::int AS transactions
+    FROM "stripe_payments"
+    WHERE "createdAt" >= $1 AND status = 'succeeded'
+    GROUP BY date
+    ORDER BY date ASC
+    `,
+    [since]
+  );
+
   // Calculate growth rate
   const currentUsers = userMetrics.rows[0]?.new_users || 0;
   const prevUsers = prevUserMetrics.rows[0]?.new_users || 0;
@@ -570,6 +623,10 @@ export async function getBusinessMetrics(range: RangeKey) {
   const totalRevenue = revenueMetrics.rows[0]?.total_revenue || 0;
   const totalUsers = userMetrics.rows[0]?.total_users || 1;
   const arpu = (totalRevenue / totalUsers / 100).toFixed(2);
+
+  // ✅ A3: Calculate ARPC (Average Revenue Per Creator) - only for paid creators
+  const paidCreators = userMetrics.rows[0]?.paid_users || 0;
+  const arpc = paidCreators > 0 ? (totalRevenue / paidCreators / 100).toFixed(2) : '0.00';
 
   // Calculate satisfaction score
   const positive = satisfactionMetrics.rows[0]?.positive || 0;
@@ -599,6 +656,7 @@ export async function getBusinessMetrics(range: RangeKey) {
       mrr: mrrMetrics.rows[0]?.mrr_cents || 0,
       activeSubscriptions: mrrMetrics.rows[0]?.active_subscriptions || 0,
       arpu: `$${arpu}`,
+      arpc: `$${arpc}`, // ✅ A3: Average Revenue Per Creator
     },
     conversion: {
       signups,
@@ -623,5 +681,6 @@ export async function getBusinessMetrics(range: RangeKey) {
     },
     acquisitionSources: acquisitionBySource.rows,
     planDistribution: planDistribution.rows,
+    revenueTrends: revenueTrends.rows, // ✅ A3: Revenue trends for charts
   };
 }

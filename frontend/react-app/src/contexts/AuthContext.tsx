@@ -81,13 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Session timeout warning
+  // ✅ F2: Session timeout warning with countdown and extend button
   useEffect(() => {
     if (state.status !== 'authenticated') return;
 
     // Check session expiry (7 days default, 30 days if rememberMe)
     const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // Default 7 days
     const WARNING_TIME = 5 * 60 * 1000; // Warn 5 minutes before expiry
+    let modalElement: HTMLElement | null = null;
+    let countdownInterval: NodeJS.Timeout | null = null;
 
     const checkSession = () => {
       // Track last activity
@@ -100,14 +102,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const timeSinceActivity = Date.now() - parseInt(lastActivity);
       const timeUntilExpiry = SESSION_DURATION - timeSinceActivity;
 
-      if (timeUntilExpiry < WARNING_TIME && timeUntilExpiry > 0) {
-        // Show warning toast
+      if (timeUntilExpiry < WARNING_TIME && timeUntilExpiry > 0 && !modalElement) {
+        // Auto-save user work before session expires
+        try {
+          // Save any form data in localStorage
+          const formData = document.querySelectorAll('input, textarea, select');
+          formData.forEach((el: any) => {
+            if (el.value && el.id) {
+              localStorage.setItem(`autosave_${el.id}`, el.value);
+            }
+          });
+        } catch {
+          // Silently fail
+        }
+
+        // Show warning modal with countdown
         const minutesLeft = Math.ceil(timeUntilExpiry / (60 * 1000));
-        showToast(
-          `Your session will expire in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}. Please save your work.`,
-          'warning',
-          10000 // Show for 10 seconds
-        );
+        const secondsLeft = Math.floor((timeUntilExpiry % (60 * 1000)) / 1000);
+        
+        modalElement = document.createElement('div');
+        modalElement.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
+        modalElement.innerHTML = `
+          <div class="bg-bg-secondary border border-border-default rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-text-primary mb-2">Session Expiring Soon</h3>
+            <p class="text-text-secondary mb-4">
+              Your session will expire in <strong id="countdown">${minutesLeft}:${secondsLeft.toString().padStart(2, '0')}</strong>.
+              Please save your work.
+            </p>
+            <div class="flex gap-2">
+              <button id="extend-btn" class="flex-1 px-4 py-2 bg-accent-primary text-white rounded hover:opacity-90">
+                Extend Session
+              </button>
+              <button id="dismiss-btn" class="px-4 py-2 bg-bg-tertiary text-text-primary rounded hover:bg-bg-elevated">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modalElement);
+
+        // Update countdown
+        const countdownEl = modalElement.querySelector('#countdown');
+        countdownInterval = setInterval(() => {
+          const newTimeLeft = SESSION_DURATION - (Date.now() - parseInt(lastActivity));
+          if (newTimeLeft <= 0) {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (modalElement) modalElement.remove();
+            modalElement = null;
+            refresh(); // This will log out if session expired
+            return;
+          }
+          const mins = Math.ceil(newTimeLeft / (60 * 1000));
+          const secs = Math.floor((newTimeLeft % (60 * 1000)) / 1000);
+          if (countdownEl) {
+            countdownEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+          }
+        }, 1000);
+
+        // Extend session button
+        modalElement.querySelector('#extend-btn')?.addEventListener('click', () => {
+          localStorage.setItem('lastActivity', Date.now().toString());
+          if (countdownInterval) clearInterval(countdownInterval);
+          if (modalElement) modalElement.remove();
+          modalElement = null;
+          showToast('Session extended', 'success');
+        });
+
+        // Dismiss button
+        modalElement.querySelector('#dismiss-btn')?.addEventListener('click', () => {
+          if (countdownInterval) clearInterval(countdownInterval);
+          if (modalElement) modalElement.remove();
+          modalElement = null;
+        });
+      } else if (timeUntilExpiry >= WARNING_TIME && modalElement) {
+        // Remove modal if time is extended
+        if (countdownInterval) clearInterval(countdownInterval);
+        if (modalElement) modalElement.remove();
+        modalElement = null;
       }
     };
 
@@ -129,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('keydown', updateActivity);
       window.removeEventListener('scroll', updateActivity);
     };
-  }, [state.status]);
+  }, [state.status, refresh]);
 
   const value = useMemo(() => ({ state, refresh, logout }), [state]);
 

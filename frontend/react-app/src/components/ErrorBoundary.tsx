@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
+import { apiFetch } from '@/lib/api';
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,38 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    
+    // Auto-report frontend errors to backend
+    this.reportError(error, errorInfo).catch(() => {
+      // Silently fail if reporting fails
+    });
+  }
+
+  private async reportError(error: Error, errorInfo: any) {
+    try {
+      // Get userId from localStorage or session if available
+      const userId = localStorage.getItem('userId') || undefined;
+      
+      await apiFetch('/api/admin/errors/log', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: error.message || 'Unknown error',
+          stack: error.stack || errorInfo.componentStack || '',
+          source: 'frontend',
+          severity: 'error',
+          userId,
+          meta: {
+            name: error.name,
+            componentStack: errorInfo.componentStack,
+            errorBoundary: true,
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+          },
+        }),
+      });
+    } catch {
+      // Silently fail - don't break the app if error reporting fails
+    }
   }
 
   render() {

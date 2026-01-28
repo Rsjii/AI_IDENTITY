@@ -262,7 +262,7 @@ export function OnboardingQuizPage() {
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent-primary/10 text-accent-primary text-xs font-medium">
                   {currentStep + 1}
                 </span>
-                <span>of {TOTAL_STEPS} questions</span>
+                <span>Question {currentStep + 1} of {TOTAL_STEPS}</span>
               </span>
               <span className="flex items-center gap-1">
                 {currentStep > 0 && (
@@ -314,15 +314,33 @@ export function OnboardingQuizPage() {
             )}
 
             <div className="flex justify-between items-center">
-              <Button
-                variant="ghost"
-                onClick={prev}
-                disabled={currentStep === 0 || isAnimating}
-                className="text-text-secondary hover:text-text-primary transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+              <div className="flex items-center gap-2">
+                {currentStep > 0 && (
+                  <Button
+                    variant="ghost"
+                    onClick={prev}
+                    disabled={isAnimating}
+                    className="text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                )}
+                {currentStep < TOTAL_STEPS - 1 && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (confirm('Skip this question? You can come back to it later.')) {
+                        next();
+                      }
+                    }}
+                    disabled={isAnimating}
+                    className="text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    Skip
+                  </Button>
+                )}
+              </div>
 
               <div className="flex items-center gap-4">
                 {currentStep === TOTAL_STEPS - 1 && (
