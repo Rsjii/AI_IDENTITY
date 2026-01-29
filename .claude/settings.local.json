@@ -4,7 +4,8 @@
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(wc:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git -C \"c:\\\\Users\\\\rsji1\\\\OneDrive\\\\डेस्कटॉप\\\\AI_IDENTITY-1\" log --oneline)"
     ]
   }
 }
