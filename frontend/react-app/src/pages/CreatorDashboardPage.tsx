@@ -554,7 +554,7 @@ export function CreatorDashboardPage() {
                     </div>
                   </div>
                 </div>
-                {data?.earnings && data.earnings.length > 0 && (
+                {data?.earnings && data.earnings.length > 0 ? (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data.earnings.slice(-10)}>
@@ -571,6 +571,19 @@ export function CreatorDashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                ) : (
+                  <EmptyState
+                    title="No earnings yet"
+                    description="Your earnings from pay-per-chat will appear here once users start paying for premium answers."
+                    action={
+                      <Button
+                        variant="outline"
+                        onClick={() => window.location.href = '/settings?tab=payment'}
+                      >
+                        Configure Payment Settings
+                      </Button>
+                    }
+                  />
                 )}
               </div>
             )}

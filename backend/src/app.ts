@@ -121,11 +121,28 @@ app.use('/api/ext', (req, res, next) => {
 
 // === WIDGET CORS (public embed on external websites) ===
 app.use('/api/widget', (req, res, next) => {
-  // Public endpoint: allow ANY origin, but NO credentials
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = String(req.headers.origin || '');
+  const allowedOrigins = config.cors.allowedOrigins;
+  const allowCredentials = config.cors.allowCredentials;
+  
+  // If specific origins are configured, use them; otherwise allow all
+  if (allowedOrigins.length > 0) {
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', allowCredentials ? 'true' : 'false');
+    } else {
+      // Origin not allowed
+      return res.status(403).json({ error: 'Origin not allowed' });
+    }
+  } else {
+    // Default: allow any origin (public widget)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Credentials', 'false');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();

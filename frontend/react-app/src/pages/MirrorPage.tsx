@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { EmptyState } from '@/components/EmptyState';
 
 type MirrorHistoryItem = {
   id: string;
@@ -215,7 +216,10 @@ export function MirrorPage({
           </CardHeader>
           <CardContent>
             {history.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No test chats yet.</div>
+              <EmptyState
+                title="No test chats yet"
+                description="Start testing your AI by sending a message above. Test chats don't count toward your plan limits."
+              />
             ) : (
               <div className="space-y-3">
                 {history.map((h) => (

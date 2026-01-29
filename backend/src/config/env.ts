@@ -99,6 +99,14 @@ export const config = {
   // ✅ Admin analytics enabled in all environments (protected by admin email check)
   enableAdminAnalytics: true,
   
+  // CORS Configuration
+  cors: {
+    // Allowed origins for widget embedding (comma-separated)
+    allowedOrigins: process.env['CORS_ALLOWED_ORIGINS']?.split(',').map(o => o.trim()) || [],
+    // Whether to allow credentials for widget requests
+    allowCredentials: process.env['CORS_ALLOW_CREDENTIALS'] === 'true',
+  },
+  
   // Rate Limiting
   rateLimit: {
     windowMs: Number(process.env['RATE_LIMIT_WINDOW_MS']), // 15 minutes

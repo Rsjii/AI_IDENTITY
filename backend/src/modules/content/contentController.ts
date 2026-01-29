@@ -396,13 +396,9 @@ export async function upload(req: Request, res: Response) {
   if (!file) return res.status(400).json({ error: 'No file provided' });
 
   try {
-    // ✅ Validate file size (max 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      return res.status(400).json({ error: 'File too large. Max 50MB.' });
-    }
-
-    // ✅ Validate file type
+    // ✅ Enhanced file validation using sanitizer
+    const { validateFileUpload } = await import('../../middleware/sanitizer');
+    
     const allowedMimeTypes = [
       'application/pdf',
       'application/msword',
@@ -415,15 +411,15 @@ export async function upload(req: Request, res: Response) {
       'audio/mp4',
     ];
     const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.mp3', '.wav', '.m4a'];
-
-    const fileExt = '.' + (file.originalname.split('.').pop() || '').toLowerCase();
-    const isValidMime = allowedMimeTypes.includes(file.mimetype);
-    const isValidExt = allowedExtensions.includes(fileExt);
-
-    if (!isValidMime && !isValidExt) {
-      return res.status(400).json({
-        error: 'Invalid file type. Only PDF, TXT, DOCX, MP3, WAV, M4A allowed.',
-      });
+    
+    const validation = validateFileUpload(file, {
+      maxSize: 25 * 1024 * 1024, // 25MB (reduced from 50MB for security)
+      allowedMimeTypes,
+      allowedExtensions,
+    });
+    
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
 
     const title = String((req as any).body?.title || '').trim() || undefined;

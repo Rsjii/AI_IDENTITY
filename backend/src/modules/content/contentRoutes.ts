@@ -3,6 +3,7 @@ import multer from 'multer';
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { validateCSRF } from '../../middleware/csrf';
 import { sanitizeInput } from '../../middleware/validation';
+import { enhancedSanitize } from '../../middleware/sanitizer';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { paste, youtube, upload, list, remove, importYoutubeChannel, importTwitterHandle } from './contentController';
 import twitterAuthRoutes from './twitterAuthRoutes';
@@ -14,8 +15,8 @@ router.use(requireJWTFromCookie);
 
 router.get('/list', asyncHandler(list));
 
-router.post('/paste', sanitizeInput, validateCSRF, asyncHandler(paste));
-router.post('/youtube', sanitizeInput, validateCSRF, asyncHandler(youtube));
+router.post('/paste', enhancedSanitize(), sanitizeInput, validateCSRF, asyncHandler(paste));
+router.post('/youtube', enhancedSanitize(), sanitizeInput, validateCSRF, asyncHandler(youtube));
 // ✅ Multer must come BEFORE validateCSRF (multer parses FormData first)
 router.post('/upload', uploadMem.single('file'), validateCSRF, asyncHandler(upload));
 router.delete('/:id', sanitizeInput, validateCSRF, asyncHandler(remove));
