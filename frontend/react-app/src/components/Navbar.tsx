@@ -66,7 +66,7 @@ export function Navbar() {
             {/* Mobile menu button */}
             <button
               type="button"
-              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent transition-colors"
+              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent transition-colors min-h-[44px] min-w-[44px]"
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
@@ -137,7 +137,7 @@ function MobileNavLink({ to, children, onClick }: { to: string; children: React.
     <Link
       to={to}
       onClick={onClick}
-      className="h-11 px-4 flex items-center rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      className="h-11 px-4 flex items-center rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors min-h-[44px]"
     >
       {children}
     </Link>

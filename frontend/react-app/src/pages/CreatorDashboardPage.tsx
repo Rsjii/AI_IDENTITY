@@ -322,7 +322,7 @@ export function CreatorDashboardPage() {
         {/* Top Row: 4 Large Metric Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {/* Card 1: Total Conversations */}
-          <Card className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all cursor-pointer">
+          <Card className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all cursor-pointer card-hover">
             <CardContent className="pt-6">
               <div className="flex items-start justify-between mb-4">
                 <MessageSquare className="h-8 w-8 text-accent-primary" />
@@ -406,7 +406,7 @@ export function CreatorDashboardPage() {
           </Card>
 
           {/* Card 4: User Satisfaction */}
-          <Card className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all cursor-pointer">
+          <Card className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all cursor-pointer card-hover">
             <CardContent className="pt-6">
               <div className="flex items-start justify-between mb-4">
                 <Star className="h-8 w-8 text-accent-primary" />

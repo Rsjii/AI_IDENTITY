@@ -202,11 +202,13 @@ export function PublicChatPage() {
             mirrorRunId: d.mirrorRunId,
           };
           setMsgs((x) => [...x, aiMsg]);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Chat error:', error);
+          const { getUserFriendlyError } = await import('@/lib/errorMessages');
+          const friendlyError = getUserFriendlyError(error);
           const errorMsg: Msg = {
             role: 'assistant',
-            content: 'Sorry, I encountered an error. Please try again.',
+            content: friendlyError,
             timestamp: new Date(),
             id: `msg_error_${Date.now()}`
           };
@@ -280,7 +282,7 @@ export function PublicChatPage() {
       {/* Chat Area */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6"
+        className="flex-1 overflow-y-auto px-4 py-6 pb-24 md:pb-6"
         style={{ scrollBehavior: 'smooth' }}
       >
         <div className="max-w-4xl mx-auto space-y-4">
@@ -493,7 +495,7 @@ export function PublicChatPage() {
             <button
               onClick={send}
               disabled={!text.trim() || typing}
-              className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center gap-2 font-medium"
+              className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center gap-2 font-medium min-h-[44px] min-w-[44px]"
             >
               {typing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

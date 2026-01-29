@@ -32,6 +32,7 @@ export function SettingsPage() {
   const [timeZone, setTimeZone] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
   
   // Social links
@@ -280,6 +281,8 @@ export function SettingsPage() {
         }),
       });
       await refresh();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setError(e.message || 'Failed to save.');
     } finally {
@@ -290,6 +293,7 @@ export function SettingsPage() {
   const onSavePaymentSettings = async () => {
     setSaving(true);
     setError('');
+    setSaveSuccess(false);
     try {
       const newConfig = {
         enablePayments,
@@ -305,6 +309,8 @@ export function SettingsPage() {
       });
       await refresh();
       setError('');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setError(e.message || 'Failed to save payment settings.');
     } finally {
@@ -532,6 +538,11 @@ export function SettingsPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving…
                   </>
+                ) : saveSuccess ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                    Saved!
+                  </>
                 ) : (
                   'Save changes'
                 )}
@@ -682,6 +693,11 @@ export function SettingsPage() {
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
                     </>
                   ) : (
                     'Save payment settings'

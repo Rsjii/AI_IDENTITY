@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
 import { Loader2, CheckCircle2, Sparkles } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -113,6 +114,15 @@ const CheckoutForm: React.FC<{
           });
           setPaymentSuccess(true);
           setMessage('Payment succeeded! Your full answer is ready 🎉');
+          
+          // ✅ Confetti animation on payment success
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#8B5CF6', '#6366F1', '#EC4899', '#F59E0B'],
+          });
+          
           setTimeout(() => {
             // ✅ Pass the reply to onSuccess callback
             onSuccess(result.reply);
