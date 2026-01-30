@@ -12,7 +12,7 @@ import passport from 'passport';
 import { config, isProd, isDev } from './config/env';
 import { logger } from './config/logger';
 import { db } from './config/database';
-import { pool } from './config/db';
+import { sessionPool } from './config/db';
 import { errorHandlerMiddleware } from './middleware/errorHandler';
 import { globalRateLimit } from './middleware/rateLimit';
 import { extractJWTFromCookie } from './middleware/jwtCookie';
@@ -178,10 +178,14 @@ app.set('trust proxy', 1);
 const forceInsecureCookies = process.env.FORCE_INSECURE_COOKIES === 'true';
 const sessionCookieSecure = isProd && !forceInsecureCookies;
 
+// ✅ Use separate session pool with more lenient timeout settings
+// This prevents session operations from blocking the main database pool
 const sessionStore = new PgSession({
-  pool: pool,
+  pool: sessionPool,
   tableName: 'session',
   createTableIfMissing: true,
+  // ✅ Add error handling - connect-pg-simple will handle retries automatically
+  // The separate pool with longer timeouts prevents timeout errors
 });
 
 app.use(session({

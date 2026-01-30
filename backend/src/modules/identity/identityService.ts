@@ -82,6 +82,8 @@ export function buildIdentityPrompt(identityJson: IdentityJson): string {
     styleAnchors = {},
   } = identityJson;
 
+  const normalizedLanguage = defaults.language || 'en';
+
   // Build compact prompt (token-optimized)
   const lines: string[] = [];
 
@@ -90,7 +92,7 @@ export function buildIdentityPrompt(identityJson: IdentityJson): string {
 
   // Defaults as compact key-value (1 line)
   const styleSettings: string[] = [];
-  if (defaults.language) styleSettings.push(`lang:${defaults.language}`);
+  if (normalizedLanguage) styleSettings.push(`lang:${normalizedLanguage}`);
   if (defaults.formality) styleSettings.push(`tone:${defaults.formality}`);
   if (defaults.directness) styleSettings.push(`direct:${defaults.directness}`);
   if (defaults.emoji) styleSettings.push(`emoji:${defaults.emoji}`);
@@ -144,6 +146,8 @@ export function buildIdentityPromptVerbose(identityJson: IdentityJson): string {
     styleAnchors = {},
   } = identityJson;
 
+  const normalizedLanguage = defaults.language || 'en';
+
   const parts: string[] = [];
 
   // Core identity
@@ -151,7 +155,7 @@ export function buildIdentityPromptVerbose(identityJson: IdentityJson): string {
   parts.push(`Your role: ${primaryUse}`);
 
   // Defaults
-  if (defaults.language) parts.push(`Language: ${defaults.language}`);
+  if (normalizedLanguage) parts.push(`Language: ${normalizedLanguage}`);
   if (defaults.formality) parts.push(`Formality: ${defaults.formality}`);
   if (defaults.directness) parts.push(`Directness: ${defaults.directness}`);
   if (defaults.emoji) parts.push(`Emoji usage: ${defaults.emoji}`);

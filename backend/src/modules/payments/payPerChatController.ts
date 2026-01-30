@@ -82,6 +82,30 @@ export async function confirmPayment(req: Request, res: Response) {
       return res.status(400).json({ error: 'Payment not completed' });
     }
 
+    // ✅ Validate metadata to prevent spoofing (source of truth = Stripe)
+    const metaCreatorId = paymentIntent.metadata?.creatorId || '';
+    const metaSessionId = paymentIntent.metadata?.sessionId || '';
+    const metaTier = paymentIntent.metadata?.tier || '';
+
+    if (metaCreatorId && metaCreatorId !== creatorId) {
+      return res.status(400).json({ error: 'Creator mismatch' });
+    }
+    if (metaSessionId && sessionId && metaSessionId !== sessionId) {
+      return res.status(400).json({ error: 'Session mismatch' });
+    }
+    if (metaTier && metaTier !== tier) {
+      return res.status(400).json({ error: 'Tier mismatch' });
+    }
+
+    // ✅ Idempotency: avoid duplicate records
+    const existing = await db.query(
+      `SELECT id FROM "stripe_payments" WHERE "stripePaymentIntentId"=$1 LIMIT 1`,
+      [paymentIntentId]
+    );
+    if (existing.rows[0]) {
+      return res.json({ success: true, reply: '' });
+    }
+
     // ✅ Trust Stripe amount, not client
     const amount = paymentIntent.amount;
 
@@ -92,8 +116,8 @@ export async function confirmPayment(req: Request, res: Response) {
 
     // Record payment
     const payment = await stripePaymentQueries.create({
-      creatorId,
-      sessionId: sessionId || null,
+      creatorId: metaCreatorId || creatorId,
+      sessionId: metaSessionId || sessionId || null,
       amount,
       status: 'succeeded',
       stripePaymentIntentId: paymentIntentId,
@@ -122,26 +146,28 @@ export async function confirmPayment(req: Request, res: Response) {
 
     // Get the last user message from the session to regenerate reply
     let fullReply = '';
-    if (sessionId) {
+    if (metaSessionId || sessionId) {
       try {
         // Get the last user message
-        const messages = await chatMessageQueries.listForSession(sessionId);
+        const resolvedSessionId = metaSessionId || sessionId || '';
+        const messages = await chatMessageQueries.listForSession(resolvedSessionId);
         const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
         
         if (lastUserMessage) {
           // Regenerate full reply after payment
-          const creator = await userQueries.findById(creatorId);
+          const resolvedCreatorId = metaCreatorId || creatorId;
+          const creator = await userQueries.findById(resolvedCreatorId);
           if (creator) {
-            const result = await generateMirrorReplyWithLogging(creatorId, 'public_chat', lastUserMessage.content, {
+            const result = await generateMirrorReplyWithLogging(resolvedCreatorId, 'public_chat', lastUserMessage.content, {
               platform: 'web',
-              sessionId,
+              sessionId: resolvedSessionId,
               visitorId,
             });
             fullReply = result.reply || '';
             
             // Save the full reply if not already saved
             if (fullReply) {
-              await chatMessageQueries.add({ sessionId, role: 'assistant', content: fullReply });
+              await chatMessageQueries.add({ sessionId: resolvedSessionId, role: 'assistant', content: fullReply });
             }
           }
         }

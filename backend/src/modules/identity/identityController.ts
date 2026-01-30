@@ -468,7 +468,7 @@ export const getTrainingStatus = async (req: AuthenticatedRequest, res: Response
       });
     }
 
-    const { identityQueries, identityVersionQueries } = await import('../../config/database');
+    const { identityQueries, identityVersionQueries, db, userQueries } = await import('../../config/database');
     const identity = await identityQueries.findByUserId(req.user.id);
     
     if (!identity) {
@@ -497,6 +497,28 @@ export const getTrainingStatus = async (req: AuthenticatedRequest, res: Response
     }
 
     // If identity and version exist, training is complete
+    // ✅ Send AI-ready email once (event-based idempotency)
+    try {
+      const sentCheck = await db.query(
+        `SELECT 1 FROM "Event" WHERE "userId"=$1 AND "type"='ai_ready_email_sent' LIMIT 1`,
+        [req.user.id]
+      );
+      if (!sentCheck.rows[0]) {
+        const user = await userQueries.findById(req.user.id);
+        if (user?.email) {
+          const { EmailService } = await import('../auth/authService');
+          const emailService = new EmailService();
+          await emailService.sendAIReadyEmail(user.email, user.name || user.handle || 'Creator');
+          await db.query(
+            `INSERT INTO "Event" (id, "userId", "type", "meta") VALUES ($1, $2, $3, $4)`,
+            [`evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`, req.user.id, 'ai_ready_email_sent', JSON.stringify({ source: 'training_status' })]
+          );
+        }
+      }
+    } catch (err: any) {
+      logger.warn('AI ready email send failed:', err?.message || err);
+    }
+
     return res.json({
       status: 'ready',
       progress: 100,

@@ -65,12 +65,23 @@ export const QUERY_DEFAULTS = {
 export const DB_POOL_CONFIG = {
   max: process.env.NODE_ENV === 'production' ? 20 : 5, // ✅ Increase for production (single instance can handle 20)
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  acquireTimeoutMillis: 10000,
-  createTimeoutMillis: 10000,
+  connectionTimeoutMillis: 30000, // ✅ Increased from 10s to 30s to handle slow connections
+  acquireTimeoutMillis: 30000, // ✅ Increased from 10s to 30s
+  createTimeoutMillis: 30000, // ✅ Increased from 10s to 30s
   retryDelayMs: 1000,
   retryAttempts: 3,
   // ✅ Additional Supabase-specific settings
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+} as const;
+
+// ✅ Separate pool config for session store (more lenient timeouts)
+export const SESSION_POOL_CONFIG = {
+  max: 3, // Smaller pool for sessions
+  idleTimeoutMillis: 60000, // 60 seconds
+  connectionTimeoutMillis: 30000, // 30 seconds
+  acquireTimeoutMillis: 30000, // 30 seconds
+  createTimeoutMillis: 30000, // 30 seconds
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 } as const;

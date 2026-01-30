@@ -199,6 +199,39 @@ export async function stripeWebhook(req: Request, res: Response) {
         logger.error(`[Stripe] Error processing customer.subscription.created:`, err.message);
       }
     }
+    // Handle customer.subscription.updated - subscription updated
+    else if (event.type === 'customer.subscription.updated') {
+      const subscription: any = event.data.object;
+      const customerId = subscription?.customer;
+      const status = subscription?.status;
+      
+      try {
+        const customerResult = await db.query(
+          `SELECT "userId" FROM "stripe_customers" WHERE "stripeCustomerId"=$1 LIMIT 1`,
+          [customerId]
+        );
+        
+        if (customerResult.rows[0]?.userId) {
+          const userId = customerResult.rows[0].userId;
+          
+          if (status === 'active') {
+            // Subscription is active - keep current tier or update if needed
+            logger.info(`[Stripe] Subscription updated (active) for user ${userId}:`, {
+              subscriptionId: subscription?.id,
+              status,
+            });
+          } else if (status === 'canceled' || status === 'unpaid' || status === 'past_due') {
+            // Downgrade to free tier
+            await db.query(`UPDATE "User" SET "planTier"='free' WHERE id=$1`, [userId]);
+            logger.info(`[Stripe] ✅ Downgraded user ${userId} to free tier after subscription update (status: ${status})`);
+          }
+        } else {
+          logger.warn(`[Stripe] Could not find user for customer ${customerId} in subscription.updated`);
+        }
+      } catch (err: any) {
+        logger.error(`[Stripe] Error processing customer.subscription.updated:`, err.message);
+      }
+    }
     // Handle invoice.payment_failed - payment failed
     else if (event.type === 'invoice.payment_failed') {
       const invoice: any = event.data.object;
@@ -232,6 +265,24 @@ export async function stripeWebhook(req: Request, res: Response) {
       // Optional: You can downgrade user or send notification here
       // For now, just log it
     }
+    // Handle invoice.payment_succeeded - subscription payment succeeded
+    else if (event.type === 'invoice.payment_succeeded') {
+      const invoice: any = event.data.object;
+      const customerId = invoice?.customer;
+      const subscriptionId = invoice?.subscription;
+      const amountPaid = invoice?.amount_paid;
+      
+      logger.info(`[Stripe] ✅ Invoice payment succeeded:`, {
+        invoiceId: invoice?.id,
+        customerId,
+        subscriptionId,
+        amountPaid,
+      });
+      
+      // Optional: Update subscription status or send confirmation
+      // The subscription should already be active from subscription.created event
+      // You can add additional logic here if needed (e.g., send confirmation email)
+    }
     // Handle customer.subscription.deleted - subscription cancelled
     else if (event.type === 'customer.subscription.deleted') {
       const subscription: any = event.data.object;
@@ -260,12 +311,19 @@ export async function stripeWebhook(req: Request, res: Response) {
         logger.error(`[Stripe] Error downgrading user after cancellation:`, err.message);
       }
     }
-    // ✅ ADD: Handle payment_intent.succeeded for pay-per-chat
+    // ✅ Handle payment_intent.succeeded for pay-per-chat
     else if (event.type === 'payment_intent.succeeded') {
       const paymentIntent: any = event.data.object;
       const creatorId = paymentIntent.metadata?.creatorId;
       const sessionId = paymentIntent.metadata?.sessionId;
       const amount = paymentIntent.amount;
+
+      logger.info(`[Stripe] Payment intent succeeded: ${paymentIntent.id}`, {
+        amount,
+        creatorId,
+        sessionId,
+        hasMetadata: !!(creatorId && sessionId),
+      });
 
       if (creatorId && sessionId) {
         try {
@@ -293,10 +351,21 @@ export async function stripeWebhook(req: Request, res: Response) {
             [sessionId]
           );
 
-          logger.info(`[Stripe] ✅ Pay-per-chat payment completed: ${paymentIntent.id}, Creator: ${creatorId}, Session: ${sessionId}`);
+          logger.info(`[Stripe] ✅ Pay-per-chat payment completed: ${paymentIntent.id}, Creator: ${creatorId}, Session: ${sessionId}, Amount: ${amount} cents`);
         } catch (err: any) {
-          logger.error(`[Stripe] Error processing pay-per-chat payment:`, err.message);
+          logger.error(`[Stripe] Error processing pay-per-chat payment:`, {
+            error: err.message,
+            paymentIntentId: paymentIntent.id,
+            creatorId,
+            sessionId,
+          });
         }
+      } else {
+        logger.warn(`[Stripe] Payment intent succeeded but missing metadata (test event?):`, {
+          paymentIntentId: paymentIntent.id,
+          amount,
+          metadata: paymentIntent.metadata,
+        });
       }
     }
     else {

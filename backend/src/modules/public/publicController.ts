@@ -13,6 +13,11 @@ const chatSchema = z.object({
   sessionId: z.string().optional(),
 });
 
+const historySchema = z.object({
+  sessionId: z.string().min(1),
+  visitorId: z.string().min(1),
+});
+
 export async function getCreator(req: Request, res: Response) {
   const slug = String(req.params.slug || '').trim().replace(/^@/, ''); // Remove @ prefix if present
   const u = await userQueries.findBySlugOrHandle(slug);
@@ -327,6 +332,39 @@ export async function publicChat(req: Request, res: Response) {
     reply: result.reply || '',
     decision: result.decision,
     mirrorRunId: result.mirrorRunId,
+  });
+}
+
+export async function publicHistory(req: Request, res: Response) {
+  const { sessionId, visitorId } = historySchema.parse({
+    sessionId: req.query.sessionId,
+    visitorId: req.query.visitorId,
+  });
+
+  const session = await chatSessionQueries.findById(sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  if (!session.visitorId || session.visitorId !== visitorId) {
+    return res.status(403).json({ error: 'Session access denied' });
+  }
+
+  const messages = await chatMessageQueries.listForSession(sessionId);
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recentMessages = messages.filter((m: any) => {
+    const createdAt = new Date(m.createdAt).getTime();
+    return Number.isNaN(createdAt) ? true : createdAt >= cutoff;
+  });
+
+  return res.json({
+    success: true,
+    sessionId,
+    messages: recentMessages.map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt,
+    })),
   });
 }
 

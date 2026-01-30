@@ -59,6 +59,8 @@ export function OnboardingContentPage() {
   const totalWords = items.reduce((sum, item) => sum + (item.wordCount || 0), 0);
   const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
   const estimatedHours = Math.ceil(totalWords / 500);
+  const minimumItemsRequired = 3;
+  const hasMinimumItems = totalFiles >= minimumItemsRequired;
 
   // Quality score calculation
   const getQualityTier = () => {
@@ -577,12 +579,20 @@ export function OnboardingContentPage() {
               >
                 Back
               </Button>
-              <Button
-                onClick={() => nav('/onboarding/plan')}
-                className="bg-accent-gradient hover:opacity-90 text-white px-8"
-              >
-                Continue
-              </Button>
+              <div className="flex flex-col items-end gap-2">
+                <Button
+                  onClick={() => nav('/onboarding/plan')}
+                  className="bg-accent-gradient hover:opacity-90 text-white px-8"
+                  disabled={!hasMinimumItems}
+                >
+                  Continue
+                </Button>
+                {!hasMinimumItems && (
+                  <span className="text-xs text-text-tertiary">
+                    Add at least {minimumItemsRequired} items to continue
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

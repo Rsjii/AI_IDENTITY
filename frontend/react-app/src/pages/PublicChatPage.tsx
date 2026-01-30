@@ -44,6 +44,7 @@ function shouldShowTimestamp(current: Date, previous?: Date): boolean {
 export function PublicChatPage() {
   const { slug = '' } = useParams();
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
+  const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
   const [creator, setCreator] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [text, setText] = useState('');
@@ -73,6 +74,27 @@ export function PublicChatPage() {
       .catch(() => setCreator(null));
   }, [slug]);
 
+  // Load previous session history if available
+  useEffect(() => {
+    const savedSessionId = sessionKey ? localStorage.getItem(sessionKey) : null;
+    if (!savedSessionId) return;
+
+    fetch(`/api/public/history?sessionId=${encodeURIComponent(savedSessionId)}&visitorId=${encodeURIComponent(visitorId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d?.success) return;
+        setSessionId(d.sessionId || savedSessionId);
+        const historyMsgs: Msg[] = (d.messages || []).map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.createdAt ? new Date(m.createdAt) : undefined,
+        }));
+        setMsgs(historyMsgs);
+      })
+      .catch(() => {});
+  }, [sessionKey, visitorId]);
+
   // Auto-scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,7 +120,11 @@ export function PublicChatPage() {
         body: JSON.stringify({ slug, message: m, visitorId, sessionId: sessionId || undefined }),
       });
       const d = await r.json();
-      setSessionId(d.sessionId || sessionId);
+      const newSessionId = d.sessionId || sessionId;
+      setSessionId(newSessionId);
+      if (newSessionId && sessionKey) {
+        localStorage.setItem(sessionKey, newSessionId);
+      }
       
       // Check if payment is required
       if (d.requiresPayment) {

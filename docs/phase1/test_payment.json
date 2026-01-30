@@ -1,0 +1,15 @@
+{
+    "amount": 5000,
+    "currency": "inr",
+    "payment_method": "pm_card_visa",
+    "confirm": true,
+    "payment_method_options": {
+      "card": {
+        "request_three_d_secure": "never"
+      }
+    },
+    "metadata": {
+      "creatorId": "test_creator_123",
+      "sessionId": "test_session_456"
+    }
+  }

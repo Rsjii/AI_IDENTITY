@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { config } from './env';
-import { DB_RETRY, DB_POOL_CONFIG } from './constants';
+import { DB_RETRY, DB_POOL_CONFIG, SESSION_POOL_CONFIG } from './constants';
 import logger from './logger';
 
 // Create a connection pool with better settings
@@ -148,5 +148,40 @@ if (config.adminAnalyticsDbUrl && config.adminAnalyticsDbUrl !== config.database
 // Export admin analytics DB (uses prod DB when running locally, falls back to main pool if not set)
 export const adminAnalyticsDb = adminAnalyticsPool || pool;
 
+// ✅ Separate pool for session store with more lenient timeout settings
+// This prevents session operations from blocking the main pool
+const sessionPool = new Pool({
+  connectionString: config.databaseUrl || '',
+  ssl: {
+    rejectUnauthorized: false
+  },
+  ...SESSION_POOL_CONFIG,
+  statement_timeout: 30000,
+  query_timeout: 30000,
+});
+
+// Error handler for session pool
+sessionPool.on('error', (err: Error) => {
+  const errorCode = (err as any).code || 'NO_CODE';
+  const errorMessage = err.message || 'Unknown error';
+  
+  // Log session pool errors as warnings (non-critical)
+  if (errorCode === 'ENOTFOUND' || errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED') {
+    logger.warn('[SESSION_POOL_ERROR] Session pool connection error (non-critical):', {
+      error: {
+        name: err.name,
+        message: errorMessage,
+        code: errorCode,
+      },
+      note: 'Session operations may be delayed but will retry automatically.',
+    });
+  } else {
+    logger.error('[SESSION_POOL_ERROR] Unexpected session pool error:', {
+      err,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 export default db;
-export { pool }; // ✅ Export pool for session store
+export { pool, sessionPool }; // ✅ Export both pools
