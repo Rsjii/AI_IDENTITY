@@ -51,6 +51,10 @@ if (!config.google || !config.google.clientId || !config.google.clientSecret) {
       logger.info(`Checking if user exists: ${email}`);
       let user = await userQueries.findByEmail(email);
       
+      if (user?.deletedAt || user?.deletionScheduledAt) {
+        return done(new Error('Account deletion requested. Login is disabled.'), null);
+      }
+      
       if (user) {
         // User exists with this email
         if (user.googleId && user.googleId !== googleId) {

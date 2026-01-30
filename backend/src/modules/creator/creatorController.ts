@@ -365,18 +365,68 @@ export async function requestPayout(req: Request, res: Response) {
   });
 }
 
+const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
+const MIN_TIER_CENTS = 100;
+const MAX_TIER_CENTS = 10000;
+
+const tierAmountSchema = z.number().int().min(MIN_TIER_CENTS).max(MAX_TIER_CENTS);
+
 const pricingSchema = z.object({
   free: z.object({ enabled: z.boolean().default(true) }).passthrough().optional(),
-  premium: z.object({ enabled: z.boolean().default(true), amountCents: z.number().int().min(50) }).passthrough().optional(),
-  vip: z.object({ enabled: z.boolean().default(true), amountCents: z.number().int().min(50) }).passthrough().optional(),
-}).passthrough();
+  payPerChatTiers: z.array(tierAmountSchema).min(1).max(10).optional(),
+  defaultTierCents: tierAmountSchema.optional(),
+  premium: z.object({
+    enabled: z.boolean().default(true),
+    amountCents: tierAmountSchema,
+  }).passthrough().optional(),
+  vip: z.object({
+    enabled: z.boolean().default(true),
+    amountCents: tierAmountSchema,
+  }).passthrough().optional(),
+}).passthrough().superRefine((cfg, ctx) => {
+  if (cfg.defaultTierCents && cfg.payPerChatTiers && !cfg.payPerChatTiers.includes(cfg.defaultTierCents)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'defaultTierCents must exist in payPerChatTiers',
+      path: ['defaultTierCents'],
+    });
+  }
+});
+
+function normalizeTierList(tiers: number[] | undefined, fallback: number[]) {
+  const base = Array.isArray(tiers) ? tiers : fallback;
+  const normalized = base
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && Number.isInteger(v) && v >= MIN_TIER_CENTS && v <= MAX_TIER_CENTS)
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .sort((a, b) => a - b);
+  return normalized.length ? normalized : fallback;
+}
 
 export async function setPricing(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const cfg = pricingSchema.parse(req.body);
-  const u = await userQueries.updatePricing(userId, cfg);
+
+  const payPerChatTiers = normalizeTierList(cfg.payPerChatTiers, DEFAULT_PAY_PER_CHAT_TIERS);
+  const defaultTierCents = cfg.defaultTierCents && payPerChatTiers.includes(cfg.defaultTierCents)
+    ? cfg.defaultTierCents
+    : payPerChatTiers[0];
+
+  // Backward compatible premium/vip for any legacy consumers
+  const premiumAmount = cfg.premium?.amountCents || payPerChatTiers[0];
+  const vipAmount = cfg.vip?.amountCents || payPerChatTiers[payPerChatTiers.length - 1];
+
+  const nextConfig = {
+    ...cfg,
+    payPerChatTiers,
+    defaultTierCents,
+    premium: { enabled: cfg.premium?.enabled ?? true, amountCents: premiumAmount },
+    vip: { enabled: cfg.vip?.enabled ?? true, amountCents: vipAmount },
+  };
+
+  const u = await userQueries.updatePricing(userId, nextConfig);
   return res.json({ success: true, priceConfig: u.priceConfig });
 }
 

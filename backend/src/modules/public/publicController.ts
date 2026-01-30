@@ -7,6 +7,18 @@ import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES } from '../../config/constants';
 import { generateVoiceAudio } from '../voice/voiceService';
 
+const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
+
+function getPayPerChatTiers(priceConfig: any): number[] {
+  const raw = Array.isArray(priceConfig?.payPerChatTiers) ? priceConfig.payPerChatTiers : DEFAULT_PAY_PER_CHAT_TIERS;
+  const normalized = raw
+    .map((v: any) => Number(v))
+    .filter((v: number) => Number.isFinite(v) && Number.isInteger(v) && v > 0)
+    .filter((v: number, i: number, arr: number[]) => arr.indexOf(v) === i)
+    .sort((a: number, b: number) => a - b);
+  return normalized.length ? normalized : DEFAULT_PAY_PER_CHAT_TIERS;
+}
+
 const chatSchema = z.object({
   slug: z.string().min(1),
   message: z.string().min(1),
@@ -255,7 +267,10 @@ export async function publicChat(req: Request, res: Response) {
       }
 
       // No payment, show paywall
-      const pricing = u.priceConfig || { premium: { amountCents: 500 }, vip: { amountCents: 5000 } };
+      const pricing = u.priceConfig || {};
+      const tiers = getPayPerChatTiers(pricing);
+      const preferred = Number((pricing as any)?.defaultTierCents || 0);
+      const defaultAmount = tiers.includes(preferred) ? preferred : tiers[0];
       
       // ✅ Log PAYMENT_REQUIRED event
       const triggerReason = sessionMessages >= FREE_MESSAGE_LIMIT 
@@ -324,8 +339,11 @@ export async function publicChat(req: Request, res: Response) {
         sessionId: sid,
         creatorId: u.id,
         paymentOptions: {
-          premium: { amount: pricing.premium?.amountCents || 500, label: 'Detailed Answer' },
-          vip: { amount: pricing.vip?.amountCents || 5000, label: 'Full Consultation' },
+          tiers: tiers.map((amount) => ({
+            amount,
+            label: `$${(amount / 100).toFixed(2)}`,
+          })),
+          defaultAmount,
         },
         previewReply,
       });

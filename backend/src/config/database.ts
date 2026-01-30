@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS "User" (
     "profileCompleted" BOOLEAN NOT NULL DEFAULT false,
     "profileImage" TEXT,
     "timeZone" TEXT,
+    "deletedAt" TIMESTAMPTZ,
+    "deletionScheduledAt" TIMESTAMPTZ,
     "trialEndsAt" TIMESTAMPTZ,
     "planTier" TEXT NOT NULL DEFAULT 'free' CHECK ("planTier" IN ('free','starter','growth','scale')),
     "onboardingStep" TEXT NOT NULL DEFAULT 'quiz' CHECK ("onboardingStep" IN ('quiz','content','voice','plan','deploy','done')),
@@ -509,6 +511,8 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeConnectId" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "payoutEnabled" BOOLEAN DEFAULT false;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "businessHours" JSONB;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "notificationPreferences" JSONB;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletionScheduledAt" TIMESTAMPTZ;
 
 -- Add missing columns to mirror_runs
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "sessionId" TEXT;
@@ -819,7 +823,7 @@ export const userQueries = {
 
   findByEmail: async (email: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig" FROM "User" WHERE email = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "deletedAt", "deletionScheduledAt" FROM "User" WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -827,7 +831,7 @@ export const userQueries = {
 
   findById: async (id: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig" FROM "User" WHERE id = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "deletedAt", "deletionScheduledAt" FROM "User" WHERE id = $1',
       [id]
     );
     return result.rows[0];

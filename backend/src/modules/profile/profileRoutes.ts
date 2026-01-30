@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { updateProfile } from './profileController';
+import { updateProfile, exportProfileData, requestAccountDeletionOtp, deleteAccount } from './profileController';
 import { uploadProfileImage, handleProfileImageUpload } from './uploadController';
 import { generateCSRFToken, validateCSRF } from '../../middleware/csrf';
 import { sanitizeInput } from '../../middleware/validation';
@@ -69,5 +69,9 @@ router.post(
   },
   handleProfileImageUpload
 );
+
+router.get('/export', requireJWTFromCookie, exportProfileData);
+router.post('/account/otp', requireJWTFromCookie, sanitizeInput, validateCSRF, requestAccountDeletionOtp);
+router.delete('/account', requireJWTFromCookie, sanitizeInput, validateCSRF, deleteAccount);
 
 export default router;

@@ -44,9 +44,16 @@ export function IntegrationsPage() {
   const [analytics, setAnalytics] = useState<{ total: number; today: number; thisWeek: number } | null>(null);
 
   // Pricing state
-  const [premiumCents, setPremiumCents] = useState(500); // $5
-  const [vipCents, setVipCents] = useState(5000); // $50
+  const [payPerChatTiers, setPayPerChatTiers] = useState<number[]>([100, 500, 1000, 2500, 5000]);
+  const [defaultTierCents, setDefaultTierCents] = useState(500);
   const [pricingSaving, setPricingSaving] = useState(false);
+  const payTierOptions = [
+    { label: '$1', value: 100 },
+    { label: '$5', value: 500 },
+    { label: '$10', value: 1000 },
+    { label: '$25', value: 2500 },
+    { label: '$50', value: 5000 },
+  ];
 
   const creatorId = useMemo(() => {
     return (user as any)?.publicId || user?.id || '';
@@ -58,12 +65,17 @@ export function IntegrationsPage() {
   const savePricing = async () => {
     setPricingSaving(true);
     try {
+      const tiers = payPerChatTiers.length ? payPerChatTiers : [100, 500, 1000, 2500, 5000];
+      const safeDefault = tiers.includes(defaultTierCents) ? defaultTierCents : tiers[0];
+
       await apiFetch('/api/creator/pricing', {
         method: 'POST',
         body: JSON.stringify({
           free: { enabled: true },
-          premium: { enabled: true, amountCents: premiumCents },
-          vip: { enabled: true, amountCents: vipCents },
+          payPerChatTiers: tiers,
+          defaultTierCents: safeDefault,
+          premium: { enabled: true, amountCents: tiers[0] },
+          vip: { enabled: true, amountCents: tiers[tiers.length - 1] },
         }),
       });
       alert('Saved pricing');
@@ -224,15 +236,42 @@ export function IntegrationsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <div className="text-sm font-medium mb-1">Premium ($) amount</div>
-                <Input value={String(Math.round(premiumCents / 100))} onChange={(e) => setPremiumCents(Math.max(50, Number(e.target.value || 0) * 100))} />
+            <div className="space-y-2">
+              <div className="text-sm font-medium mb-1">Select tiers</div>
+              <div className="grid grid-cols-2 gap-2">
+                {payTierOptions.map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={payPerChatTiers.includes(opt.value)}
+                      onChange={() => {
+                        setPayPerChatTiers((prev) => {
+                          const next = prev.includes(opt.value)
+                            ? prev.filter((x) => x !== opt.value)
+                            : [...prev, opt.value];
+                          return next.sort((a, b) => a - b);
+                        });
+                      }}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
               </div>
-              <div>
-                <div className="text-sm font-medium mb-1">VIP ($) amount</div>
-                <Input value={String(Math.round(vipCents / 100))} onChange={(e) => setVipCents(Math.max(50, Number(e.target.value || 0) * 100))} />
-              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium mb-1">Default tier</div>
+              <select
+                className="w-full border rounded-md px-3 py-2 bg-background"
+                value={defaultTierCents}
+                onChange={(e) => setDefaultTierCents(Number(e.target.value))}
+              >
+                {payPerChatTiers.map((amount) => (
+                  <option key={amount} value={amount}>
+                    ${((amount / 100)).toFixed(2)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <Button onClick={savePricing} disabled={pricingSaving}>

@@ -12,11 +12,24 @@ import {
   generateVoiceReply,
 } from './whatsappService';
 import { db, userQueries, whatsappConversationQueries } from '../../config/database';
+import { createWhatsAppPaymentLink } from '../../services/stripeService';
 
 // ========== HELPERS ==========
 
 function getUserId(req: Request): string | null {
   return req.user?.id || req.user?.userId || null;
+}
+
+const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
+
+function getPayPerChatTiers(priceConfig: any): number[] {
+  const raw = Array.isArray(priceConfig?.payPerChatTiers) ? priceConfig.payPerChatTiers : DEFAULT_PAY_PER_CHAT_TIERS;
+  const normalized = raw
+    .map((v: any) => Number(v))
+    .filter((v: number) => Number.isFinite(v) && Number.isInteger(v) && v > 0)
+    .filter((v: number, i: number, arr: number[]) => arr.indexOf(v) === i)
+    .sort((a: number, b: number) => a - b);
+  return normalized.length ? normalized : DEFAULT_PAY_PER_CHAT_TIERS;
 }
 
 // ========== CONNECTION MANAGEMENT ==========
@@ -292,15 +305,37 @@ export async function handleWebhook(req: Request, res: Response) {
       const { shouldRequirePayment } = await import('../identity/intelligentPricing');
       const decision = shouldRequirePayment(messageBody, updatedMessages, user.priceConfig);
       if (decision.requiresPayment) {
-        const slug = user.publicSlug || user.handle || '';
-        const paymentLink = slug ? `${process.env.FRONTEND_URL || 'https://selflyx.com'}/chat/${slug}?upgrade=1` : '';
-        const teaser = `This is a premium request. ${paymentLink ? `Pay here: ${paymentLink}` : 'Please visit the chat link to unlock.'}`;
+        const tiers = getPayPerChatTiers(user.priceConfig);
+        const preferred = Number((user.priceConfig as any)?.defaultTierCents || 0);
+        const amountCents = tiers.includes(preferred) ? preferred : tiers[0];
+
+        let paymentLink = '';
+        try {
+          paymentLink = await createWhatsAppPaymentLink({
+            amountCents,
+            creatorId: userId,
+            visitorId: fromNumber,
+            tierLabel: `$${(amountCents / 100).toFixed(2)}`,
+          });
+        } catch (err: any) {
+          logger.error('[WhatsApp] Failed to create payment link:', err);
+        }
+
+        const teaser = `This is a premium request. ${
+          paymentLink ? `Pay here: ${paymentLink}` : 'Please visit your chat link to unlock.'
+        }`;
+
         await sendWhatsAppMessage(fromNumber, teaser);
         await whatsappConversationQueries.upsert(userId, fromNumber, {
           ...convoData,
           recentMessages: updatedMessages,
           hourlyCount,
           hourlyResetAt: now + 60 * 60 * 1000,
+          pendingPayment: {
+            amountCents,
+            paymentLink: paymentLink || null,
+            createdAt: new Date().toISOString(),
+          },
         });
         return res.status(200).send('<Response></Response>');
       }

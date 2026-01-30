@@ -15,8 +15,8 @@ interface PaymentPromptProps {
   creatorId: string;
   sessionId: string;
   paymentOptions: {
-    premium: { amount: number; label: string };
-    vip: { amount: number; label: string };
+    tiers: { amount: number; label: string }[];
+    defaultAmount?: number;
   };
   onSuccess: (reply?: string) => void;
   onCancel: () => void;
@@ -34,7 +34,12 @@ const CheckoutForm: React.FC<{
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<'premium' | 'vip'>('premium');
+  const [selectedAmount, setSelectedAmount] = useState<number>(() => {
+    const fallback = paymentOptions.tiers?.[0]?.amount || 500;
+    return paymentOptions.defaultAmount && paymentOptions.tiers.some((t) => t.amount === paymentOptions.defaultAmount)
+      ? paymentOptions.defaultAmount
+      : fallback;
+  });
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -50,17 +55,19 @@ const CheckoutForm: React.FC<{
 
   useEffect(() => {
     const fetchPaymentIntent = async () => {
-      if (!selectedTier) return;
+      if (!selectedAmount) return;
       setLoading(true);
       setMessage(null);
       try {
+        const selectedTier = paymentOptions.tiers.find((t) => t.amount === selectedAmount);
         const res = await apiFetch<{ clientSecret: string }>(
           '/api/payments/pay-per-chat/intent',
           {
             method: 'POST',
             body: JSON.stringify({
               creatorId,
-              tier: selectedTier,
+              amountCents: selectedAmount,
+              tierLabel: selectedTier?.label || `$${(selectedAmount / 100).toFixed(2)}`,
               visitorId,
               sessionId,
             }),
@@ -76,7 +83,7 @@ const CheckoutForm: React.FC<{
       }
     };
     fetchPaymentIntent();
-  }, [creatorId, selectedTier, visitorId, sessionId, onClientSecretChange]);
+  }, [creatorId, selectedAmount, visitorId, sessionId, onClientSecretChange, paymentOptions.tiers]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -109,7 +116,7 @@ const CheckoutForm: React.FC<{
               paymentIntentId: paymentIntent.id,
               sessionId,
               creatorId,
-              tier: selectedTier,
+              amountCents: selectedAmount,
             }),
           });
           setPaymentSuccess(true);
@@ -158,7 +165,7 @@ const CheckoutForm: React.FC<{
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-full">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <span className="text-sm font-medium text-green-700 dark:text-green-400">
-              Unlocked: {selectedTier === 'premium' ? paymentOptions.premium.label : paymentOptions.vip.label}
+              Unlocked: ${((selectedAmount || 0) / 100).toFixed(2)}
             </span>
           </div>
         </div>
@@ -171,9 +178,10 @@ const CheckoutForm: React.FC<{
       <div className="space-y-2">
         <Label htmlFor="tier-select" className="text-base font-semibold">Choose your tier:</Label>
         <Select
-          value={selectedTier}
-          onValueChange={(value: 'premium' | 'vip') => {
-            setSelectedTier(value);
+          value={String(selectedAmount)}
+          onValueChange={(value: string) => {
+            const amount = Number(value);
+            setSelectedAmount(amount);
             setClientSecret(null); // Reset to fetch new intent
             onClientSecretChange(null);
           }}
@@ -182,18 +190,14 @@ const CheckoutForm: React.FC<{
             <SelectValue placeholder="Select a tier" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="premium" className="py-3">
-              <div className="flex items-center justify-between w-full">
-                <span>{paymentOptions.premium.label}</span>
-                <span className="font-semibold ml-4">${(paymentOptions.premium.amount / 100).toFixed(2)}</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="vip" className="py-3">
-              <div className="flex items-center justify-between w-full">
-                <span>{paymentOptions.vip.label}</span>
-                <span className="font-semibold ml-4">${(paymentOptions.vip.amount / 100).toFixed(2)}</span>
-              </div>
-            </SelectItem>
+            {paymentOptions.tiers.map((tier) => (
+              <SelectItem key={tier.amount} value={String(tier.amount)} className="py-3">
+                <div className="flex items-center justify-between w-full">
+                  <span>{tier.label}</span>
+                  <span className="font-semibold ml-4">${(tier.amount / 100).toFixed(2)}</span>
+                </div>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -231,7 +235,7 @@ const CheckoutForm: React.FC<{
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Pay ${selectedTier === 'premium' ? (paymentOptions.premium.amount / 100).toFixed(2) : (paymentOptions.vip.amount / 100).toFixed(2)}
+              Pay ${((selectedAmount || 0) / 100).toFixed(2)}
             </>
           )}
         </Button>

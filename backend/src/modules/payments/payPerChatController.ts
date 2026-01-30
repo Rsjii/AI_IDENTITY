@@ -14,9 +14,22 @@ if (!stripeSecret) {
 }
 const stripe = stripeSecret ? new Stripe(stripeSecret, {}) : null;
 
+const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
+
+function getPayPerChatTiers(priceConfig: any): number[] {
+  const raw = Array.isArray(priceConfig?.payPerChatTiers) ? priceConfig.payPerChatTiers : DEFAULT_PAY_PER_CHAT_TIERS;
+  const normalized = raw
+    .map((v: any) => Number(v))
+    .filter((v: number) => Number.isFinite(v) && Number.isInteger(v) && v > 0)
+    .filter((v: number, i: number, arr: number[]) => arr.indexOf(v) === i)
+    .sort((a: number, b: number) => a - b);
+  return normalized.length ? normalized : DEFAULT_PAY_PER_CHAT_TIERS;
+}
+
 const createPaymentIntentSchema = z.object({
   creatorId: z.string().min(1),
-  tier: z.enum(['premium', 'vip']),
+  amountCents: z.number().int().min(100),
+  tierLabel: z.string().min(1).optional(),
   visitorId: z.string().optional(),
   sessionId: z.string().optional(),
   payerEmail: z.string().email().optional(),
@@ -26,7 +39,8 @@ const confirmPaymentSchema = z.object({
   paymentIntentId: z.string().min(1),
   creatorId: z.string().min(1),
   sessionId: z.string().optional(),
-  tier: z.enum(['premium', 'vip']),
+  amountCents: z.number().int().min(100).optional(),
+  tierLabel: z.string().optional(),
 });
 
 export async function createPaymentIntent(req: Request, res: Response) {
@@ -34,26 +48,27 @@ export async function createPaymentIntent(req: Request, res: Response) {
     if (!stripe) {
       return res.status(500).json({ error: 'STRIPE_SECRET_KEY not configured' });
     }
-    const { creatorId, tier, visitorId, sessionId, payerEmail } = createPaymentIntentSchema.parse(req.body);
+    const { creatorId, amountCents, tierLabel, visitorId, sessionId, payerEmail } = createPaymentIntentSchema.parse(req.body);
 
     const creator = await userQueries.findById(creatorId);
     if (!creator) {
       return res.status(404).json({ error: 'Creator not found' });
     }
 
-    const pricing = (creator.priceConfig as any) || {
-      premium: { amountCents: 500 },
-      vip: { amountCents: 5000 },
-    };
+    const tiers = getPayPerChatTiers(creator.priceConfig);
+    if (!tiers.includes(amountCents)) {
+      return res.status(400).json({ error: 'Invalid tier amount' });
+    }
 
-    const amount = tier === 'vip' ? pricing.vip?.amountCents || 5000 : pricing.premium?.amountCents || 500;
+    const resolvedTierLabel = tierLabel || `$${(amountCents / 100).toFixed(2)}`;
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: amountCents,
       currency: 'usd',
       metadata: {
         creatorId,
-        tier,
+        tierAmountCents: String(amountCents),
+        tierLabel: resolvedTierLabel,
         visitorId: visitorId || '',
         sessionId: sessionId || '',
         payerEmail: payerEmail || '',
@@ -73,7 +88,7 @@ export async function confirmPayment(req: Request, res: Response) {
     if (!stripe) {
       return res.status(500).json({ error: 'STRIPE_SECRET_KEY not configured' });
     }
-    const { paymentIntentId, creatorId, sessionId, tier } = confirmPaymentSchema.parse(req.body);
+    const { paymentIntentId, creatorId, sessionId, amountCents } = confirmPaymentSchema.parse(req.body);
 
     // Verify payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -85,7 +100,7 @@ export async function confirmPayment(req: Request, res: Response) {
     // ✅ Validate metadata to prevent spoofing (source of truth = Stripe)
     const metaCreatorId = paymentIntent.metadata?.creatorId || '';
     const metaSessionId = paymentIntent.metadata?.sessionId || '';
-    const metaTier = paymentIntent.metadata?.tier || '';
+    const metaTierAmount = Number(paymentIntent.metadata?.tierAmountCents || 0);
 
     if (metaCreatorId && metaCreatorId !== creatorId) {
       return res.status(400).json({ error: 'Creator mismatch' });
@@ -93,8 +108,11 @@ export async function confirmPayment(req: Request, res: Response) {
     if (metaSessionId && sessionId && metaSessionId !== sessionId) {
       return res.status(400).json({ error: 'Session mismatch' });
     }
-    if (metaTier && metaTier !== tier) {
-      return res.status(400).json({ error: 'Tier mismatch' });
+    if (amountCents && amountCents !== paymentIntent.amount) {
+      return res.status(400).json({ error: 'Amount mismatch' });
+    }
+    if (amountCents && metaTierAmount && amountCents !== metaTierAmount) {
+      return res.status(400).json({ error: 'Tier amount mismatch' });
     }
 
     // ✅ Idempotency: avoid duplicate records
@@ -146,7 +164,8 @@ export async function confirmPayment(req: Request, res: Response) {
       sessionId: sessionId || null,
       visitorId: paymentIntent.metadata?.visitorId || null,
       amountCents: amount,
-      tier,
+      tierAmountCents: metaTierAmount || amount,
+      tierLabel: paymentIntent.metadata?.tierLabel || null,
       platformFeeCents: platformFee,
       creatorEarningsCents: creatorEarnings,
       paymentIntentId,
@@ -251,4 +270,3 @@ export async function confirmPayment(req: Request, res: Response) {
     return res.status(400).json({ error: error.message || 'Failed to confirm payment' });
   }
 }
-

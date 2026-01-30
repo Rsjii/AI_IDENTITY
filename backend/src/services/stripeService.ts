@@ -28,7 +28,45 @@ export function getStripePriceId(tier: 'starter' | 'growth' | 'scale'): string {
   return v;
 }
 
+export async function createWhatsAppPaymentLink(params: {
+  amountCents: number;
+  creatorId: string;
+  visitorId?: string | null;
+  sessionId?: string | null;
+  tierLabel?: string;
+  returnUrl?: string;
+}) {
+  const stripeClient = getStripe();
 
+  const label = params.tierLabel || `$${(params.amountCents / 100).toFixed(2)}`;
+  const returnUrl = params.returnUrl || (process.env.FRONTEND_URL || 'https://selflyx.com');
 
+  const link = await stripeClient.paymentLinks.create({
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: params.amountCents,
+          product_data: {
+            name: `Pay-per-chat (${label})`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    after_completion: {
+      type: 'redirect',
+      redirect: { url: returnUrl },
+    },
+    metadata: {
+      creatorId: params.creatorId,
+      visitorId: params.visitorId || '',
+      sessionId: params.sessionId || '',
+      tierAmountCents: String(params.amountCents),
+      tierLabel: label,
+      platform: 'whatsapp',
+    },
+  });
 
-
+  return link.url;
+}

@@ -44,8 +44,9 @@ export function SettingsPage() {
   });
 
   // Payment settings
-  const [premiumPrice, setPremiumPrice] = useState(500);
-  const [vipPrice, setVipPrice] = useState(5000);
+  const [payPerChatTiers, setPayPerChatTiers] = useState<number[]>([100, 500, 1000, 2500, 5000]);
+  const [defaultTierCents, setDefaultTierCents] = useState(500);
+  const [customTierInput, setCustomTierInput] = useState('');
   const [enablePayments, setEnablePayments] = useState(false);
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [popularQuestions, setPopularQuestions] = useState<string[]>(['']);
@@ -54,6 +55,13 @@ export function SettingsPage() {
     minLength: number;
     alwaysRequire: boolean;
   }>({ keywords: [], minLength: 0, alwaysRequire: false });
+  const payTierOptions = [
+    { label: '$1', value: 100 },
+    { label: '$5', value: 500 },
+    { label: '$10', value: 1000 },
+    { label: '$25', value: 2500 },
+    { label: '$50', value: 5000 },
+  ];
 
   // Billing
   const [planTier, setPlanTier] = useState('free');
@@ -81,6 +89,14 @@ export function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  // Data export and account deletion
+  const [exportingData, setExportingData] = useState(false);
+  const [deleteOtpCode, setDeleteOtpCode] = useState('');
+  const [deleteOtpSent, setDeleteOtpSent] = useState(false);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
 
   // Notification preferences
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -114,8 +130,14 @@ export function SettingsPage() {
       });
       
       const config = (state.user as any).priceConfig || {};
-      setPremiumPrice(config.premium?.amountCents || 500);
-      setVipPrice(config.vip?.amountCents || 5000);
+      const tiers = Array.isArray(config.payPerChatTiers) && config.payPerChatTiers.length
+        ? config.payPerChatTiers
+        : [100, 500, 1000, 2500, 5000];
+
+      setPayPerChatTiers(tiers);
+      const preferred = Number(config.defaultTierCents || 0);
+      setDefaultTierCents(tiers.includes(preferred) ? preferred : tiers[0]);
+
       setEnablePayments(config.enablePayments || false);
       setWelcomeMessage(config.welcomeMessage || '');
       setPopularQuestions(config.popularQuestions?.length ? config.popularQuestions : ['']);
@@ -341,10 +363,15 @@ export function SettingsPage() {
     setError('');
     setSaveSuccess(false);
     try {
+      const tiers = payPerChatTiers.length ? payPerChatTiers : [100, 500, 1000, 2500, 5000];
+      const safeDefault = tiers.includes(defaultTierCents) ? defaultTierCents : tiers[0];
+
       const newConfig = {
         enablePayments,
-        premium: { amountCents: premiumPrice },
-        vip: { amountCents: vipPrice },
+        payPerChatTiers: tiers,
+        defaultTierCents: safeDefault,
+        premium: { amountCents: tiers[0] },
+        vip: { amountCents: tiers[tiers.length - 1] },
         welcomeMessage: welcomeMessage || undefined,
         popularQuestions: popularQuestions.filter(q => q.trim()),
         paymentTriggerRules: paymentTriggerRules,
@@ -361,6 +388,63 @@ export function SettingsPage() {
       setError(e.message || 'Failed to save payment settings.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExportingData(true);
+    setError('');
+    try {
+      const res = await fetch('/api/profile/export', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to export data');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `profile-export-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e: any) {
+      setError(e.message || 'Failed to export data');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const requestDeleteOtp = async () => {
+    setDeleteInProgress(true);
+    setDeleteError('');
+    setDeleteSuccess('');
+    try {
+      await apiFetch('/api/profile/account/otp', { method: 'POST' });
+      setDeleteOtpSent(true);
+      setDeleteSuccess('OTP sent to your email.');
+    } catch (e: any) {
+      setDeleteError(e.message || 'Failed to send OTP');
+    } finally {
+      setDeleteInProgress(false);
+    }
+  };
+
+  const confirmDeleteAccount = async () => {
+    setDeleteInProgress(true);
+    setDeleteError('');
+    setDeleteSuccess('');
+    try {
+      await apiFetch('/api/profile/account', {
+        method: 'DELETE',
+        body: JSON.stringify({ otpCode: deleteOtpCode }),
+      });
+      setDeleteSuccess('Account deletion requested. Login will be disabled.');
+    } catch (e: any) {
+      setDeleteError(e.message || 'Failed to delete account');
+    } finally {
+      setDeleteInProgress(false);
     }
   };
 
@@ -420,6 +504,31 @@ export function SettingsPage() {
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+  };
+
+  const toggleTier = (amount: number) => {
+    setPayPerChatTiers((prev) => {
+      const next = prev.includes(amount)
+        ? prev.filter((x) => x !== amount)
+        : [...prev, amount];
+      const sorted = next.sort((a, b) => a - b);
+      if (!sorted.includes(defaultTierCents)) {
+        setDefaultTierCents(sorted[0] || amount);
+      }
+      return sorted;
+    });
+  };
+
+  const addCustomTier = () => {
+    const dollars = Number(customTierInput);
+    if (!Number.isFinite(dollars) || dollars <= 0) return;
+    const cents = Math.round(dollars * 100);
+    setPayPerChatTiers((prev) => {
+      if (prev.includes(cents)) return prev;
+      const next = [...prev, cents].sort((a, b) => a - b);
+      return next;
+    });
+    setCustomTierInput('');
   };
 
   const planNames: Record<string, string> = {
@@ -622,31 +731,47 @@ export function SettingsPage() {
                 {enablePayments && (
                   <>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Premium Answer Price (cents)</label>
-                      <Input
-                        type="number"
-                        value={premiumPrice}
-                        onChange={(e) => setPremiumPrice(parseInt(e.target.value) || 500)}
-                        min={100}
-                        step={100}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(premiumPrice)} per detailed answer
-                      </p>
+                      <label className="text-sm font-medium">Select tiers</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {payTierOptions.map((opt) => (
+                          <label key={opt.value} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={payPerChatTiers.includes(opt.value)}
+                              onChange={() => toggleTier(opt.value)}
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          step="0.01"
+                          value={customTierInput}
+                          onChange={(e) => setCustomTierInput(e.target.value)}
+                          placeholder="Custom amount (USD)"
+                        />
+                        <Button type="button" variant="outline" onClick={addCustomTier}>
+                          Add
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">VIP Consultation Price (cents)</label>
-                      <Input
-                        type="number"
-                        value={vipPrice}
-                        onChange={(e) => setVipPrice(parseInt(e.target.value) || 5000)}
-                        min={1000}
-                        step={500}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(vipPrice)} per full consultation
-                      </p>
+                      <label className="text-sm font-medium">Default tier</label>
+                      <select
+                        className="w-full border rounded-md px-3 py-2 bg-background"
+                        value={defaultTierCents}
+                        onChange={(e) => setDefaultTierCents(Number(e.target.value))}
+                      >
+                        {payPerChatTiers.map((amount) => (
+                          <option key={amount} value={amount}>
+                            {formatCurrency(amount)}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="space-y-2">
@@ -1159,6 +1284,63 @@ export function SettingsPage() {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Data Export</CardTitle>
+                <CardDescription>Download your profile, chats, payments, and uploads in a ZIP file.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleExportData} disabled={exportingData}>
+                  {exportingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Download Export
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Delete Account</CardTitle>
+                <CardDescription>Soft delete with a 30‑day grace period. Login will be blocked.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {deleteError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{deleteError}</AlertDescription>
+                  </Alert>
+                )}
+                {deleteSuccess && (
+                  <Alert>
+                    <Check className="h-4 w-4" />
+                    <AlertDescription>{deleteSuccess}</AlertDescription>
+                  </Alert>
+                )}
+                <Button variant="outline" onClick={requestDeleteOtp} disabled={deleteInProgress || deleteOtpSent}>
+                  {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Send OTP
+                </Button>
+                {deleteOtpSent && (
+                  <div className="space-y-2">
+                    <Label>OTP Code</Label>
+                    <Input
+                      value={deleteOtpCode}
+                      onChange={(e) => setDeleteOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 6-digit OTP"
+                      maxLength={6}
+                    />
+                    <Button
+                      variant="destructive"
+                      onClick={confirmDeleteAccount}
+                      disabled={deleteInProgress || deleteOtpCode.length !== 6}
+                    >
+                      {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Confirm Delete
+                    </Button>
                   </div>
                 )}
               </CardContent>

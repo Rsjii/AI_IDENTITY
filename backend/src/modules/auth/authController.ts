@@ -870,6 +870,13 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         errorCode: 'UNAUTHORIZED'
       });
     }
+
+    if (user.deletedAt || user.deletionScheduledAt) {
+      return res.status(403).json({
+        error: 'Account deletion requested. Login is disabled.',
+        errorCode: 'ACCOUNT_DELETION_REQUESTED',
+      });
+    }
     
     // Check if user is active
     if (!user.active) {
@@ -1038,6 +1045,13 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       return res.status(404).json({
         error: 'User not found. Please signup first.',
         errorCode: 'USER_NOT_FOUND'
+      });
+    }
+
+    if (user.deletedAt || user.deletionScheduledAt) {
+      return res.status(403).json({
+        error: 'Account deletion requested. Login is disabled.',
+        errorCode: 'ACCOUNT_DELETION_REQUESTED',
       });
     }
     

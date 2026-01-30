@@ -57,7 +57,7 @@ export function PublicChatPage() {
   const [paymentData, setPaymentData] = useState<{
     creatorId: string;
     sessionId: string;
-    paymentOptions: { premium: { amount: number; label: string }; vip: { amount: number; label: string } };
+    paymentOptions: { tiers: { amount: number; label: string }[]; defaultAmount?: number };
   } | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);

@@ -4,7 +4,15 @@ import { logger } from '../../config/logger';
 import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
-import {db} from '../../config/database';
+import { db } from '../../config/database';
+import JSZip from 'jszip';
+import { EmailService, generateOTP, hashOTP, verifyOTP } from '../auth/authService';
+import { otpQueries } from '../../config/database';
+
+function getUserId(req: Request): string | null {
+  const u: any = (req as any).user;
+  return u?.id || u?.userId || null;
+}
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
@@ -123,10 +131,11 @@ export const updateProfile = async (req: Request, res: Response) => {
         paymentNotifications: z.boolean().optional(),
         weeklySummary: z.boolean().optional(),
       }).optional(),
+      priceConfig: z.unknown().optional(),
     });    
 
     // ✅ FIX: Parse from req.body (multer will parse multipart/form-data)
-    const { name, phone, profileImage, timeZone, socialLinks, notificationPreferences } = updateProfileSchema.parse(req.body);
+    const { name, phone, profileImage, timeZone, socialLinks, notificationPreferences, priceConfig } = updateProfileSchema.parse(req.body);
 
     // Get current user data
     const currentUser = await userQueries.findByEmail(req.user.email);
@@ -172,6 +181,14 @@ export const updateProfile = async (req: Request, res: Response) => {
       logger.info(`Notification preferences updated for user: ${req.user.email}`);
     }
 
+    // ✅ Save price config if provided
+    if (priceConfig !== undefined) {
+      if (typeof priceConfig !== 'object' || priceConfig === null || Array.isArray(priceConfig)) {
+        return res.status(400).json({ error: 'Invalid priceConfig' });
+      }
+      await userQueries.updatePricing(currentUser.id, priceConfig);
+    }
+
     return res.json({
       success: true,
       user: {
@@ -189,3 +206,142 @@ export const updateProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const exportProfileData = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await db.query(`SELECT * FROM "User" WHERE id=$1 LIMIT 1`, [userId]);
+    const identities = await db.query(`SELECT * FROM "identities" WHERE "userId"=$1`, [userId]);
+    const identityVersions = await db.query(
+      `SELECT iv.* FROM "identity_versions" iv JOIN "identities" i ON i.id = iv."identityId" WHERE i."userId"=$1`,
+      [userId]
+    );
+    const chatSessions = await db.query(`SELECT * FROM "chat_sessions" WHERE "creatorId"=$1`, [userId]);
+    const chatMessages = await db.query(
+      `SELECT cm.* FROM "chat_messages" cm JOIN "chat_sessions" cs ON cs.id = cm."sessionId" WHERE cs."creatorId"=$1`,
+      [userId]
+    );
+    const payments = await db.query(`SELECT * FROM "stripe_payments" WHERE "creatorId"=$1`, [userId]);
+    const knowledgeSources = await db.query(`SELECT * FROM "knowledge_sources" WHERE "userId"=$1`, [userId]);
+
+    const uploads = {
+      profileImage: user.rows[0]?.profileImage || null,
+      knowledgeSources: knowledgeSources.rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        originalUrl: r.originalUrl,
+        storageUrl: r.storageUrl,
+      })),
+    };
+
+    const zip = new JSZip();
+    zip.file('profile.json', JSON.stringify(user.rows[0] || {}, null, 2));
+    zip.file('identities.json', JSON.stringify(identities.rows || [], null, 2));
+    zip.file('identity_versions.json', JSON.stringify(identityVersions.rows || [], null, 2));
+    zip.file('chat_sessions.json', JSON.stringify(chatSessions.rows || [], null, 2));
+    zip.file('chat_messages.json', JSON.stringify(chatMessages.rows || [], null, 2));
+    zip.file('payments.json', JSON.stringify(payments.rows || [], null, 2));
+    zip.file('uploads.json', JSON.stringify(uploads, null, 2));
+
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="profile-export-${new Date().toISOString().split('T')[0]}.zip"`
+    );
+    return res.send(buffer);
+  } catch (error: any) {
+    logger.error('Export profile error:', error);
+    return res.status(500).json({ error: 'Failed to export data' });
+  }
+};
+
+export const requestAccountDeletionOtp = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const email = String(req.user.email || '').toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email not found' });
+
+    const emailService = new EmailService();
+    const otp = generateOTP(6);
+    const hashed = await hashOTP(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await otpQueries.deleteByEmail(email, 'delete');
+    await otpQueries.create(email, hashed, expiresAt, 'delete');
+
+    const sent = await emailService.sendOTP(email, otp, 'delete');
+    if (!sent) {
+      return res.status(500).json({ error: 'Failed to send OTP' });
+    }
+
+    return res.json({ success: true, message: 'OTP sent to your email' });
+  } catch (error: any) {
+    logger.error('Request delete OTP error:', error);
+    return res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+const deleteAccountSchema = z.object({
+  otpCode: z.string().length(6).regex(/^\d{6}$/),
+});
+
+export const deleteAccount = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { otpCode } = deleteAccountSchema.parse(req.body || {});
+    const email = String(req.user.email || '').toLowerCase();
+
+    const otpRecord = await otpQueries.findByEmail(email, 'delete');
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    const nowMs = Date.now();
+    const expiresAtMs = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : new Date(String(otpRecord.expiresAt)).getTime();
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs < nowMs) {
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+    if (otpRecord.used) {
+      return res.status(400).json({ error: 'OTP already used. Please request a new one.' });
+    }
+
+    const isValid = await verifyOTP(otpCode, otpRecord.codeHash);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid OTP code' });
+    }
+
+    await otpQueries.markAsUsed(otpRecord.id);
+
+    const deletedAt = new Date();
+    const deletionScheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await db.query(
+      `UPDATE "User" SET active=false, "deletedAt"=$1, "deletionScheduledAt"=$2 WHERE id=$3`,
+      [deletedAt, deletionScheduledAt, userId]
+    );
+    await db.query(`DELETE FROM "auth_sessions" WHERE "userId"=$1`, [userId]);
+
+    return res.json({
+      success: true,
+      deletedAt: deletedAt.toISOString(),
+      deletionScheduledAt: deletionScheduledAt.toISOString(),
+    });
+  } catch (error: any) {
+    logger.error('Delete account error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input', details: error.errors });
+    }
+    return res.status(500).json({ error: 'Failed to delete account' });
+  }
+};
