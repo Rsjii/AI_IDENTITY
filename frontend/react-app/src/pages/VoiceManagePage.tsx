@@ -9,17 +9,27 @@ type Voice = {
   label: string;
   status: string;
   sampleAudioUrl?: string | null;
+  settings?: { stability?: number; similarity_boost?: number };
 };
 
 export function VoiceManagePage() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [settingsById, setSettingsById] = useState<Record<string, { stability: number; similarity_boost: number }>>({});
 
   const load = async () => {
     try {
       const r = await apiFetch<{ success: true; voices: Voice[] }>('/api/voice/list');
       setVoices(r.voices || []);
+      const nextSettings: Record<string, { stability: number; similarity_boost: number }> = {};
+      (r.voices || []).forEach((v) => {
+        nextSettings[v.id] = {
+          stability: v.settings?.stability ?? 0.5,
+          similarity_boost: v.settings?.similarity_boost ?? 0.75,
+        };
+      });
+      setSettingsById(nextSettings);
     } catch (e) {
       console.error('Failed to load voices:', e);
     }
@@ -50,6 +60,19 @@ export function VoiceManagePage() {
       alert(`Failed to generate: ${e?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveSettings = async (id: string) => {
+    try {
+      const settings = settingsById[id];
+      await apiFetch(`/api/voice/${id}/settings`, {
+        method: 'PATCH',
+        body: JSON.stringify({ settings }),
+      });
+      await load();
+    } catch (e: any) {
+      alert(`Failed to save settings: ${e?.message || 'Unknown error'}`);
     }
   };
 
@@ -84,9 +107,55 @@ export function VoiceManagePage() {
                     </div>
                   ) : null}
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Stability</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={settingsById[v.id]?.stability ?? 0.5}
+                        onChange={(e) =>
+                          setSettingsById((prev) => ({
+                            ...prev,
+                            [v.id]: {
+                              ...prev[v.id],
+                              stability: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        className="w-full border rounded-md px-2 py-1 bg-background"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Similarity Boost</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={settingsById[v.id]?.similarity_boost ?? 0.75}
+                        onChange={(e) =>
+                          setSettingsById((prev) => ({
+                            ...prev,
+                            [v.id]: {
+                              ...prev[v.id],
+                              similarity_boost: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        className="w-full border rounded-md px-2 py-1 bg-background"
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex gap-2 flex-wrap">
                     <Button size="sm" onClick={() => test(v.id)} disabled={loading || v.status !== 'ready'}>
                       {loading ? 'Generating…' : 'Test Voice'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => saveSettings(v.id)}>
+                      Save Settings
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => del(v.id)}>Delete</Button>
                   </div>

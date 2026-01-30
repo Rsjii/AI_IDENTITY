@@ -13,7 +13,7 @@ export function PricingPage() {
   const [error, setError] = useState('');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
-  const goStripe = async (tier: 'starter' | 'growth' | 'scale') => {
+  const goStripe = async (tier: 'pro' | 'growth' | 'scale') => {
     if (state.status !== 'authenticated') {
       window.location.href = '/auth';
       return;
@@ -82,7 +82,7 @@ export function PricingPage() {
 
           <Card className="glass">
             <CardHeader>
-              <CardTitle>Starter</CardTitle>
+              <CardTitle>Pro</CardTitle>
               <CardDescription>5K chats/month</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -96,7 +96,7 @@ export function PricingPage() {
                 <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> All features</li>
                 <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Email support</li>
               </ul>
-              <Button className="w-full" disabled={loading} onClick={() => goStripe('starter')}>Choose</Button>
+              <Button className="w-full" disabled={loading} onClick={() => goStripe('pro')}>Choose</Button>
             </CardContent>
           </Card>
 
@@ -115,7 +115,7 @@ export function PricingPage() {
               </div>
               {billingCycle === 'annual' && <p className="text-xs text-muted-foreground">Billed annually ($1,428/year)</p>}
               <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Everything in Starter</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Everything in Pro</li>
                 <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Priority support</li>
                 <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Advanced analytics</li>
                 <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Custom integrations</li>
@@ -158,7 +158,7 @@ export function PricingPage() {
                   <tr className="border-b">
                     <th className="text-left p-2">Feature</th>
                     <th className="text-center p-2">Free</th>
-                    <th className="text-center p-2">Starter</th>
+                    <th className="text-center p-2">Pro</th>
                     <th className="text-center p-2">Growth</th>
                     <th className="text-center p-2">Scale</th>
                   </tr>

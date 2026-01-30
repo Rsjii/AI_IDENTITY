@@ -10,6 +10,7 @@ type Msg = {
   timestamp?: Date;
   id?: string;
   mirrorRunId?: string;
+  audioUrl?: string | null;
 };
 
 function getOrCreateVisitorId(): string {
@@ -52,6 +53,7 @@ export function PublicChatPage() {
   const [typing, setTyping] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [paymentData, setPaymentData] = useState<{
     creatorId: string;
     sessionId: string;
@@ -117,7 +119,7 @@ export function PublicChatPage() {
       const r = await fetch('/api/public/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, message: m, visitorId, sessionId: sessionId || undefined }),
+        body: JSON.stringify({ slug, message: m, visitorId, sessionId: sessionId || undefined, voiceEnabled }),
       });
       const d = await r.json();
       const newSessionId = d.sessionId || sessionId;
@@ -160,6 +162,7 @@ export function PublicChatPage() {
         timestamp: new Date(),
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         mirrorRunId: d.mirrorRunId,
+        audioUrl: d.audioUrl || null,
       };
       setMsgs((x) => [...x, aiMsg]);
     } catch (error) {
@@ -214,7 +217,7 @@ export function PublicChatPage() {
           const r = await fetch('/api/public/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug, message: messageToSend, visitorId, sessionId: sessionId || undefined }),
+            body: JSON.stringify({ slug, message: messageToSend, visitorId, sessionId: sessionId || undefined, voiceEnabled }),
           });
           const d = await r.json();
           setSessionId(d.sessionId || sessionId);
@@ -226,6 +229,7 @@ export function PublicChatPage() {
             timestamp: new Date(),
             id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
             mirrorRunId: d.mirrorRunId,
+            audioUrl: d.audioUrl || null,
           };
           setMsgs((x) => [...x, aiMsg]);
         } catch (error: any) {
@@ -408,6 +412,11 @@ export function PublicChatPage() {
                       >
                         {m.content}
                       </ReactMarkdown>
+                      {m.audioUrl && !isUser && (
+                        <audio controls className="mt-2 w-full">
+                          <source src={m.audioUrl} />
+                        </audio>
+                      )}
                     </div>
                   </div>
 
@@ -508,6 +517,16 @@ export function PublicChatPage() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
       >
         <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-end mb-2">
+            <label className="flex items-center gap-2 text-xs text-text-secondary">
+              <input
+                type="checkbox"
+                checked={voiceEnabled}
+                onChange={(e) => setVoiceEnabled(e.target.checked)}
+              />
+              Voice responses
+            </label>
+          </div>
           <div className="flex gap-2">
             <textarea
               value={text}

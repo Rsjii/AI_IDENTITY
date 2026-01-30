@@ -220,6 +220,45 @@ export class EmailService {
     }
   }
 
+  async sendTrainingReady(email: string): Promise<boolean> {
+    try {
+      if (!config.mail.smtp.pass || !this.resend) {
+        logger.error('❌ [EMAIL] Resend API not configured. Cannot send training ready email.');
+        return false;
+      }
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2563eb;">Your AI clone is ready 🎉</h2>
+            <p>Your training is complete. You can now test and share your AI clone.</p>
+            <p><a href="${config.frontendUrl || 'https://selflyx.com'}/dashboard" style="color:#2563eb;">Open Dashboard</a></p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { error } = await this.resend.emails.send({
+        from: config.mail.from || 'onboarding@resend.dev',
+        to: email,
+        subject: 'Your AI clone is ready',
+        html: htmlContent,
+      });
+
+      if (error) {
+        logger.error('❌ [EMAIL] Training ready email failed:', error);
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      logger.error('❌ [EMAIL] Training ready email error:', error);
+      return false;
+    }
+  }
+
   /**
    * Generic email sending method for receipts, notifications, etc.
    */

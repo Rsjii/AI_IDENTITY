@@ -15,7 +15,7 @@ export function OnboardingPlanPage() {
     nav('/onboarding/deploy');
   };
 
-  const checkout = async (tier: 'starter' | 'growth' | 'scale') => {
+  const checkout = async (tier: 'pro' | 'growth' | 'scale') => {
     setLoading(true);
     try {
       const r = await apiFetch<{ url: string }>('/api/billing/stripe/create-checkout-session', {
@@ -56,9 +56,9 @@ export function OnboardingPlanPage() {
               <Button className="mt-3 w-full" disabled={loading} onClick={startTrial}>Start trial</Button>
             </div>
             <div className="border rounded-md p-4">
-              <div className="font-semibold">Starter</div>
+              <div className="font-semibold">Pro</div>
               <div className="text-sm text-muted-foreground">$49/mo</div>
-              <Button className="mt-3 w-full" disabled={loading} onClick={() => checkout('starter')}>Choose</Button>
+              <Button className="mt-3 w-full" disabled={loading} onClick={() => checkout('pro')}>Choose</Button>
             </div>
             <div className="border rounded-md p-4">
               <div className="font-semibold">Growth</div>

@@ -2,6 +2,28 @@
 
 This document contains low priority features and improvements that can be implemented in future iterations.
 
+## 0. Deferred From FINAL_REQUIREMENTS_GAP_PLAN (Phase 3)
+
+These items are not required for MVP or the current phase, and are deferred.
+
+- Instagram: enforce 24-hour response window + 200/hour rate limits.
+- Phone integration: real-time call flow (Twilio webhooks + Whisper STT + TTS streaming).
+- Advanced analytics dashboard (geo, funnel, insights, export).
+- Mobile apps (iOS/Android full implementation).
+- Video avatar settings/triggers (quality, length, keyword routing).
+
+---
+
+## 0.1 Deferred From FINAL_REQUIREMENTS_GAP_PLAN (MVP/Phase 2 - High Level)
+
+These were marked in the gap plan but are not required for MVP or can be done later due to infra complexity.
+
+- Training job flow with dedicated queue/worker + job dashboard.
+- WhatsApp real queue + durable rate limiter (Redis/SQS).
+- Premium tiers expansion beyond premium/vip.
+
+---
+
 ## 1. Data Export in Settings
 
 **Description:** Allow users to download all their data in a structured format (JSON, CSV, or ZIP).

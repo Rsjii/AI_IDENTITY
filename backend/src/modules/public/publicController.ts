@@ -1,16 +1,18 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { userQueries, chatSessionQueries, chatMessageQueries, db, mirrorRunQueries, identityVersionQueries, identityQueries, trustEventQueries } from '../../config/database';
+import { userQueries, chatSessionQueries, chatMessageQueries, db, mirrorRunQueries, identityVersionQueries, identityQueries, trustEventQueries, premiumSessionQueries, voiceCloneQueries } from '../../config/database';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
 import { logger } from '../../config/logger';
 import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES } from '../../config/constants';
+import { generateVoiceAudio } from '../voice/voiceService';
 
 const chatSchema = z.object({
   slug: z.string().min(1),
   message: z.string().min(1),
   visitorId: z.string().optional(),
   sessionId: z.string().optional(),
+  voiceEnabled: z.boolean().optional(),
 });
 
 const historySchema = z.object({
@@ -113,7 +115,7 @@ async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
 }
 
 export async function publicChat(req: Request, res: Response) {
-  const { slug, message, visitorId, sessionId } = chatSchema.parse(req.body);
+  const { slug, message, visitorId, sessionId, voiceEnabled } = chatSchema.parse(req.body);
 
   const u = await userQueries.findBySlugOrHandle(slug);
   if (!u) return res.status(404).json({ error: 'Creator not found' });
@@ -180,9 +182,12 @@ export async function publicChat(req: Request, res: Response) {
   // Save user message
   await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
 
+  // ✅ Check for active premium session (24-hour window)
+  const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
+
   // Check payment requirement - only if creator has enabled pay-per-chat
   const enablePayments = (u.priceConfig as any)?.enablePayments === true;
-  if (enablePayments) {
+  if (enablePayments && !hasPremiumSession) {
     // ✅ Use intelligent pricing detection
     const { shouldRequirePayment: intelligentPricing } = await import('../identity/intelligentPricing');
     
@@ -224,6 +229,18 @@ export async function publicChat(req: Request, res: Response) {
           sessionId: sid,
           visitorId,
         });
+        let audioUrl: string | null = null;
+        if (voiceEnabled && result.reply) {
+          try {
+            const voices = await voiceCloneQueries.findByUserId(u.id);
+            const defaultVoice = voices.find((v: any) => v.status === 'ready');
+            if (defaultVoice) {
+              audioUrl = await generateVoiceAudio(u.id, defaultVoice.id, result.reply);
+            }
+          } catch (err: any) {
+            logger.warn('[PublicChat] Voice generation failed:', err?.message || err);
+          }
+        }
         if (result.reply) {
           await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
         }
@@ -233,6 +250,7 @@ export async function publicChat(req: Request, res: Response) {
           reply: result.reply || '',
           decision: result.decision,
           mirrorRunId: result.mirrorRunId,
+          audioUrl,
         });
       }
 
@@ -320,6 +338,18 @@ export async function publicChat(req: Request, res: Response) {
     sessionId: sid,
     visitorId,
   });
+  let audioUrl: string | null = null;
+  if (voiceEnabled && result.reply) {
+    try {
+      const voices = await voiceCloneQueries.findByUserId(u.id);
+      const defaultVoice = voices.find((v: any) => v.status === 'ready');
+      if (defaultVoice) {
+        audioUrl = await generateVoiceAudio(u.id, defaultVoice.id, result.reply);
+      }
+    } catch (err: any) {
+      logger.warn('[PublicChat] Voice generation failed:', err?.message || err);
+    }
+  }
 
   // Save assistant reply
   if (result.reply) {
@@ -332,6 +362,7 @@ export async function publicChat(req: Request, res: Response) {
     reply: result.reply || '',
     decision: result.decision,
     mirrorRunId: result.mirrorRunId,
+    audioUrl,
   });
 }
 

@@ -24,12 +24,14 @@ export function MarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
+  const [sort, setSort] = useState('popular');
 
   const fetchListings = async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (category) params.set('category', category);
+    if (sort) params.set('sort', sort);
     const res = await fetch(`/api/marketplace/listings?${params.toString()}`);
     const data = await res.json();
     setItems(data.items || []);
@@ -59,6 +61,18 @@ export function MarketplacePage() {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           />
+          <select
+            className="border rounded-md px-3 py-2 bg-background"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          >
+            <option value="popular">Popular</option>
+            <option value="trending">Trending</option>
+            <option value="newest">Newest</option>
+            <option value="rating">Top Rated</option>
+            <option value="price_low">Price: Low to High</option>
+            <option value="price_high">Price: High to Low</option>
+          </select>
           <Button onClick={fetchListings}>Search</Button>
         </div>
 

@@ -419,6 +419,28 @@ ALTER TABLE "chat_messages" DROP CONSTRAINT IF EXISTS "chat_messages_sessionId_f
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_sessionId_fkey"
   FOREIGN KEY ("sessionId") REFERENCES "chat_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- ========== PREMIUM SESSIONS (Pay-Per-Chat Unlock Window) ==========
+CREATE TABLE IF NOT EXISTS "premium_sessions" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "sessionId" TEXT NOT NULL,
+  "stripePaymentId" TEXT,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_premium_sessions_sessionId" ON "premium_sessions"("sessionId");
+CREATE INDEX IF NOT EXISTS "idx_premium_sessions_creatorId" ON "premium_sessions"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_premium_sessions_expiresAt" ON "premium_sessions"("expiresAt");
+
+ALTER TABLE "premium_sessions" DROP CONSTRAINT IF EXISTS "premium_sessions_creatorId_fkey";
+ALTER TABLE "premium_sessions" ADD CONSTRAINT "premium_sessions_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "premium_sessions" DROP CONSTRAINT IF EXISTS "premium_sessions_sessionId_fkey";
+ALTER TABLE "premium_sessions" ADD CONSTRAINT "premium_sessions_sessionId_fkey"
+  FOREIGN KEY ("sessionId") REFERENCES "chat_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- ========== STRIPE ==========
 CREATE TABLE IF NOT EXISTS "stripe_customers" (
   "id" TEXT PRIMARY KEY,
@@ -670,6 +692,44 @@ ALTER TABLE "marketplace_subscriptions" ADD CONSTRAINT "marketplace_subscription
 
 ALTER TABLE "marketplace_subscriptions" DROP CONSTRAINT IF EXISTS "marketplace_subscriptions_userId_fkey";
 ALTER TABLE "marketplace_subscriptions" ADD CONSTRAINT "marketplace_subscriptions_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== WHATSAPP CONVERSATIONS (Phase 2) ==========
+CREATE TABLE IF NOT EXISTS "whatsapp_conversations" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "phoneNumber" TEXT NOT NULL,
+  "conversationData" JSONB,
+  "lastMessageAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_whatsapp_conversations_userId" ON "whatsapp_conversations"("userId");
+CREATE INDEX IF NOT EXISTS "idx_whatsapp_conversations_phoneNumber" ON "whatsapp_conversations"("phoneNumber");
+CREATE UNIQUE INDEX IF NOT EXISTS "uniq_whatsapp_conversations_phoneNumber" ON "whatsapp_conversations"("phoneNumber");
+
+ALTER TABLE "whatsapp_conversations" DROP CONSTRAINT IF EXISTS "whatsapp_conversations_userId_fkey";
+ALTER TABLE "whatsapp_conversations" ADD CONSTRAINT "whatsapp_conversations_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== TRAINING JOBS (Phase 1 async processing) ==========
+CREATE TABLE IF NOT EXISTS "training_jobs" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending','processing','completed','failed')),
+  "startedAt" TIMESTAMPTZ,
+  "completedAt" TIMESTAMPTZ,
+  "error" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_training_jobs_userId" ON "training_jobs"("userId");
+CREATE INDEX IF NOT EXISTS "idx_training_jobs_status" ON "training_jobs"("status");
+
+ALTER TABLE "training_jobs" DROP CONSTRAINT IF EXISTS "training_jobs_userId_fkey";
+ALTER TABLE "training_jobs" ADD CONSTRAINT "training_jobs_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- ========== VIDEO AVATARS (Phase 3) ==========
@@ -1231,6 +1291,14 @@ export const voiceCloneQueries = {
     return result.rows[0];
   },
 
+  updateSettings: async (id: string, settings: any) => {
+    const result = await db.query(
+      `UPDATE "voice_clones" SET "settings" = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [JSON.stringify(settings || {}), id]
+    );
+    return result.rows[0];
+  },
+
   delete: async (userId: string, voiceId: string) => {
     const result = await db.query(
       `DELETE FROM "voice_clones" WHERE id = $1 AND "userId" = $2 RETURNING *`,
@@ -1266,6 +1334,33 @@ export const platformIntegrationQueries = {
        ORDER BY "createdAt" DESC
        LIMIT 1`,
       [platform, field, value]
+    );
+    return r.rows[0] || null;
+  },
+};
+
+// ========== WHATSAPP CONVERSATION QUERIES ==========
+export const whatsappConversationQueries = {
+  upsert: async (userId: string, phoneNumber: string, conversationData?: any) => {
+    const id = `wa_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "whatsapp_conversations"(id,"userId","phoneNumber","conversationData","lastMessageAt","createdAt","updatedAt")
+       VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       ON CONFLICT ("phoneNumber")
+       DO UPDATE SET
+         "conversationData" = COALESCE(EXCLUDED."conversationData", "whatsapp_conversations"."conversationData"),
+         "lastMessageAt" = CURRENT_TIMESTAMP,
+         "updatedAt" = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [id, userId, phoneNumber, conversationData ? JSON.stringify(conversationData) : null]
+    );
+    return r.rows[0];
+  },
+
+  findByPhoneNumber: async (phoneNumber: string) => {
+    const r = await db.query(
+      `SELECT * FROM "whatsapp_conversations" WHERE "phoneNumber"=$1 LIMIT 1`,
+      [phoneNumber]
     );
     return r.rows[0] || null;
   },
@@ -1345,6 +1440,54 @@ export const knowledgeChunkQueries = {
   },
 };
 
+// ========== TRAINING JOB QUERIES ==========
+export const trainingJobQueries = {
+  create: async (userId: string) => {
+    const id = `tj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "training_jobs"(id,"userId","status","createdAt","updatedAt")
+       VALUES ($1,$2,'pending',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+       RETURNING *`,
+      [id, userId]
+    );
+    return r.rows[0];
+  },
+  findLatestByUserId: async (userId: string) => {
+    const r = await db.query(
+      `SELECT * FROM "training_jobs" WHERE "userId"=$1 ORDER BY "createdAt" DESC LIMIT 1`,
+      [userId]
+    );
+    return r.rows[0] || null;
+  },
+  listPending: async () => {
+    const r = await db.query(
+      `SELECT * FROM "training_jobs" WHERE status IN ('pending','processing') ORDER BY "createdAt" ASC LIMIT 50`
+    );
+    return r.rows;
+  },
+  markProcessing: async (id: string) => {
+    const r = await db.query(
+      `UPDATE "training_jobs" SET status='processing', "startedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [id]
+    );
+    return r.rows[0] || null;
+  },
+  markCompleted: async (id: string) => {
+    const r = await db.query(
+      `UPDATE "training_jobs" SET status='completed', "completedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [id]
+    );
+    return r.rows[0] || null;
+  },
+  markFailed: async (id: string, error: string) => {
+    const r = await db.query(
+      `UPDATE "training_jobs" SET status='failed', "error"=$2, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+      [id, error]
+    );
+    return r.rows[0] || null;
+  },
+};
+
 // ========== CHAT HISTORY QUERIES ==========
 export const chatSessionQueries = {
   create: async (params: { creatorId: string; visitorId?: string | null; userId?: string | null; platform?: string }) => {
@@ -1382,6 +1525,27 @@ export const chatMessageQueries = {
       [sessionId]
     );
     return parseInt(r.rows[0]?.count || '0', 10);
+  },
+};
+
+// ========== PREMIUM SESSION QUERIES ==========
+export const premiumSessionQueries = {
+  create: async (params: { creatorId: string; sessionId: string; stripePaymentId?: string | null; expiresAt: Date }) => {
+    const id = `ps_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const r = await db.query(
+      `INSERT INTO "premium_sessions"(id,"creatorId","sessionId","stripePaymentId","expiresAt")
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING *`,
+      [id, params.creatorId, params.sessionId, params.stripePaymentId || null, params.expiresAt.toISOString()]
+    );
+    return r.rows[0];
+  },
+  isSessionPremium: async (sessionId: string) => {
+    const r = await db.query(
+      `SELECT 1 FROM "premium_sessions" WHERE "sessionId"=$1 AND "expiresAt" > CURRENT_TIMESTAMP LIMIT 1`,
+      [sessionId]
+    );
+    return r.rowCount > 0;
   },
 };
 

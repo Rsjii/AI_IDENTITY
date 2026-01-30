@@ -276,7 +276,7 @@ export function LandingPage() {
                   <tr className="border-b">
                     <th className="text-left p-3">Feature</th>
                     <th className="text-center p-3">Free</th>
-                    <th className="text-center p-3">Starter</th>
+                    <th className="text-center p-3">Pro</th>
                     <th className="text-center p-3">Growth</th>
                     <th className="text-center p-3">Scale</th>
                   </tr>

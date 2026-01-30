@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthPage } from './pages/AuthPage';
 import { LandingPage } from './pages/LandingPage';
+import { HomeRoute } from './pages/HomeRoute';
 import { SignupVerifyPage } from './pages/SignupVerifyPage';
 import { LoginVerifyPage } from './pages/LoginVerifyPage';
 import { SignupProfilePage } from './pages/SignupProfilePage';
@@ -65,7 +66,8 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/landing" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
               
               <Route path="/signup/verify" element={<SignupVerifyPage />} />

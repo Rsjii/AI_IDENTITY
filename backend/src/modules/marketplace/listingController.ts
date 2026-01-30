@@ -69,6 +69,7 @@ export async function getPublicListings(req: Request, res: Response) {
     where += ` AND ("description" ILIKE $${idx} OR "slug" ILIKE $${idx})`;
   }
 
+  const isTrending = sort === 'trending';
   const orderBy = (() => {
     switch (sort) {
       case 'newest':
@@ -79,14 +80,26 @@ export async function getPublicListings(req: Request, res: Response) {
         return `"subscriptionPriceCents" ASC`;
       case 'price_high':
         return `"subscriptionPriceCents" DESC`;
+      case 'trending':
+        return `COALESCE(ts."recentSubs", 0) DESC, "totalSubscribers" DESC, "createdAt" DESC`;
       default:
         return `"totalSubscribers" DESC, "createdAt" DESC`;
     }
   })();
 
+  const trendJoin = isTrending
+    ? `LEFT JOIN (
+         SELECT "listingId", COUNT(*)::int AS "recentSubs"
+         FROM "marketplace_subscriptions"
+         WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+         GROUP BY "listingId"
+       ) ts ON ts."listingId" = ml.id`
+    : '';
+
   const listQuery = `
     SELECT ml.*, u.handle, u.name, u."profileImage"
     FROM "marketplace_listings" ml
+    ${trendJoin}
     JOIN "User" u ON u.id = ml."creatorId"
     WHERE ${where}
     ORDER BY ${orderBy}

@@ -27,6 +27,18 @@ export function IntegrationsPage() {
   const [waStatus, setWaStatus] = useState<{ connected: boolean; phoneNumber?: string }>({ connected: false });
   const [waPhoneNumber, setWaPhoneNumber] = useState('');
   const [waLoading, setWaLoading] = useState(false);
+  const [waSettings, setWaSettings] = useState({
+    autoReply: true,
+    businessHours: '24/7',
+    greeting: 'Hi! Thanks for your message.',
+    paymentEnabled: true,
+  });
+  const [waStats, setWaStats] = useState<{
+    totalMessages: number;
+    todayMessages: number;
+    todayConversions: number;
+    todayRevenueCents: number;
+  } | null>(null);
 
   // Widget Analytics
   const [analytics, setAnalytics] = useState<{ total: number; today: number; thisWeek: number } | null>(null);
@@ -82,8 +94,18 @@ export function IntegrationsPage() {
 
     // WhatsApp status
     apiFetch('/api/whatsapp/status')
-      .then((data) => setWaStatus(data))
+      .then((data) => {
+        setWaStatus(data);
+        if (data?.settings) {
+          setWaSettings((prev) => ({ ...prev, ...data.settings }));
+        }
+      })
       .catch(() => setWaStatus({ connected: false }));
+
+    // WhatsApp stats
+    apiFetch('/api/whatsapp/stats')
+      .then((data) => setWaStats(data))
+      .catch(() => setWaStats(null));
 
     // Widget analytics
     apiFetch('/api/widget/analytics')
@@ -162,6 +184,18 @@ export function IntegrationsPage() {
       alert('Failed to disconnect');
     } finally {
       setWaLoading(false);
+    }
+  };
+
+  const saveWhatsAppSettings = async () => {
+    try {
+      await apiFetch('/api/whatsapp/settings', {
+        method: 'POST',
+        body: JSON.stringify(waSettings),
+      });
+      alert('WhatsApp settings saved');
+    } catch (e: any) {
+      alert(e.message || 'Failed to save WhatsApp settings');
     }
   };
 
@@ -343,6 +377,63 @@ export function IntegrationsPage() {
                   <span className="text-green-500">●</span>
                   <span>Connected: {waStatus.phoneNumber}</span>
                 </div>
+                {waStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div className="rounded-md border p-2">
+                      <div className="text-lg font-semibold">{waStats.todayMessages}</div>
+                      <div className="text-xs text-muted-foreground">Messages today</div>
+                    </div>
+                    <div className="rounded-md border p-2">
+                      <div className="text-lg font-semibold">{waStats.todayConversions}</div>
+                      <div className="text-xs text-muted-foreground">Conversions</div>
+                    </div>
+                    <div className="rounded-md border p-2">
+                      <div className="text-lg font-semibold">
+                        ${(waStats.todayRevenueCents / 100).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Revenue today</div>
+                    </div>
+                    <div className="rounded-md border p-2">
+                      <div className="text-lg font-semibold">{waStats.totalMessages}</div>
+                      <div className="text-xs text-muted-foreground">Total messages</div>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={waSettings.autoReply}
+                      onChange={(e) => setWaSettings((prev) => ({ ...prev, autoReply: e.target.checked }))}
+                    />
+                    <span className="text-sm">Auto-reply</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={waSettings.paymentEnabled}
+                      onChange={(e) => setWaSettings((prev) => ({ ...prev, paymentEnabled: e.target.checked }))}
+                    />
+                    <span className="text-sm">Payment links</span>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Business hours</div>
+                    <Input
+                      value={waSettings.businessHours}
+                      onChange={(e) => setWaSettings((prev) => ({ ...prev, businessHours: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Greeting</div>
+                    <Input
+                      value={waSettings.greeting}
+                      onChange={(e) => setWaSettings((prev) => ({ ...prev, greeting: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <Button variant="outline" onClick={saveWhatsAppSettings}>
+                  Save Settings
+                </Button>
                 <Button variant="destructive" onClick={disconnectWhatsApp} disabled={waLoading}>
                   {waLoading ? 'Disconnecting...' : 'Disconnect'}
                 </Button>

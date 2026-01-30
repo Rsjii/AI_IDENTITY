@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { userQueries, stripePaymentQueries, chatMessageQueries, db } from '../../config/database';
+import { userQueries, stripePaymentQueries, chatMessageQueries, db, premiumSessionQueries } from '../../config/database';
 import Stripe from 'stripe';
 import { logger } from '../../config/logger';
 import { EmailService } from '../auth/authService';
@@ -125,6 +125,20 @@ export async function confirmPayment(req: Request, res: Response) {
       creatorEarningsCents: creatorEarnings,
       type: 'pay_per_chat',
     });
+
+    // ✅ Create premium session window (24 hours)
+    if (metaSessionId || sessionId) {
+      const resolvedSessionId = metaSessionId || sessionId || '';
+      if (resolvedSessionId) {
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await premiumSessionQueries.create({
+          creatorId: metaCreatorId || creatorId,
+          sessionId: resolvedSessionId,
+          stripePaymentId: paymentIntentId,
+          expiresAt,
+        });
+      }
+    }
 
     // ✅ Log PAYMENT_COMPLETED event
     EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_COMPLETED, {

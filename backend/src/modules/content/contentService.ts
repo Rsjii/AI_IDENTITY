@@ -3,6 +3,7 @@ import { knowledgeSourceQueries, knowledgeChunkQueries } from '../../config/data
 import { logger } from '../../config/logger';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { ragService } from '../../services/ragService';
+import { ensureTrainingJob } from '../../services/trainingJobService';
 
 // PDF parsing
 let pdfParse: any = null;
@@ -127,6 +128,8 @@ export async function createPasteSource(userId: string, title: string | undefine
     logger.warn('[Content] Failed to generate embeddings:', err);
   });
 
+  await ensureTrainingJob(userId);
+
   return source;
 }
 
@@ -155,6 +158,8 @@ export async function createYoutubeSource(userId: string, url: string, title?: s
       logger.warn('[Content] Failed to generate embeddings:', err);
     });
   }
+
+  await ensureTrainingJob(userId);
 
   return source;
 }
@@ -203,6 +208,8 @@ export async function createFileSource(userId: string, file: Express.Multer.File
       logger.warn('[Content] Failed to generate embeddings:', err);
     });
   }
+
+  await ensureTrainingJob(userId);
 
   return source;
 }

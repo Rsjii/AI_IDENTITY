@@ -124,3 +124,22 @@ export async function generateVoice(req: Request, res: Response) {
     return res.status(500).json({ error: 'Failed to generate voice', message: error.message });
   }
 }
+
+/**
+ * PATCH /api/voice/:voiceId/settings
+ * Update voice settings
+ */
+export async function updateVoiceSettings(req: Request, res: Response) {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const { voiceId } = req.params;
+    const settings = req.body?.settings || req.body || {};
+    const updated = await voiceService.updateVoiceSettings(userId, voiceId, settings);
+    return res.status(200).json({ success: true, voice: updated });
+  } catch (error: any) {
+    logger.error('[Voice Settings] Error:', error);
+    return res.status(500).json({ error: 'Failed to update voice settings', message: error.message });
+  }
+}

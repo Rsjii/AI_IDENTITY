@@ -41,7 +41,11 @@ async function createElevenLabsVoice(audioBuffer: Buffer, fileName: string, labe
 /**
  * Generate speech using ElevenLabs TTS
  */
-async function generateElevenLabsSpeech(voiceId: string, text: string): Promise<ArrayBuffer> {
+async function generateElevenLabsSpeech(
+  voiceId: string,
+  text: string,
+  settings?: { stability?: number; similarity_boost?: number }
+): Promise<ArrayBuffer> {
   if (!ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY not configured');
   }
@@ -56,8 +60,8 @@ async function generateElevenLabsSpeech(voiceId: string, text: string): Promise<
       text,
       model_id: 'eleven_monolingual_v1',
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
+        stability: settings?.stability ?? 0.5,
+        similarity_boost: settings?.similarity_boost ?? 0.75,
       },
     }),
   });
@@ -182,6 +186,17 @@ export async function deleteVoice(userId: string, voiceId: string) {
 }
 
 /**
+ * Update voice settings (speed/pitch/emotion placeholders)
+ */
+export async function updateVoiceSettings(userId: string, voiceId: string, settings: any) {
+  const voice = await voiceCloneQueries.findById(voiceId);
+  if (!voice || voice.userId !== userId) {
+    throw new Error('Voice clone not found');
+  }
+  return await voiceCloneQueries.updateSettings(voiceId, settings || {});
+}
+
+/**
  * Generate voice audio from text
  */
 export async function generateVoiceAudio(userId: string, voiceCloneId: string, text: string): Promise<string> {
@@ -190,7 +205,8 @@ export async function generateVoiceAudio(userId: string, voiceCloneId: string, t
   if (voice.status !== 'ready') throw new Error('Voice clone is not ready yet');
   if (!voice.voiceId) throw new Error('Voice clone has no provider voice ID');
 
-  const ab = await generateElevenLabsSpeech(voice.voiceId, text);
+  const settings = (voice.settings || {}) as { stability?: number; similarity_boost?: number };
+  const ab = await generateElevenLabsSpeech(voice.voiceId, text, settings);
   const buf = Buffer.from(ab);
 
   // Upload generated audio to S3/R2 and return a public URL

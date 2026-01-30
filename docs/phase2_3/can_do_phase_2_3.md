@@ -5,6 +5,16 @@ Goal: keep the live system simple; add these only when metrics/ops pain proves i
 
 ---
 
+## Z) Deferred from FINAL_REQUIREMENTS_GAP_PLAN (Not needed now)
+
+- Voice settings expansion (speed/pitch/emotion) + usage stats UI.
+- WhatsApp: Stripe payment link generation inside chat (beyond public chat link).
+- Instagram DM: 24-hour response window enforcement + 200/hour rate limits.
+- Phone integration: real-time voice flow (Twilio + Whisper + TTS streaming).
+- Advanced analytics dashboard (geo, funnel, insights, export).
+- Mobile apps full implementation.
+- Video avatar settings/triggers (quality, length, routing).
+
 ## A) Redis (Queue + Rate-limit + Cache)
 
 ### A1) Redis Queue (BullMQ) for WhatsApp/Instagram webhooks

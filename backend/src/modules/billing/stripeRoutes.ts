@@ -5,6 +5,12 @@ import { asyncHandler } from '../../middleware/errorHandler';
 import { createCheckoutSession, stripeWebhook } from './stripeController';
 import { upgradePlan, downgradePlan, cancelSubscription } from './subscriptionService';
 
+function normalizePlan(input: string): 'starter' | 'growth' | 'scale' | 'free' {
+  if (input === 'pro') return 'starter';
+  if (input === 'starter' || input === 'growth' || input === 'scale' || input === 'free') return input;
+  throw new Error('Invalid plan');
+}
+
 const router = Router();
 
 // subscription checkout (auth + CSRF)
@@ -16,11 +22,14 @@ router.post('/upgrade', requireJWTFromCookie, validateCSRF, asyncHandler(async (
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   
   const { plan } = req.body;
-  if (!['starter', 'growth', 'scale'].includes(plan)) {
+  let normalizedPlan: 'starter' | 'growth' | 'scale';
+  try {
+    normalizedPlan = normalizePlan(String(plan)) as 'starter' | 'growth' | 'scale';
+  } catch {
     return res.status(400).json({ error: 'Invalid plan' });
   }
   
-  const result = await upgradePlan(userId, plan);
+  const result = await upgradePlan(userId, normalizedPlan);
   if (result.success) {
     return res.json({ success: true, message: 'Plan upgraded successfully' });
   }
@@ -32,11 +41,14 @@ router.post('/downgrade', requireJWTFromCookie, validateCSRF, asyncHandler(async
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   
   const { plan } = req.body;
-  if (!['starter', 'growth', 'free'].includes(plan)) {
+  let normalizedPlan: 'starter' | 'growth' | 'free';
+  try {
+    normalizedPlan = normalizePlan(String(plan)) as 'starter' | 'growth' | 'free';
+  } catch {
     return res.status(400).json({ error: 'Invalid plan' });
   }
   
-  const result = await downgradePlan(userId, plan);
+  const result = await downgradePlan(userId, normalizedPlan);
   if (result.success) {
     return res.json({ success: true, message: 'Plan downgraded successfully' });
   }

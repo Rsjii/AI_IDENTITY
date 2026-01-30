@@ -7,12 +7,23 @@ function getFrontendUrl(): string {
   return process.env.FRONTEND_URL || 'http://localhost:5173';
 }
 
+function normalizeTier(input: string): 'starter' | 'growth' | 'scale' {
+  if (input === 'pro') return 'starter';
+  if (input === 'starter' || input === 'growth' || input === 'scale') return input;
+  throw new Error('Invalid tier');
+}
+
 export async function createCheckoutSession(req: Request, res: Response) {
   const userId = (req as any).user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const tier = String(req.body?.tier || '') as 'starter' | 'growth' | 'scale';
-  if (!['starter', 'growth', 'scale'].includes(tier)) return res.status(400).json({ error: 'Invalid tier' });
+  const tierRaw = String(req.body?.tier || '');
+  let tier: 'starter' | 'growth' | 'scale';
+  try {
+    tier = normalizeTier(tierRaw);
+  } catch {
+    return res.status(400).json({ error: 'Invalid tier' });
+  }
 
   const returnUrl = req.body?.returnUrl || '/onboarding/deploy?paid=1';
   const frontendUrl = getFrontendUrl();
@@ -164,9 +175,15 @@ export async function stripeWebhook(req: Request, res: Response) {
       const userId = sess?.metadata?.userId;
       const tier = sess?.metadata?.tier;
 
-      if (userId && ['starter', 'growth', 'scale'].includes(tier)) {
-        await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [tier, userId]);
-        logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${tier} from checkout.session.completed`);
+      let normalizedTier: 'starter' | 'growth' | 'scale' | null = null;
+      try {
+        normalizedTier = tier ? normalizeTier(tier) : null;
+      } catch {
+        normalizedTier = null;
+      }
+      if (userId && normalizedTier) {
+        await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [normalizedTier, userId]);
+        logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${normalizedTier} from checkout.session.completed`);
       } else if (sess?.metadata?.type === 'marketplace_subscription') {
         const listingId = sess?.metadata?.listingId;
         const subscriptionId = sess?.subscription;

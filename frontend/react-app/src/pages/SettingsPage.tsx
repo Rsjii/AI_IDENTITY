@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, TestTube } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { Label } from '@/components/ui/label';
@@ -130,6 +130,23 @@ export function SettingsPage() {
       }
     }
   }, [state]);
+
+  const loadVariantGroups = async () => {
+    setLoadingVariants(true);
+    try {
+      const res = await apiFetch<{ success: boolean; groups: any[] }>('/api/identity/variants/list');
+      if (res.success && Array.isArray(res.groups)) {
+        setVariantGroups(res.groups);
+      } else {
+        setVariantGroups([]);
+      }
+    } catch (e) {
+      console.error('Failed to load variant groups:', e);
+      setVariantGroups([]);
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
 
   // Load active sessions when user is authenticated and Security tab is opened
   useEffect(() => {
@@ -347,7 +364,7 @@ export function SettingsPage() {
     }
   };
 
-  const upgradePlan = async (tier: 'starter' | 'growth' | 'scale') => {
+  const upgradePlan = async (tier: 'pro' | 'growth' | 'scale') => {
     setSaving(true);
     setError('');
     try {
@@ -407,7 +424,7 @@ export function SettingsPage() {
 
   const planNames: Record<string, string> = {
     free: 'Free',
-    starter: 'Starter',
+    starter: 'Pro',
     growth: 'Growth',
     scale: 'Scale',
   };
@@ -818,10 +835,10 @@ export function SettingsPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <Button
                       variant={planTier === 'starter' ? 'default' : 'outline'}
-                      onClick={() => upgradePlan('starter')}
+                      onClick={() => upgradePlan('pro')}
                       disabled={saving || planTier === 'starter'}
                     >
-                      Starter ($49/mo)
+                      Pro ($49/mo)
                     </Button>
                     <Button
                       variant={planTier === 'growth' ? 'default' : 'outline'}

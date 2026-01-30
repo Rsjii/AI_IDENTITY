@@ -42,4 +42,7 @@ router.delete('/:voiceId', validateCSRF, voiceController.deleteVoiceClone);
 // Generate TTS (CSRF)
 router.post('/generate', validateCSRF, voiceController.generateVoice);
 
+// Update settings (CSRF)
+router.patch('/:voiceId/settings', validateCSRF, voiceController.updateVoiceSettings);
+
 export default router;

@@ -6,6 +6,7 @@ import { initializeDatabase } from './config/database';
 import { initializePostHog, shutdownPostHog } from './services/posthogService';
 import { validateEnv } from './config/envValidation';
 import { initializeRazorpay } from './services/razorpayService';
+import { processTrainingJobs } from './services/trainingJobService';
 
 // Initialize Sentry (error tracking)
 if (process.env.SENTRY_DSN && !isDev) {
@@ -159,6 +160,13 @@ async function startServer() {
       logger.info(`📧 Email configured: ${config.mail.smtp.user ? 'Yes' : 'No'}`);
       logger.info(`💾 Database: ${dbConnected ? '✅ Connected' : '⚠️ Degraded mode (DB unavailable)'}`);
     });
+
+    // ✅ Background training job processor (runs every 2 minutes)
+    setInterval(() => {
+      processTrainingJobs().catch((err) => {
+        logger.warn('[TrainingJobs] Processing failed:', err?.message || err);
+      });
+    }, 2 * 60 * 1000);
 
     // Handle server errors
     server.on('error', (error: NodeJS.ErrnoException) => {
