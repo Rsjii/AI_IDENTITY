@@ -13,12 +13,37 @@ type Msg = {
   audioUrl?: string | null;
 };
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
+
+function getCookie(name: string): string | null {
+  try {
+    const m = document.cookie.match(new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`));
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCookie(name: string, value: string, maxAgeSeconds: number): void {
+  // Keep it simple + predictable for Phase-1: JS-readable cookie, 30-day max-age, Lax.
+  document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Lax`;
+}
+
 function getOrCreateVisitorId(): string {
+  // Phase-1 spec: session stored in browser (cookie) and persists up to ~30 days.
   const k = 'selflyx_visitor_id';
-  const existing = localStorage.getItem(k);
-  if (existing) return existing;
+  const existingCookie = getCookie(k);
+  const existingLocal = localStorage.getItem(k);
+  const existing = existingCookie || existingLocal;
+  if (existing) {
+    // Ensure cookie is set for Phase-1 spec compliance
+    if (!existingCookie) setCookie(k, existing, THIRTY_DAYS_SECONDS);
+    return existing;
+  }
   const v = `v_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   localStorage.setItem(k, v);
+  setCookie(k, v, THIRTY_DAYS_SECONDS);
   return v;
 }
 
@@ -46,6 +71,7 @@ export function PublicChatPage() {
   const { slug = '' } = useParams();
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
   const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
+  const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
   const [creator, setCreator] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [text, setText] = useState('');
@@ -78,7 +104,26 @@ export function PublicChatPage() {
 
   // Load previous session history if available
   useEffect(() => {
-    const savedSessionId = sessionKey ? localStorage.getItem(sessionKey) : null;
+    if (!sessionKey) return;
+
+    // Prefer cookie (spec), fallback to localStorage (backward compatibility)
+    const cookieSessionId = getCookie(sessionKey);
+    const savedSessionId = cookieSessionId || localStorage.getItem(sessionKey);
+    const savedTs = Number(localStorage.getItem(sessionTsKey) || '0');
+
+    // Enforce "history persists for 30 days" behavior from spec:
+    // - If we only have a stale localStorage entry, clear it and start fresh.
+    if (!cookieSessionId && savedSessionId) {
+      const isFresh = savedTs > 0 && Date.now() - savedTs < THIRTY_DAYS_MS;
+      if (!isFresh) {
+        localStorage.removeItem(sessionKey);
+        localStorage.removeItem(sessionTsKey);
+        return;
+      }
+      // Re-establish cookie for the remaining window (sliding, based on last activity).
+      setCookie(sessionKey, savedSessionId, THIRTY_DAYS_SECONDS);
+    }
+
     if (!savedSessionId) return;
 
     fetch(`/api/public/history?sessionId=${encodeURIComponent(savedSessionId)}&visitorId=${encodeURIComponent(visitorId)}`)
@@ -86,6 +131,8 @@ export function PublicChatPage() {
       .then((d) => {
         if (!d?.success) return;
         setSessionId(d.sessionId || savedSessionId);
+        // Touch last-activity timestamp (sliding 30-day window)
+        localStorage.setItem(sessionTsKey, String(Date.now()));
         const historyMsgs: Msg[] = (d.messages || []).map((m: any) => ({
           id: m.id,
           role: m.role,
@@ -95,7 +142,7 @@ export function PublicChatPage() {
         setMsgs(historyMsgs);
       })
       .catch(() => {});
-  }, [sessionKey, visitorId]);
+  }, [sessionKey, sessionTsKey, visitorId]);
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
@@ -126,6 +173,8 @@ export function PublicChatPage() {
       setSessionId(newSessionId);
       if (newSessionId && sessionKey) {
         localStorage.setItem(sessionKey, newSessionId);
+        localStorage.setItem(sessionTsKey, String(Date.now()));
+        setCookie(sessionKey, newSessionId, THIRTY_DAYS_SECONDS);
       }
       
       // Check if payment is required
