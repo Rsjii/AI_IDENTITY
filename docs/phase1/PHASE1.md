@@ -6,7 +6,7 @@
 ```
 You create a platform where:
 1. Creators upload their content (blogs, videos, voice)
-2. AI learns their personality in 24 hours
+2. AI processes their content asynchronously (ready shortly after processing completes)
 3. Fans chat with AI (feels like talking to real creator)
 4. Fans pay for detailed answers ($5-50)
 5. You take 25%, creator gets 75%
@@ -75,7 +75,7 @@ What it does:
 - Creator fills simple form
 - Uploads 3-5 documents (PDFs/text files)
 - System processes in background
-- AI ready in 24 hours
+- AI ready shortly after processing completes (no fixed 24h delay)
 
 Flow:
 1. Dashboard → "Create AI Clone" button
@@ -89,12 +89,12 @@ Flow:
    ├─ Response style (brief/detailed)
    └─ Upload 3-5 files (drag-drop)
    
-3. Click "Create" → Shows "Training... 24 hours"
+3. Click "Create" → Shows "Training... (processing in background)"
 4. Email sent when ready
 
 Behind the scenes:
 - Files uploaded to storage (Supabase)
-- Background job processes text
+- Background job processes text and builds embeddings (interval-based)
 - Creates AI prompt with personality
 - Saves to database
 - Status changes from "training" to "active"
@@ -156,6 +156,7 @@ Plans:
 Implementation:
 - Stripe Checkout page
 - After payment → webhook updates database
+- Webhook: /api/billing/stripe/webhook
 - Dashboard shows current plan
 - Usage limits enforced
 ```

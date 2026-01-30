@@ -15,6 +15,17 @@
     return;
   }
 
+  function getOrCreateVisitorId() {
+    const key = `selflyx_widget_visitor_${CREATOR_ID}`;
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const v = `wv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    localStorage.setItem(key, v);
+    return v;
+  }
+
+  const VISITOR_ID = getOrCreateVisitorId();
+
   const root = document.getElementById('selflyx-widget-root');
   if (!root) return;
 
@@ -125,6 +136,7 @@
           creatorId: CREATOR_ID,
           message: text,
           voiceEnabled: VOICE_ENABLED,
+          visitorId: VISITOR_ID,
         }),
       });
       const data = await res.json();
@@ -135,7 +147,8 @@
         addMessage(`The creator has reached their plan limit. Please visit ${upgradeUrl} to upgrade.`, false);
       } else if (data.requiresPayment) {
         const creatorSlug = CREATOR_SLUG || CREATOR_ID;
-        addMessage(`This is a premium feature. Click here to unlock: ${API_BASE}/chat/${creatorSlug}?upgrade=1`, false);
+        const upgradeUrl = data.upgradeUrl || `${API_BASE}/chat/${creatorSlug}?upgrade=1`;
+        addMessage(`This is a premium feature. Click here to unlock: ${upgradeUrl}`, false);
       } else if (data.reply) {
         addMessage(data.reply, false, data.audioUrl);
       } else {

@@ -276,7 +276,8 @@ After Payment:
 ```
 Payment Flow:
 ├─ Stripe Payment Links (for quick checkout)
-├─ Webhook: /api/stripe/webhook (confirms payment)
+├─ Webhook: /api/billing/stripe/webhook (confirms payment)
+├─ Website widget uses iframe embed; paywall redirects to full /chat/[slug] for payment
 ├─ Unlock premium features in real-time
 └─ Revenue split: Auto-transfer to creator (75%)
 

@@ -2,9 +2,18 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { detokenizeId } from '../../utils/idTokenization';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
-import { widgetChatLogQueries, voiceCloneQueries, db, chatSessionQueries } from '../../config/database';
+import {
+  widgetChatLogQueries,
+  voiceCloneQueries,
+  db,
+  chatSessionQueries,
+  chatMessageQueries,
+  premiumSessionQueries,
+  userQueries,
+} from '../../config/database';
 import { generateVoiceAudio } from '../voice/voiceService';
 import { logger } from '../../config/logger';
+import { config } from '../../config/env';
 
 const chatSchema = z.object({
   creatorId: z.string().min(1), // tokenized preferred
@@ -52,6 +61,11 @@ export async function widgetChat(req: Request, res: Response) {
   const detok = detokenizeId(creatorId, { endpoint: '/api/widget/chat' });
   const creatorUserId = detok?.id || creatorId;
 
+  const creator = await userQueries.findById(creatorUserId);
+  if (!creator || !creator.active) {
+    return res.status(404).json({ error: 'Creator not found' });
+  }
+
   // ✅ Check creator's plan limit (PHASE1 requirement - same as public chat)
   const { tier, trialActive } = await getUserPlan(creatorUserId);
   const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
@@ -94,11 +108,59 @@ export async function widgetChat(req: Request, res: Response) {
     });
   }
 
-  const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, { 
+  // Persist user message + compute gating decision (match public chat behavior)
+  const FREE_MESSAGE_LIMIT = 3;
+  const sessionMessages = await chatMessageQueries.countBySession(session.id);
+  await chatMessageQueries.add({ sessionId: session.id, role: 'user', content: message });
+
+  const hasPremiumSession = await premiumSessionQueries.isSessionPremium(session.id);
+  const enablePayments = (creator.priceConfig as any)?.enablePayments === true;
+
+  if (enablePayments && !hasPremiumSession) {
+    const recentMessages = await chatMessageQueries.listForSession(session.id);
+    const conversationContext = recentMessages
+      .filter((m: any) => m.role === 'user')
+      .slice(-5)
+      .map((m: any) => m.content);
+
+    const triggerRules = (creator.priceConfig as any)?.paymentTriggerRules || {};
+    const { shouldRequirePayment: intelligentPricing } = await import('../identity/intelligentPricing');
+    const intelligentDecision = intelligentPricing(message, conversationContext, creator.priceConfig);
+
+    const shouldRequirePayment =
+      sessionMessages >= FREE_MESSAGE_LIMIT || // Always after free limit
+      triggerRules.alwaysRequire === true || // Creator set always require
+      intelligentDecision.requiresPayment || // Intelligent detection
+      (triggerRules.keywords?.length > 0 && triggerRules.keywords.some((kw: string) =>
+        message.toLowerCase().includes(kw.toLowerCase())
+      )) || // Keyword match
+      (triggerRules.minLength > 0 && message.length >= triggerRules.minLength); // Length threshold
+
+    if (shouldRequirePayment) {
+      const frontendUrl = config.frontendUrl || `${req.protocol}://${req.get('host')}`;
+      const slug = (creator as any).publicSlug || creator.handle || creatorUserId;
+      const upgradeUrl = `${frontendUrl}/chat/${slug}?upgrade=1`;
+
+      await widgetChatLogQueries.create(creatorUserId, null, message, '');
+
+      return res.json({
+        success: true,
+        requiresPayment: true,
+        upgradeUrl,
+        sessionId: session.id,
+      });
+    }
+  }
+
+  const result = await generateMirrorReplyWithLogging(creatorUserId, 'widget', message, {
     platform: 'api',
     visitorId: finalVisitorId,
     sessionId: session.id,
   });
+
+  if (result.reply) {
+    await chatMessageQueries.add({ sessionId: session.id, role: 'assistant', content: result.reply });
+  }
 
   await widgetChatLogQueries.create(creatorUserId, null, message, result.reply || '');
 
