@@ -66,6 +66,8 @@ export function SettingsPage() {
     pendingEarningsCents: number;
   } | null>(null);
   const [requestingPayout, setRequestingPayout] = useState(false);
+  const [stripeConnectStatus, setStripeConnectStatus] = useState<any>(null);
+  const [connectingStripe, setConnectingStripe] = useState(false);
 
   // Active sessions (chat sessions) for Security tab
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -120,6 +122,7 @@ export function SettingsPage() {
       setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
 
       loadBillingHistory();
+      loadStripeConnectStatus();
 
       // Load variant groups if Scale plan
       if ((state.user as any).planTier === 'scale') {
@@ -170,6 +173,17 @@ export function SettingsPage() {
     }
   };
 
+  const loadStripeConnectStatus = async () => {
+    if (state.status !== 'authenticated') return;
+    try {
+      const res = await apiFetch('/api/creator/stripe/status');
+      setStripeConnectStatus(res);
+    } catch (e: any) {
+      console.error('Failed to load Stripe Connect status:', e);
+      setStripeConnectStatus({ connected: false });
+    }
+  };
+
   const handleExportCSV = async () => {
     try {
       const res = await fetch('/api/creator/earnings/export', {
@@ -202,6 +216,21 @@ export function SettingsPage() {
       setError(e.message || 'Failed to request payout');
     } finally {
       setRequestingPayout(false);
+    }
+  };
+
+  const handleConnectStripe = async () => {
+    setConnectingStripe(true);
+    try {
+      const res = await apiFetch<{ url: string }>('/api/creator/stripe/connect', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      window.location.href = res.url;
+    } catch (e: any) {
+      setError(e.message || 'Failed to start Stripe onboarding');
+    } finally {
+      setConnectingStripe(false);
     }
   };
 
@@ -810,6 +839,28 @@ export function SettingsPage() {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Stripe Connect</CardTitle>
+                <CardDescription>Enable marketplace payouts by connecting Stripe.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {stripeConnectStatus?.connected ? (
+                  <div className="space-y-2 text-sm text-text-secondary">
+                    <div>Connected: {stripeConnectStatus.chargesEnabled ? 'Charges enabled' : 'Charges pending'}</div>
+                    <div>Payouts: {stripeConnectStatus.payoutsEnabled ? 'Enabled' : 'Disabled'}</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-text-secondary">
+                    Not connected. Connect to receive marketplace payouts.
+                  </div>
+                )}
+                <Button onClick={handleConnectStripe} disabled={connectingStripe}>
+                  {connectingStripe ? 'Connecting…' : stripeConnectStatus?.connected ? 'Update Stripe Info' : 'Connect Stripe'}
+                </Button>
               </CardContent>
             </Card>
 

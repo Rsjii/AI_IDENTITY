@@ -17,6 +17,7 @@ import { errorHandlerMiddleware } from './middleware/errorHandler';
 import { globalRateLimit } from './middleware/rateLimit';
 import { extractJWTFromCookie } from './middleware/jwtCookie';
 import { generateCSRFToken } from './middleware/csrf';
+import { isFeatureEnabled } from './config/featureFlags';
 
 // API routes
 import authRoutes from './modules/auth/authRoutes';
@@ -39,6 +40,11 @@ import publicRoutes from './modules/public/publicRoutes';
 import creatorRoutes from './modules/creator/creatorRoutes';
 import payPerChatRoutes from './modules/payments/payPerChatRoutes';
 import rateLimitRoutes from './modules/rateLimit/rateLimitRoutes';
+import marketplaceListingRoutes from './modules/marketplace/listingRoutes';
+import marketplaceReviewRoutes from './modules/marketplace/reviewRoutes';
+import marketplaceSubscriptionRoutes from './modules/marketplace/subscriptionRoutes';
+import videoRoutes from './modules/video/videoRoutes';
+import phoneRoutes from './modules/phone/phoneRoutes';
 
 
 // Page routes
@@ -476,16 +482,40 @@ app.use('/api/history', historyRoutes);
 app.use('/api/extension', extensionRoutes);
 app.use('/api/ext', extRoutes);
 app.use('/api/payment', paymentRoutes);
-app.use('/api/voice', voiceRoutes);
-app.use('/api/widget', widgetRoutes);
-app.use('/api/instagram', instagramRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
+
+// Phase 2/3 routes are gated behind feature flags (opt-in in prod; default on in dev)
+if (isFeatureEnabled('ENABLE_VOICE')) {
+  app.use('/api/voice', voiceRoutes);
+}
+if (isFeatureEnabled('ENABLE_WIDGET')) {
+  app.use('/api/widget', widgetRoutes);
+}
+if (isFeatureEnabled('ENABLE_INSTAGRAM')) {
+  app.use('/api/instagram', instagramRoutes);
+}
+if (isFeatureEnabled('ENABLE_WHATSAPP')) {
+  app.use('/api/whatsapp', whatsappRoutes);
+}
+
 app.use('/api/billing/stripe', stripeRoutes);
-app.use('/api/payments/pay-per-chat', payPerChatRoutes);
+if (isFeatureEnabled('ENABLE_PAYMENTS') && isFeatureEnabled('ENABLE_PAY_PER_CHAT')) {
+  app.use('/api/payments/pay-per-chat', payPerChatRoutes);
+}
 app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
+if (isFeatureEnabled('ENABLE_MARKETPLACE') && isFeatureEnabled('ENABLE_PAYMENTS')) {
+  app.use('/api/marketplace', marketplaceListingRoutes);
+  app.use('/api/marketplace', marketplaceReviewRoutes);
+  app.use('/api/marketplace', marketplaceSubscriptionRoutes);
+}
+if (isFeatureEnabled('ENABLE_VIDEO')) {
+  app.use('/api/video', videoRoutes);
+}
+if (isFeatureEnabled('ENABLE_PHONE') && isFeatureEnabled('ENABLE_PAYMENTS')) {
+  app.use('/api/phone', phoneRoutes);
+}
 
 // Health check
 app.get('/health', (_req, res) => {

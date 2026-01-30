@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Selflyx",
+    "slug": "selflyx",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {}
+  }
+}
+

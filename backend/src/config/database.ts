@@ -598,6 +598,141 @@ CREATE INDEX IF NOT EXISTS "idx_user_profileCompleted" ON "User"("profileComplet
 
 -- Knowledge chunks optimization for RAG
 CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_userId_sourceId" ON "knowledge_chunks"("userId", "sourceId");
+
+-- ========== MARKETPLACE (Phase 2) ==========
+
+CREATE TABLE IF NOT EXISTS "marketplace_listings" (
+  "id" TEXT PRIMARY KEY,
+  "creatorId" TEXT NOT NULL,
+  "slug" TEXT UNIQUE,
+  "isPublic" BOOLEAN NOT NULL DEFAULT false,
+  "category" TEXT,
+  "subscriptionPriceCents" INTEGER NOT NULL DEFAULT 0,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "freeTrialQuestions" INTEGER NOT NULL DEFAULT 0,
+  "description" TEXT,
+  "tags" TEXT[],
+  "totalSubscribers" INTEGER NOT NULL DEFAULT 0,
+  "rating" NUMERIC(2,1),
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_creatorId" ON "marketplace_listings"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_isPublic" ON "marketplace_listings"("isPublic");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_category" ON "marketplace_listings"("category");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_rating" ON "marketplace_listings"("rating");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_price" ON "marketplace_listings"("subscriptionPriceCents");
+
+ALTER TABLE "marketplace_listings" DROP CONSTRAINT IF EXISTS "marketplace_listings_creatorId_fkey";
+ALTER TABLE "marketplace_listings" ADD CONSTRAINT "marketplace_listings_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE IF NOT EXISTS "marketplace_reviews" (
+  "id" TEXT PRIMARY KEY,
+  "listingId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "rating" INTEGER NOT NULL CHECK ("rating" BETWEEN 1 AND 5),
+  "comment" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_marketplace_reviews_listingId" ON "marketplace_reviews"("listingId");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_reviews_userId" ON "marketplace_reviews"("userId");
+
+ALTER TABLE "marketplace_reviews" DROP CONSTRAINT IF EXISTS "marketplace_reviews_listingId_fkey";
+ALTER TABLE "marketplace_reviews" ADD CONSTRAINT "marketplace_reviews_listingId_fkey"
+  FOREIGN KEY ("listingId") REFERENCES "marketplace_listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "marketplace_reviews" DROP CONSTRAINT IF EXISTS "marketplace_reviews_userId_fkey";
+ALTER TABLE "marketplace_reviews" ADD CONSTRAINT "marketplace_reviews_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE IF NOT EXISTS "marketplace_subscriptions" (
+  "id" TEXT PRIMARY KEY,
+  "listingId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "stripeSubscriptionId" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'active' CHECK ("status" IN ('active','trialing','past_due','canceled','incomplete','incomplete_expired','unpaid')),
+  "currentPeriodStart" TIMESTAMPTZ,
+  "currentPeriodEnd" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_marketplace_subscriptions_listingId" ON "marketplace_subscriptions"("listingId");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_subscriptions_userId" ON "marketplace_subscriptions"("userId");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_subscriptions_status" ON "marketplace_subscriptions"("status");
+
+ALTER TABLE "marketplace_subscriptions" DROP CONSTRAINT IF EXISTS "marketplace_subscriptions_listingId_fkey";
+ALTER TABLE "marketplace_subscriptions" ADD CONSTRAINT "marketplace_subscriptions_listingId_fkey"
+  FOREIGN KEY ("listingId") REFERENCES "marketplace_listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "marketplace_subscriptions" DROP CONSTRAINT IF EXISTS "marketplace_subscriptions_userId_fkey";
+ALTER TABLE "marketplace_subscriptions" ADD CONSTRAINT "marketplace_subscriptions_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== VIDEO AVATARS (Phase 3) ==========
+CREATE TABLE IF NOT EXISTS "video_avatars" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "provider" TEXT NOT NULL DEFAULT 'did',
+  "avatarId" TEXT,
+  "label" TEXT,
+  "sampleVideoUrl" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending','training','ready','failed')),
+  "settings" JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_video_avatars_userId" ON "video_avatars"("userId");
+CREATE INDEX IF NOT EXISTS "idx_video_avatars_status" ON "video_avatars"("status");
+
+ALTER TABLE "video_avatars" DROP CONSTRAINT IF EXISTS "video_avatars_userId_fkey";
+ALTER TABLE "video_avatars" ADD CONSTRAINT "video_avatars_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== PHONE CALLS (Phase 3) ==========
+CREATE TABLE IF NOT EXISTS "phone_calls" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "callerNumber" TEXT,
+  "callSid" TEXT,
+  "durationSeconds" INTEGER,
+  "transcript" TEXT,
+  "recordingUrl" TEXT,
+  "amountChargedCents" INTEGER,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_phone_calls_userId" ON "phone_calls"("userId");
+CREATE INDEX IF NOT EXISTS "idx_phone_calls_createdAt" ON "phone_calls"("createdAt");
+
+ALTER TABLE "phone_calls" DROP CONSTRAINT IF EXISTS "phone_calls_userId_fkey";
+ALTER TABLE "phone_calls" ADD CONSTRAINT "phone_calls_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== ADVANCED ANALYTICS (Phase 3) ==========
+CREATE TABLE IF NOT EXISTS "analytics_daily" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "date" DATE NOT NULL,
+  "totalChats" INTEGER NOT NULL DEFAULT 0,
+  "totalMessages" INTEGER NOT NULL DEFAULT 0,
+  "uniqueUsers" INTEGER NOT NULL DEFAULT 0,
+  "revenueCents" INTEGER NOT NULL DEFAULT 0,
+  "avgResponseTimeMs" INTEGER,
+  "satisfactionScore" INTEGER,
+  "topQuestions" JSONB,
+  "geographicData" JSONB
+);
+
+CREATE INDEX IF NOT EXISTS "idx_analytics_daily_userId_date" ON "analytics_daily"("userId","date");
+
+ALTER TABLE "analytics_daily" DROP CONSTRAINT IF EXISTS "analytics_daily_userId_fkey";
+ALTER TABLE "analytics_daily" ADD CONSTRAINT "analytics_daily_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 `;
 
 export async function initializeDatabase() {

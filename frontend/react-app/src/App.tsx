@@ -34,6 +34,12 @@ import { PublicChatPage } from './pages/PublicChatPage';
 import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { CreatorPublicProfile } from './pages/CreatorPublicProfile';
+import { MarketplacePage } from './pages/MarketplacePage';
+import { MarketplaceListingPage } from './pages/MarketplaceListingPage';
+import { MarketplaceManagePage } from './pages/MarketplaceManagePage';
+import { VideoSetupPage } from './pages/VideoSetupPage';
+import { VideoManagePage } from './pages/VideoManagePage';
+import { PhoneSetupPage } from './pages/PhoneSetupPage';
 
 
 
@@ -94,6 +100,12 @@ function App() {
               <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
               <Route path="/chat/:slug" element={<PublicChatPage />} />
               <Route path="/@:handle" element={<CreatorPublicProfile />} />
+              <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/marketplace/:slug" element={<MarketplaceListingPage />} />
+              <Route path="/marketplace/manage" element={<ProtectedRoute><MarketplaceManagePage /></ProtectedRoute>} />
+              <Route path="/video/setup" element={<ProtectedRoute><VideoSetupPage /></ProtectedRoute>} />
+              <Route path="/video/manage" element={<ProtectedRoute><VideoManagePage /></ProtectedRoute>} />
+              <Route path="/phone/setup" element={<ProtectedRoute><PhoneSetupPage /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>

@@ -15,6 +15,16 @@ export interface FeatureFlags {
   ENABLE_CONTENT_FILTERING: boolean;
   ENABLE_EMAIL_NOTIFICATIONS: boolean;
   ENABLE_PAYMENTS: boolean; // ✅ Payment integration flag
+
+  // Phase 2/3 feature toggles (integrations + revenue modules)
+  ENABLE_WIDGET: boolean;
+  ENABLE_PAY_PER_CHAT: boolean;
+  ENABLE_MARKETPLACE: boolean;
+  ENABLE_VOICE: boolean;
+  ENABLE_VIDEO: boolean;
+  ENABLE_PHONE: boolean;
+  ENABLE_WHATSAPP: boolean;
+  ENABLE_INSTAGRAM: boolean;
   DEBUG_MODE: boolean;
 }
 
@@ -45,6 +55,16 @@ export function getFeatureFlags(): FeatureFlags {
     
     // Payments (disabled by default, enable with ENABLE_PAYMENTS=true)
     ENABLE_PAYMENTS: process.env.ENABLE_PAYMENTS === 'true' || isDev,
+
+    // Phase 2/3 feature modules (default ON in dev, opt-in in prod via env=true)
+    ENABLE_WIDGET: process.env.ENABLE_WIDGET === 'true' || isDev,
+    ENABLE_PAY_PER_CHAT: process.env.ENABLE_PAY_PER_CHAT === 'true' || isDev,
+    ENABLE_MARKETPLACE: process.env.ENABLE_MARKETPLACE === 'true' || isDev,
+    ENABLE_VOICE: process.env.ENABLE_VOICE === 'true' || isDev,
+    ENABLE_VIDEO: process.env.ENABLE_VIDEO === 'true' || isDev,
+    ENABLE_PHONE: process.env.ENABLE_PHONE === 'true' || isDev,
+    ENABLE_WHATSAPP: process.env.ENABLE_WHATSAPP === 'true' || isDev,
+    ENABLE_INSTAGRAM: process.env.ENABLE_INSTAGRAM === 'true' || isDev,
     
     // Debug mode
     DEBUG_MODE: isDev || process.env.DEBUG_MODE === 'true',

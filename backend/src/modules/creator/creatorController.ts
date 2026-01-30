@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db, userQueries, stripePaymentQueries } from '../../config/database';
+import { getConversationCountsLast30Days, getTopQuestionsForPeriod } from '../../services/analyticsAggregationService';
+import { createConnectOnboardingLink, getConnectAccountStatus } from '../../services/stripeConnectService';
 
 function getUserId(req: Request): string | null {
   const u: any = (req as any).user;
@@ -144,16 +146,7 @@ export async function dashboard(req: Request, res: Response) {
     );
 
     // Most asked questions (from chat_messages)
-    const topQuestionsR = await db.query(
-      `SELECT "content", COUNT(*)::int AS count
-       FROM "chat_messages" cm
-       JOIN "chat_sessions" cs ON cs.id = cm."sessionId"
-       WHERE cs."creatorId" = $1 AND cm."role" = 'user'
-       GROUP BY "content"
-       ORDER BY count DESC
-       LIMIT 10`,
-      [userId]
-    );
+    const topQuestionsR = await getTopQuestionsForPeriod(userId, 30);
 
     // Response times (from mirror_runs)
     const responseTimeR = await db.query(
@@ -217,10 +210,11 @@ export async function dashboard(req: Request, res: Response) {
       },
       activeUsers: activeR.rows[0]?.c || 0,
       analytics: {
-        topQuestions: topQuestionsR.rows,
+        topQuestions: topQuestionsR,
         responseTime: responseTimeR.rows[0] || { avg: 0, min: 0, max: 0 },
         satisfaction: { positive, negative, score },
         peakHours: peakHoursR.rows,
+        conversationsOverTime: await getConversationCountsLast30Days(userId),
       },
     });
   } catch (error) {
@@ -392,4 +386,34 @@ export async function startTrial(req: Request, res: Response) {
 
   const u = await userQueries.startTrial(userId, 7);
   return res.json({ success: true, trialEndsAt: u.trialEndsAt });
+}
+
+export async function connectStripeAccount(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const returnUrl = `${frontendUrl}/settings?tab=billing&stripe=success`;
+  const refreshUrl = `${frontendUrl}/settings?tab=billing&stripe=refresh`;
+
+  const url = await createConnectOnboardingLink(userId, returnUrl, refreshUrl);
+  return res.json({ url });
+}
+
+export async function getStripeConnectStatus(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const account = await getConnectAccountStatus(userId);
+  if (!account) {
+    return res.json({ connected: false });
+  }
+
+  return res.json({
+    connected: true,
+    detailsSubmitted: account.details_submitted,
+    chargesEnabled: account.charges_enabled,
+    payoutsEnabled: account.payouts_enabled,
+    requirements: account.requirements || null,
+  });
 }

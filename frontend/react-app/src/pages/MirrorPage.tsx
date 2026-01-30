@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,20 @@ export function MirrorPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<MirrorHistoryItem[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoAvatars, setVideoAvatars] = useState<any[]>([]);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>('');
+
+  useEffect(() => {
+    if (!reply) return;
+    apiFetch<{ items: any[] }>('/api/video/list')
+      .then((res) => {
+        setVideoAvatars(res.items || []);
+        if (res.items?.[0]?.id) setSelectedAvatarId(res.items[0].id);
+      })
+      .catch(() => setVideoAvatars([]));
+  }, [reply]);
 
   const stats = useMemo(() => {
     const total = history.length;
@@ -57,6 +71,7 @@ export function MirrorPage({
       const t1 = performance.now();
 
       setReply(result?.reply || 'No response generated.');
+      setVideoUrl(null);
       setHistory((prev) => [
         {
           id: `test_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -191,6 +206,48 @@ export function MirrorPage({
               >
                 Copy Response
               </Button>
+              {videoAvatars.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <label className="text-sm font-medium">Video Avatar</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2 bg-background"
+                    value={selectedAvatarId}
+                    onChange={(e) => setSelectedAvatarId(e.target.value)}
+                  >
+                    {videoAvatars.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label || 'Video Avatar'}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!selectedAvatarId) return;
+                      setVideoLoading(true);
+                      try {
+                        const res = await apiFetch<{ videoUrl: string }>('/api/video/generate', {
+                          method: 'POST',
+                          body: JSON.stringify({ avatarId: selectedAvatarId, text: reply }),
+                        });
+                        setVideoUrl(res.videoUrl);
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to generate video');
+                      } finally {
+                        setVideoLoading(false);
+                      }
+                    }}
+                    disabled={videoLoading}
+                  >
+                    {videoLoading ? 'Generating video…' : 'Generate Video Reply'}
+                  </Button>
+                </div>
+              )}
+              {videoUrl && (
+                <div className="mt-4">
+                  <video src={videoUrl} controls className="w-full rounded-md" />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

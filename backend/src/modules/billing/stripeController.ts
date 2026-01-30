@@ -167,6 +167,23 @@ export async function stripeWebhook(req: Request, res: Response) {
       if (userId && ['starter', 'growth', 'scale'].includes(tier)) {
         await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [tier, userId]);
         logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${tier} from checkout.session.completed`);
+      } else if (sess?.metadata?.type === 'marketplace_subscription') {
+        const listingId = sess?.metadata?.listingId;
+        const subscriptionId = sess?.subscription;
+        if (listingId && userId && subscriptionId) {
+          await db.query(
+            `INSERT INTO "marketplace_subscriptions"
+             ("id","listingId","userId","stripeSubscriptionId","status","createdAt","updatedAt")
+             VALUES ($1,$2,$3,$4,'active',now(),now())
+             ON CONFLICT ("stripeSubscriptionId") DO UPDATE SET "status"='active', "updatedAt"=now()`,
+            [`mkt_sub_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`, listingId, userId, subscriptionId]
+          );
+          await db.query(
+            `UPDATE "marketplace_listings" SET "totalSubscribers" = "totalSubscribers" + 1 WHERE id=$1`,
+            [listingId]
+          );
+          logger.info(`[Stripe] ✅ Marketplace subscription activated: listing=${listingId} user=${userId}`);
+        }
       } else {
         logger.warn(`[Stripe] Invalid metadata in checkout.session.completed:`, {
           userId,
@@ -204,6 +221,9 @@ export async function stripeWebhook(req: Request, res: Response) {
       const subscription: any = event.data.object;
       const customerId = subscription?.customer;
       const status = subscription?.status;
+      const metaType = subscription?.metadata?.type;
+      const listingId = subscription?.metadata?.listingId;
+      const userIdMeta = subscription?.metadata?.userId;
       
       try {
         const customerResult = await db.query(
@@ -227,6 +247,15 @@ export async function stripeWebhook(req: Request, res: Response) {
           }
         } else {
           logger.warn(`[Stripe] Could not find user for customer ${customerId} in subscription.updated`);
+        }
+        
+        if (metaType === 'marketplace_subscription' && listingId && userIdMeta) {
+          await db.query(
+            `UPDATE "marketplace_subscriptions"
+             SET "status"=$1, "updatedAt"=now()
+             WHERE "stripeSubscriptionId"=$2`,
+            [status || 'active', subscription?.id]
+          );
         }
       } catch (err: any) {
         logger.error(`[Stripe] Error processing customer.subscription.updated:`, err.message);
@@ -287,6 +316,7 @@ export async function stripeWebhook(req: Request, res: Response) {
     else if (event.type === 'customer.subscription.deleted') {
       const subscription: any = event.data.object;
       const customerId = subscription?.customer;
+      const metaType = subscription?.metadata?.type;
       
       logger.info(`[Stripe] Subscription cancelled:`, {
         subscriptionId: subscription?.id,
@@ -309,6 +339,15 @@ export async function stripeWebhook(req: Request, res: Response) {
         }
       } catch (err: any) {
         logger.error(`[Stripe] Error downgrading user after cancellation:`, err.message);
+      }
+
+      if (metaType === 'marketplace_subscription') {
+        await db.query(
+          `UPDATE "marketplace_subscriptions"
+           SET "status"='canceled', "updatedAt"=now()
+           WHERE "stripeSubscriptionId"=$1`,
+          [subscription?.id]
+        );
       }
     }
     // ✅ Handle payment_intent.succeeded for pay-per-chat

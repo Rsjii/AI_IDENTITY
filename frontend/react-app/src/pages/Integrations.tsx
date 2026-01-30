@@ -369,6 +369,22 @@ export function IntegrationsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Phone */}
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle>Phone</CardTitle>
+            <CardDescription>Enable AI voice calls via Twilio Voice.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Connect a phone number to allow users to call your AI clone.
+            </p>
+            <Button onClick={() => (window.location.href = '/phone/setup')}>
+              Open Phone Setup
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

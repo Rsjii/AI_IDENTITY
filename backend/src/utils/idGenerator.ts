@@ -24,4 +24,8 @@ export const generateId = {
   follow: () => `follow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   invite: () => `invite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   subscription: () => `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  marketplaceListing: () => `mkt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  marketplaceReview: () => `mkt_rev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  marketplaceSubscription: () => `mkt_sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  videoAvatar: () => `vid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 };
