@@ -43,7 +43,8 @@ import { VideoSetupPage } from './pages/VideoSetupPage';
 import { VideoManagePage } from './pages/VideoManagePage';
 import { PhoneSetupPage } from './pages/PhoneSetupPage';
 import { HistoryPage } from './pages/HistoryPage';
-
+import { CreatorConversationsPage } from './pages/CreatorConversationsPage';
+import { CreatorConversationDetailPage } from './pages/CreatorConversationDetailPage';
 
 
 // Initialize CSRF token on app load
@@ -112,6 +113,9 @@ function App() {
               <Route path="/video/manage" element={<ProtectedRoute><VideoManagePage /></ProtectedRoute>} />
               <Route path="/phone/setup" element={<ProtectedRoute><PhoneSetupPage /></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+
+              <Route path="/conversations" element={<ProtectedRoute><CreatorConversationsPage /></ProtectedRoute>} />
+              <Route path="/conversations/:sessionId" element={<ProtectedRoute><CreatorConversationDetailPage /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>

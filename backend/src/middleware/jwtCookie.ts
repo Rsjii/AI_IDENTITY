@@ -3,6 +3,8 @@ import { verifyJWT } from '../services/jwtService';
 import { logger } from '../config/logger';
 import { isProd } from '../config/env';
 
+const cookieSameSite = isProd ? 'none' : 'lax';
+
 export const extractJWTFromCookie = (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenFromCookie = req.cookies?.['jwtToken'];
@@ -26,7 +28,7 @@ export const extractJWTFromCookie = (req: Request, res: Response, next: NextFunc
         res.clearCookie('jwtToken', {
           httpOnly: true,
           secure: isProd,
-          sameSite: 'none',
+          sameSite: cookieSameSite,
           path: '/',
         });
       }
@@ -83,7 +85,7 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
             res.clearCookie('jwtToken', {
               httpOnly: true,
               secure: isProd,
-              sameSite: 'none',
+              sameSite: cookieSameSite,
               path: '/',
             });
             if (isApiRequest) {
@@ -110,7 +112,7 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'none',
+        sameSite: cookieSameSite,
         path: '/',
       });
 

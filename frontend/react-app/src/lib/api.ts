@@ -10,6 +10,8 @@ export interface ApiError {
 // Get API base URL from environment variable
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+let refreshInFlight: Promise<void> | null = null;
+
 // Helper to build full API URL
 export function buildApiUrl(path: string): string {
   if (API_BASE_URL) {
@@ -91,15 +93,24 @@ export async function apiFetch<T = any>(
 
 // Handle 401 (Unauthorized) - try refresh once, then fail
 if (response.status === 401) {
-  // Avoid infinite loops & don't refresh if we're already refreshing
   const isRefreshCall = url.includes('/api/auth/refresh');
 
   if (!_didRetryAuth && !isRefreshCall) {
     try {
-      // Try refresh (cookie-based)
-      await apiFetch('/api/auth/refresh', { method: 'POST', body: JSON.stringify({}) }, true);
+      if (!refreshInFlight) {
+        refreshInFlight = apiFetch(
+          '/api/auth/refresh',
+          { method: 'POST', body: JSON.stringify({}) },
+          true
+        )
+          .then(() => {})
+          .finally(() => {
+            refreshInFlight = null;
+          });
+      }
 
-      // Retry original request once (with new cookies)
+      await refreshInFlight;
+
       const retryResponse = await fetch(buildApiUrl(url), {
         ...options,
         headers,
@@ -112,9 +123,10 @@ if (response.status === 401) {
         return retryResponse.json();
       }
     } catch {
-      // Refresh failed => fallthrough to session-expired
+      // fallthrough
     }
   }
+
 
   window.dispatchEvent(new CustomEvent('auth:session-expired'));
   const errorData = await response.json().catch(() => ({

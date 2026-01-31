@@ -46,6 +46,7 @@ import marketplaceSubscriptionRoutes from './modules/marketplace/subscriptionRou
 import videoRoutes from './modules/video/videoRoutes';
 import phoneRoutes from './modules/phone/phoneRoutes';
 
+const cookieSameSite = isProd ? 'none' : 'lax';
 
 // Page routes
 import pageRoutes from './routes';
@@ -337,7 +338,7 @@ app.use(async (req, res, next) => {
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'none',
+        sameSite: cookieSameSite,
         path: '/',
       });
       if (req.session) {

@@ -5,11 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { useSearchParams } from 'react-router-dom';
 
 type Range = 'today' | '7d' | '30d';
 
 export function HistoryPage() {
-  const [range, setRange] = useState<Range>('7d');
+  const [searchParams] = useSearchParams();
+
+  const qpRange = String(searchParams.get('range') || '7d');
+  const qpFilter = String(searchParams.get('filter') || '');
+
+  const [range, setRange] = useState<Range>(
+    qpRange === 'today' || qpRange === '7d' || qpRange === '30d' ? (qpRange as Range) : '7d'
+  );
+
   const [error, setError] = useState('');
   const [overview, setOverview] = useState<any>(null);
   const [runs, setRuns] = useState<any[]>([]);
@@ -27,6 +36,11 @@ export function HistoryPage() {
       }
     })();
   }, [range]);
+
+  const filteredRuns =
+  qpFilter === 'disliked'
+    ? runs.filter((x: any) => x.confirmEvent === 'confirm_no')
+    : runs;
 
   return (
     <Layout>
@@ -84,10 +98,14 @@ export function HistoryPage() {
             <CardDescription>Latest mirror runs.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {runs.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">No runs found for this period.</div>
+            {filteredRuns.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                {qpFilter === 'disliked'
+                  ? 'No disliked runs found for this period.'
+                  : 'No runs found for this period.'}
+                </div>
             ) : (
-              runs.map((x: any) => (
+              filteredRuns.map((x: any) => (
                 <div key={x.id} className="rounded-xl border bg-card/40 p-4 space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="text-xs text-muted-foreground">{new Date(x.createdAt).toLocaleString()}</div>

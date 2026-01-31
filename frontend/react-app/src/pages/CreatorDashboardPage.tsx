@@ -190,26 +190,79 @@ export function CreatorDashboardPage() {
   const handleExportChat = async (format: 'csv' | 'json' = 'csv') => {
     setExporting(true);
     try {
-      const res = await fetch(buildApiUrl(`/api/creator/chats/export?format=${format}`), {
-        credentials: 'include',
-      });      
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
+      const rows = (data?.analytics?.conversationsOverTime || sparklineData) as Array<{ date: string; count: number }>;
+      const d = new Date().toISOString().split('T')[0];
+  
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `conversations-over-time-${d}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast('Exported conversations-over-time JSON', 'success');
+        return;
+      }
+  
+      const csv = ['date,count', ...rows.map((r) => `"${String(r.date).replace(/"/g, '""')}",${r.count}`)].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `chat-history-${new Date().toISOString().split('T')[0]}.${format}`;
+      a.download = `conversations-over-time-${d}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      showToast(`Chat history exported as ${format.toUpperCase()}`, 'success');
+      showToast('Exported conversations-over-time CSV', 'success');
     } catch {
-      showToast('Failed to export chat history', 'error');
+      showToast('Failed to export conversations over time', 'error');
     } finally {
       setExporting(false);
     }
-  };
+  };  
+
+const top = data?.analytics?.topQuestions?.[0]?.content || '—';
+const topCount = data?.analytics?.topQuestions?.[0]?.count || 0;
+
+const negativeToReview = data?.analytics?.satisfaction?.negative ?? 0;
+const negativeToReviewLabel =
+  negativeToReview === 1
+    ? '1 negative rating needs review'
+    : `${negativeToReview} negative ratings need review`;
+
+const handleGenerateInsightsReport = () => {
+  const d = new Date().toISOString().split('T')[0];
+
+  const report = [
+    `# AI Insights Report (${d})`,
+    ``,
+    `## Summary`,
+    `- Total conversations (all-time): ${data?.chats?.total ?? 0}`,
+    `- Conversations today: ${data?.chats?.today ?? 0}`,
+    `- Avg response time: ${data?.analytics?.responseTime?.avg ?? 0}ms`,
+    `- Satisfaction score: ${data?.analytics?.satisfaction?.score ?? 0}/100`,
+    ``,
+    `## Top questions (last 30 days)`,
+    ...(data?.analytics?.topQuestions?.length
+      ? data.analytics.topQuestions.slice(0, 10).map((q) => `- ${q.content} (${q.count})`)
+      : [`- —`]),
+    ``,
+  ].join('\n');
+
+  const blob = new Blob([report], { type: 'text/markdown' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ai-insights-report-${d}.md`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
 
   // Generate sparkline data (last 7 days) - mock data if not available
   const sparklineData =
@@ -746,6 +799,7 @@ export function CreatorDashboardPage() {
                   <div
                     key={conv.sessionId || i}
                     className="p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                    onClick={() => nav(`/conversations/${encodeURIComponent(conv.sessionId)}`)}
                   >
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
@@ -764,7 +818,7 @@ export function CreatorDashboardPage() {
                   </div>
                 ))}                
               </div>
-              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary" onClick={() => nav('/history')}>
+              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary" onClick={() => nav('/conversations')}>
                 View All
               </Button>
             </CardContent>
@@ -779,7 +833,9 @@ export function CreatorDashboardPage() {
               <div className="space-y-4">
                 <div className="p-3 bg-bg-tertiary rounded-lg">
                   <div className="text-sm font-semibold text-text-primary mb-1">Most asked topic:</div>
-                  <div className="text-sm text-text-secondary">React hooks</div>
+                  <div className="text-sm text-text-secondary">
+                  {top}{topCount ? ` (${topCount})` : ''}
+                  </div>
                 </div>
                 <div className="p-3 bg-bg-tertiary rounded-lg">
                   <div className="text-sm font-semibold text-text-primary mb-1">Users struggle with:</div>
@@ -791,7 +847,7 @@ export function CreatorDashboardPage() {
                 </div>
               </div>
               <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary"
-                onClick={() => showToast('AI Insights report is coming soon.', 'info')}>
+                onClick={handleGenerateInsightsReport}>
                 Generate Report
               </Button>
             </CardContent>
@@ -807,10 +863,18 @@ export function CreatorDashboardPage() {
                 <div className="flex items-start gap-3 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                   <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                   <div className="flex-1">
-                    <div className="text-sm font-semibold text-text-primary">5 negative ratings need review</div>
-                    <Button variant="link" className="p-0 h-auto text-xs text-accent-primary mt-1" onClick={() => nav('/history')}>
-                      Review now →
-                    </Button>
+                    <div className="text-sm font-semibold text-text-primary">{negativeToReviewLabel}</div>
+                    {negativeToReview > 0 ? (
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-xs text-accent-primary mt-1"
+                        onClick={() => nav('/history?range=30d&filter=disliked')}
+                      >
+                        Review now →
+                      </Button>
+                    ) : (
+                      <div className="text-xs text-text-tertiary mt-1">Nothing to review yet.</div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-bg-tertiary rounded-lg">

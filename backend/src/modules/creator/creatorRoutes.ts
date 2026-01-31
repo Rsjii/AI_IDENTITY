@@ -14,6 +14,8 @@ import {
   connectStripeAccount,
   getStripeConnectStatus,
   recentChats,
+  listChats,
+  chatDetails,
 } from './creatorController';
 
 const router = Router();
@@ -31,5 +33,7 @@ router.post('/stripe/connect', validateCSRF, asyncHandler(connectStripeAccount))
 router.get('/stripe/status', asyncHandler(getStripeConnectStatus));
 
 router.get('/chats/recent', asyncHandler(recentChats));
+router.get('/chats', asyncHandler(listChats));
+router.get('/chats/:sessionId', asyncHandler(chatDetails));
 
 export default router;

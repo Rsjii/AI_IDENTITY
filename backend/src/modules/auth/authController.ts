@@ -15,6 +15,8 @@ import { identifyPostHogUser } from '../../services/posthogService';
 import { tokenizeId } from '../../utils/idTokenization';
 import { createOrUpdateAuthSession } from '../../services/authSessionService';
 
+const cookieSameSite = isProd ? 'none' : 'lax';
+
 const emailService = new EmailService();
 
 /**
@@ -496,14 +498,14 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
       res.cookie('jwtToken', accessToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'none',
+        sameSite: cookieSameSite,
         maxAge: accessTokenMaxAge,
         path: '/',
       });
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'none',
+        sameSite: cookieSameSite,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         path: '/',
       });
@@ -573,7 +575,7 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
     res.cookie('jwtToken', token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'none',
+      sameSite: cookieSameSite,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
@@ -947,7 +949,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'none',
+      sameSite: cookieSameSite,
       maxAge: accessTokenMaxAge,
       path: '/'
     });
@@ -955,7 +957,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'none',
+      sameSite: cookieSameSite,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/',
     });
@@ -1121,9 +1123,17 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'none',
+      sameSite: cookieSameSite,
       maxAge: accessTokenMaxAge,
       path: '/'
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: cookieSameSite,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
     });
     
     // Also create session for backward compatibility

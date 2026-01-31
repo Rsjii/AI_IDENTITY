@@ -504,3 +504,79 @@ export async function recentChats(req: Request, res: Response) {
 
   return res.json({ success: true, items: r.rows });
 }
+
+export async function listChats(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit || 50)));
+  const offset = Math.max(0, Number(req.query.offset || 0));
+
+  const r = await db.query(
+    `
+    SELECT
+      cs.id as "sessionId",
+      cs."createdAt" as "sessionCreatedAt",
+      cs."platform",
+      cs."visitorId",
+      cs."userId" as "viewerUserId",
+      COALESCE(u."handle", CONCAT('Visitor ', COALESCE(cs."visitorId",'unknown'))) as "label",
+      COALESCE((
+        SELECT cm."content"
+        FROM "chat_messages" cm
+        WHERE cm."sessionId" = cs.id AND cm."role" = 'user'
+        ORDER BY cm."createdAt" DESC
+        LIMIT 1
+      ), '') as "preview",
+      COALESCE((
+        SELECT cm."createdAt"
+        FROM "chat_messages" cm
+        WHERE cm."sessionId" = cs.id
+        ORDER BY cm."createdAt" DESC
+        LIMIT 1
+      ), cs."createdAt") as "lastMessageAt",
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM "chat_messages" cm
+        WHERE cm."sessionId" = cs.id
+      ), 0) as "messageCount"
+    FROM "chat_sessions" cs
+    LEFT JOIN "User" u ON u.id = cs."userId"
+    WHERE cs."creatorId" = $1
+    ORDER BY "lastMessageAt" DESC
+    LIMIT $2 OFFSET $3
+    `,
+    [userId, limit, offset]
+  );
+
+  return res.json({ success: true, limit, offset, items: r.rows });
+}
+
+export async function chatDetails(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const sessionId = String(req.params.sessionId || '');
+  if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+  // Ensure this chat session belongs to the logged-in creator
+  const s = await db.query(
+    `SELECT id, "creatorId" FROM "chat_sessions" WHERE id = $1 LIMIT 1`,
+    [sessionId]
+  );
+  const row = s.rows[0];
+  if (!row) return res.status(404).json({ error: 'Chat session not found' });
+  if (row.creatorId !== userId) return res.status(403).json({ error: 'Forbidden' });
+
+  const m = await db.query(
+    `
+    SELECT id, "createdAt", "role", "content"
+    FROM "chat_messages"
+    WHERE "sessionId" = $1
+    ORDER BY "createdAt" ASC
+    `,
+    [sessionId]
+  );
+
+  return res.json({ success: true, sessionId, messages: m.rows });
+}
