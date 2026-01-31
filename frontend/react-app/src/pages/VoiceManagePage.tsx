@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 type Voice = {
   id: string;
@@ -43,7 +44,7 @@ export function VoiceManagePage() {
       await apiFetch(`/api/voice/${id}`, { method: 'DELETE', body: JSON.stringify({}) });
       await load();
     } catch (e: any) {
-      alert(`Failed to delete: ${e?.message || 'Unknown error'}`);
+      showToast(`Failed to delete: ${e?.message || 'Unknown error'}`, 'error');
     }
   };
 
@@ -57,7 +58,7 @@ export function VoiceManagePage() {
       });
       setAudioUrl(r.audioUrl);
     } catch (e: any) {
-      alert(`Failed to generate: ${e?.message || 'Unknown error'}`);
+      showToast(`Failed to generate: ${e?.message || 'Unknown error'}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export function VoiceManagePage() {
       });
       await load();
     } catch (e: any) {
-      alert(`Failed to save settings: ${e?.message || 'Unknown error'}`);
+      showToast(`Failed to save settings: ${e?.message || 'Unknown error'}`, 'error');
     }
   };
 

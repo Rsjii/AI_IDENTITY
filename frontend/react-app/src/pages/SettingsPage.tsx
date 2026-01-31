@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, BarChart3 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
+import { showToast } from '@/lib/toast';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
@@ -84,6 +85,9 @@ export function SettingsPage() {
   // Password management
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -251,7 +255,7 @@ export function SettingsPage() {
       const res = await apiFetch<{ payoutId: string; amountCents: number; message?: string }>('/api/creator/earnings/payout', {
         method: 'POST',
       });
-      alert(`Payout request submitted! Amount: ${formatCurrency(res.amountCents)}. ${res.message || ''}`);
+      showToast(`Payout request submitted! Amount: ${formatCurrency(res.amountCents)}. ${res.message || ''}`, 'success', 5000);
       await loadBillingHistory();
     } catch (e: any) {
       setError(e.message || 'Failed to request payout');
@@ -1075,21 +1079,43 @@ export function SettingsPage() {
                   <>
                     <div className="space-y-2">
                       <Label>Current Password</Label>
-                      <Input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>New Password</Label>
-                      <Input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Enter new password"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                       <PasswordStrengthMeter password={newPassword} />
                     </div>
                     <Button 
@@ -1134,12 +1160,23 @@ export function SettingsPage() {
                           </div>
                           <div className="space-y-2">
                             <Label>New Password</Label>
-                            <Input
-                              type="password"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              placeholder="Enter new password"
-                            />
+                            <div className="relative">
+                              <Input
+                                type={showSetPassword ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Enter new password"
+                                className="pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowSetPassword((v) => !v)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                                aria-label={showSetPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                             <PasswordStrengthMeter password={newPassword} />
                           </div>
                           <Button 

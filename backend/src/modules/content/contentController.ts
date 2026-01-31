@@ -38,6 +38,15 @@ export async function paste(req: Request, res: Response) {
 
   const { title, text } = pasteSchema.parse(req.body);
   const source = await createPasteSource(userId, title, text);
+
+  // ✅ ADD: advance step safely
+  try {
+    const { userQueries } = await import('../../config/database');
+    await userQueries.updateOnboardingStep(userId, 'content');
+    const items = await knowledgeSourceQueries.listByUserId(userId);
+    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+  } catch {}
+
   return res.json({ success: true, source });
 }
 
@@ -47,6 +56,15 @@ export async function youtube(req: Request, res: Response) {
 
   const { url, title } = youtubeSchema.parse(req.body);
   const source = await createYoutubeSource(userId, url, title);
+
+  // ✅ ADD: advance step safely
+  try {
+    const { userQueries } = await import('../../config/database');
+    await userQueries.updateOnboardingStep(userId, 'content');
+    const items = await knowledgeSourceQueries.listByUserId(userId);
+    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+  } catch {}
+
   return res.json({ success: true, source });
 }
 
@@ -56,6 +74,15 @@ export async function url(req: Request, res: Response) {
 
   const { url: inputUrl, title } = urlSchema.parse(req.body);
   const source = await createUrlSource(userId, inputUrl, title);
+
+  // ✅ ADD: advance step safely
+  try {
+    const { userQueries } = await import('../../config/database');
+    await userQueries.updateOnboardingStep(userId, 'content');
+    const items = await knowledgeSourceQueries.listByUserId(userId);
+    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+  } catch {}
+
   return res.json({ success: true, source });
 }
 
@@ -467,6 +494,14 @@ export async function upload(req: Request, res: Response) {
     
     // ✅ Upload to S3 with error handling
     const source = await createFileSource(userId, file, title);
+
+    // ✅ ADD: advance step safely
+    try {
+      const { userQueries } = await import('../../config/database');
+      await userQueries.updateOnboardingStep(userId, 'content');
+      const items = await knowledgeSourceQueries.listByUserId(userId);
+      if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+    } catch {}
     
     return res.json({
       success: true,

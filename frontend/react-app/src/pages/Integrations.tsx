@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 export function IntegrationsPage() {
   const { state } = useAuth();
@@ -78,9 +79,9 @@ export function IntegrationsPage() {
           vip: { enabled: true, amountCents: tiers[tiers.length - 1] },
         }),
       });
-      alert('Saved pricing');
+      showToast('Saved pricing', 'success');
     } catch (e: any) {
-      alert(e.message || 'Failed to save pricing');
+      showToast(e.message || 'Failed to save pricing', 'error');
     } finally {
       setPricingSaving(false);
     }
@@ -145,7 +146,7 @@ export function IntegrationsPage() {
   const connectInstagram = () => {
     const META_APP_ID = import.meta.env.VITE_META_APP_ID || '';
     if (!META_APP_ID) {
-      alert('META_APP_ID not configured. Add VITE_META_APP_ID to your .env');
+      showToast('META_APP_ID not configured. Add VITE_META_APP_ID to your .env', 'error');
       return;
     }
     const redirectUri = `${window.location.origin}/integrations`;
@@ -160,7 +161,7 @@ export function IntegrationsPage() {
       await apiFetch('/api/instagram/disconnect', { method: 'POST' });
       setIgStatus({ connected: false });
     } catch (e) {
-      alert('Failed to disconnect');
+      showToast('Failed to disconnect', 'error');
     } finally {
       setIgLoading(false);
     }
@@ -169,7 +170,7 @@ export function IntegrationsPage() {
   // WhatsApp connect
   const connectWhatsApp = async () => {
     if (!waPhoneNumber) {
-      alert('Please enter your phone number');
+      showToast('Please enter your phone number', 'error');
       return;
     }
     setWaLoading(true);
@@ -181,7 +182,7 @@ export function IntegrationsPage() {
       setWaStatus({ connected: true, phoneNumber: waPhoneNumber });
       setWaPhoneNumber('');
     } catch (e: any) {
-      alert(e.message || 'Failed to connect');
+      showToast(e.message || 'Failed to connect', 'error');
     } finally {
       setWaLoading(false);
     }
@@ -193,7 +194,7 @@ export function IntegrationsPage() {
       await apiFetch('/api/whatsapp/disconnect', { method: 'POST' });
       setWaStatus({ connected: false });
     } catch (e) {
-      alert('Failed to disconnect');
+      showToast('Failed to disconnect', 'error');
     } finally {
       setWaLoading(false);
     }
@@ -205,9 +206,9 @@ export function IntegrationsPage() {
         method: 'POST',
         body: JSON.stringify(waSettings),
       });
-      alert('WhatsApp settings saved');
+      showToast('WhatsApp settings saved', 'success');
     } catch (e: any) {
-      alert(e.message || 'Failed to save WhatsApp settings');
+      showToast(e.message || 'Failed to save WhatsApp settings', 'error');
     }
   };
 

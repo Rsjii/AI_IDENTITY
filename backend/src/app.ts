@@ -256,6 +256,14 @@ app.use(session({
 
 // CSRF token endpoint for React SPA
 app.get('/api/csrf', (req: Request, res: Response) => {
+  // ✅ Ensure session is initialized and will be saved
+  // With saveUninitialized: false, we need to modify session for it to persist
+  // This creates a new session after logout, allowing login to work
+  if (req.session) {
+    // Touch session to ensure it gets saved (creates new session after logout)
+    (req.session as any)._csrfRequest = Date.now();
+  }
+  
   generateCSRFToken(req, res, () => {
     res.json({ csrfToken: res.locals.csrfToken || '' });
   });
@@ -459,7 +467,10 @@ app.use((req, res, next) => {
   // Log response when finished
   res.on('finish', () => {
     const duration = Date.now() - start;
-    const logLevel = res.statusCode >= 400 ? 'error' : 'info';
+    const logLevel =
+      res.statusCode >= 500 ? 'error'
+      : res.statusCode >= 400 ? 'warn'
+      : 'info';
 
     logger[logLevel]({
       method: req.method,

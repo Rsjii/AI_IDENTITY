@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 export function OnboardingPlanPage() {
   const nav = useNavigate();
@@ -25,7 +26,7 @@ export function OnboardingPlanPage() {
       if (r.url) {
         window.location.href = r.url;
       } else {
-        alert('Failed to create checkout session. Please try again.');
+        showToast('Failed to create checkout session. Please try again.', 'error');
         setLoading(false);
       }
     } catch (error: any) {
@@ -33,9 +34,9 @@ export function OnboardingPlanPage() {
       
       // Handle specific Stripe setup errors
       if (error.errorCode === 'STRIPE_ACCOUNT_SETUP_REQUIRED') {
-        alert('Stripe account setup required!\n\nPlease set your business name in Stripe Dashboard:\nhttps://dashboard.stripe.com/account\n\nAfter setting up, try again.');
+        showToast('Stripe account setup required. Please complete Stripe setup and try again.', 'warning', 6000);
       } else {
-        alert(error.message || 'Failed to start checkout. Please try again.');
+        showToast(error.message || 'Failed to start checkout. Please try again.', 'error');
       }
       setLoading(false);
     }

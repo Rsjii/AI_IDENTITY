@@ -15,10 +15,18 @@ export const generateCSRFToken = (req: Request, res: Response, next: NextFunctio
   try {
     if (req.method !== 'GET') return next();
 
+    // ✅ Ensure session exists - express-session creates req.session object,
+    // but with saveUninitialized: false, we need to modify it for it to be saved
     if (!req.session) {
       logger.debug('[CSRF] No session available, skipping token generation');
       res.locals.csrfToken = ''; // Set empty token if no session
       return next();
+    }
+
+    // ✅ Touch session to ensure it gets saved (required when saveUninitialized: false)
+    // This ensures a new session is created and persisted after logout
+    if (!(req.session as any)._csrfInitialized) {
+      (req.session as any)._csrfInitialized = true;
     }
 
     const currentSecretHash = getSessionSecretHash();

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { clearCSRFToken } from '@/lib/csrf';
 
 export type MeUser = {
   id: string;
@@ -14,6 +15,7 @@ export type MeUser = {
   profileImage?: string;
   profileCompleted?: boolean;
   active?: boolean;
+  onboardingStep?: 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'done';
   isAdmin?: boolean;
   hasPassword?: boolean;
   hasGoogle?: boolean;
@@ -49,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiFetch('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) });
     } finally {
+      // ✅ Clear CSRF token cache on logout (session destroyed on backend)
+      clearCSRFToken();
       setState({ status: 'unauthenticated', user: null });
     }
   };

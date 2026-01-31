@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { apiFetch, apiFetchForm } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 import {
   Upload, FileText, Link as LinkIcon, Youtube, Twitter,
   Linkedin, Instagram, File, X, CheckCircle2, Loader2, AlertCircle,
@@ -125,12 +126,12 @@ export function OnboardingContentPage() {
     const allowedTypes = ['.pdf', '.txt', '.md', '.docx', '.doc', '.xlsx', '.csv'];
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedTypes.includes(fileExt)) {
-      alert(`File type ${fileExt} not supported. Allowed: ${allowedTypes.join(', ')}`);
+      showToast(`File type ${fileExt} not supported. Allowed: ${allowedTypes.join(', ')}`, 'error');
       return;
     }
 
     if (file.size > 25 * 1024 * 1024) {
-      alert('File size exceeds 25 MB limit');
+      showToast('File size exceeds 25 MB limit', 'error');
       return;
     }
 
@@ -169,7 +170,7 @@ export function OnboardingContentPage() {
       }, 1000);
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Upload failed. Please try again.');
+      showToast('Upload failed. Please try again.', 'error');
     } finally {
       if (progressInterval) clearInterval(progressInterval);
       setLoading(false);
@@ -190,7 +191,7 @@ export function OnboardingContentPage() {
 
   const addPaste = async () => {
     if (pasteText.trim().length < 100) {
-      alert('Please enter at least 100 characters');
+      showToast('Please enter at least 100 characters', 'error');
       return;
     }
     setLoading(true);
@@ -259,10 +260,10 @@ export function OnboardingContentPage() {
           c.platform === 'youtube' ? { ...c, connected: true, username: url } : c
         ));
         await refresh();
-        alert('YouTube channel saved! Content will be imported shortly.');
+        showToast('YouTube channel saved! Content will be imported shortly.', 'success');
       } catch (err) {
         console.error(err);
-        alert('Failed to save YouTube channel.');
+        showToast('Failed to save YouTube channel.', 'error');
       } finally {
         setLoading(false);
       }
@@ -272,7 +273,7 @@ export function OnboardingContentPage() {
         window.location.href = '/api/content/social/twitter/authorize';
       } catch (err) {
         console.error(err);
-        alert('Failed to connect Twitter.');
+        showToast('Failed to connect Twitter.', 'error');
         setLoading(false);
       }
     } else if (platform === 'instagram') {
@@ -281,16 +282,18 @@ export function OnboardingContentPage() {
         window.location.href = '/api/content/social/instagram/authorize';
       } catch (err) {
         console.error(err);
-        alert('Failed to connect Instagram.');
+        showToast('Failed to connect Instagram.', 'error');
         setLoading(false);
       }
     } else if (platform === 'linkedin') {
-      alert(
-        'LinkedIn import uses Extension (official API is restricted). Go to Account → create Extension Token → install extension → paste token → click Import.'
+      showToast(
+        'LinkedIn import uses Extension (official API is restricted). Go to Account → create Extension Token → install extension → paste token → click Import.',
+        'info',
+        6000
       );
       nav('/account');
     } else {
-      alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} import will be added in the next phase.`);
+      showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} import will be added in the next phase.`, 'info');
     }
   };
 

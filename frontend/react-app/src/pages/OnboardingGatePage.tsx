@@ -18,18 +18,31 @@ export function OnboardingGatePage() {
   useEffect(() => {
     (async () => {
       try {
+        // ✅ Step 0: trust server onboardingStep first
+        try {
+          const me = await apiFetch<{ success: true; user: { onboardingStep?: string } }>('/api/auth/me');
+          const step = me?.user?.onboardingStep;
+
+          if (step) {
+            if (step === 'done') {
+              nav('/dashboard', { replace: true });
+            } else {
+              nav(`/onboarding/${step}`, { replace: true });
+            }
+            return;
+          }
+        } catch {
+          // ignore; fallback to heuristic below
+        }
+
         // Step 1: Check if identity exists
         try {
           await apiFetch('/api/identity/me');
-          // Identity exists, check content
         } catch (err: any) {
-          // No identity found (404) → start with quiz
           if (err?.status === 404) {
             nav('/onboarding/quiz', { replace: true });
             return;
           }
-          // Other error → go to dashboard
-          console.error('Failed to check identity:', err);
           nav('/dashboard', { replace: true });
           return;
         }
@@ -39,21 +52,12 @@ export function OnboardingGatePage() {
           const content = await apiFetch<{ items: any[] }>('/api/content/list');
           const count = content?.items?.length || 0;
 
-          if (count < 3) {
-            // Not enough content → go to content upload
-            nav('/onboarding/content', { replace: true });
-          } else {
-            // Enough content → go to plan selection
-            nav('/onboarding/plan', { replace: true });
-          }
-        } catch (err: any) {
-          // If content check fails, assume no content and go to content page
-          console.warn('Failed to check content, assuming no content:', err);
+          if (count < 3) nav('/onboarding/content', { replace: true });
+          else nav('/onboarding/plan', { replace: true });
+        } catch {
           nav('/onboarding/content', { replace: true });
         }
-      } catch (err: any) {
-        // Fallback: go to dashboard if everything fails
-        console.error('Onboarding gate error:', err);
+      } catch {
         nav('/dashboard', { replace: true });
       }
     })();

@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 interface ListingForm {
   isPublic: boolean;
@@ -59,9 +60,9 @@ export function MarketplaceManagePage() {
           tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         }),
       });
-      alert('Listing saved');
+      showToast('Listing saved', 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to save listing');
+      showToast(err.message || 'Failed to save listing', 'error');
     } finally {
       setSaving(false);
     }

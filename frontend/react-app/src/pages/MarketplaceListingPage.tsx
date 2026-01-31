@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 interface Listing {
   id: string;
@@ -68,9 +69,9 @@ export function MarketplaceListingPage() {
         method: 'POST',
         body: JSON.stringify({ listingId: listing.id }),
       });
-      alert('Subscription started.');
+      showToast('Subscription started.', 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to subscribe');
+      showToast(err.message || 'Failed to subscribe', 'error');
     } finally {
       setSubscribing(false);
     }

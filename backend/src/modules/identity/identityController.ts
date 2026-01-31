@@ -67,6 +67,12 @@ export const createIdentity = async (req: AuthenticatedRequest, res: Response, n
     // Create identity using service
     const { identity, version } = await createIdentityService(req.user.id, identityJson);
 
+    // ✅ ADD: advance onboarding step
+    try {
+      const { userQueries } = await import('../../config/database');
+      await userQueries.updateOnboardingStep(req.user.id, 'content');
+    } catch {}
+
     res.json({
       success: true,
       identity: {

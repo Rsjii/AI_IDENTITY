@@ -195,7 +195,7 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
           // Log signup event (for password linking)
           try {
             await EventLogger.logUserEvent(user.id, EVENT_TYPES.PASSWORD_LINKED, {
-              source: 'signup'
+              flow: 'signup'
             });
           } catch (eventError) {
             logger.warn({ err: eventError }, 'Failed to log password linking event');
@@ -518,7 +518,7 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     
     res.json({ 
       message: 'Account activated successfully', 
-      redirect: '/onboarding/quiz'
+      redirect: '/onboarding'
     });
   } catch (error: any) {
     // ✅ Ensure Error is serialized (message/stack) so we can see root cause in logs
@@ -978,8 +978,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     let nextRedirect: string;
     if (user.profileCompleted) {
       // Check onboarding step
-      if (user.onboardingStep === 'done' || user.onboardingStep === 'deploy') {
-        nextRedirect = await getPostLoginRedirect(user.id);
+      if (user.onboardingStep === 'done') {
+        nextRedirect = '/dashboard';
       } else {
         // Continue onboarding flow
         nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
@@ -1152,8 +1152,8 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     let nextRedirect: string;
     if (user.profileCompleted) {
       // Check onboarding step
-      if (user.onboardingStep === 'done' || user.onboardingStep === 'deploy') {
-        nextRedirect = await getPostLoginRedirect(user.id);
+      if (user.onboardingStep === 'done') {
+        nextRedirect = '/dashboard';
       } else {
         // Continue onboarding flow
         nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
@@ -1506,6 +1506,7 @@ export const me = async (req: Request, res: Response) => {
       profileImage: user.profileImage,
       profileCompleted: user.profileCompleted,
       active: user.active,
+      onboardingStep: (user as any).onboardingStep,
       isAdmin,
       hasPassword: Boolean(user.passwordHash),
       hasGoogle: Boolean(user.googleId),

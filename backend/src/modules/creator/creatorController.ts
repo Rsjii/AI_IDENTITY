@@ -435,6 +435,10 @@ export async function startTrial(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const u = await userQueries.startTrial(userId, 7);
+
+  // ✅ ADD
+  await userQueries.updateOnboardingStep(userId, 'deploy');
+
   return res.json({ success: true, trialEndsAt: u.trialEndsAt });
 }
 

@@ -955,6 +955,43 @@ export const userQueries = {
     );
     return r.rows[0];
   },
+
+  // ✅ ADD: only ADVANCE step (never regress)
+  updateOnboardingStep: async (
+    userId: string,
+    step: 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'done'
+  ) => {
+    await db.query(
+      `
+      UPDATE "User"
+      SET "onboardingStep" = $1,
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE id = $2
+        AND (
+          CASE "onboardingStep"
+            WHEN 'quiz' THEN 0
+            WHEN 'content' THEN 1
+            WHEN 'voice' THEN 2
+            WHEN 'plan' THEN 3
+            WHEN 'deploy' THEN 4
+            WHEN 'done' THEN 5
+            ELSE 0
+          END
+        ) < (
+          CASE $1
+            WHEN 'quiz' THEN 0
+            WHEN 'content' THEN 1
+            WHEN 'voice' THEN 2
+            WHEN 'plan' THEN 3
+            WHEN 'deploy' THEN 4
+            WHEN 'done' THEN 5
+            ELSE 0
+          END
+        )
+      `,
+      [step, userId]
+    );
+  },
 };
 
 // ========== OTP QUERIES ==========

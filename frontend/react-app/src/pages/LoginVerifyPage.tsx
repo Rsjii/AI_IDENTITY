@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
+import { showToast } from '@/lib/toast';
 
 function useQuery() {
   const { search } = useLocation();
@@ -23,6 +24,31 @@ export function LoginVerifyPage() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
+
+  const resend = async () => {
+    if (!email) return;
+    setResendLoading(true);
+    try {
+      await apiFetch('/api/auth/resend-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, type: 'login' }),
+      });
+      showToast('OTP sent to your email', 'success', 4000);
+      setCooldown(30);
+    } catch (e: any) {
+      showToast(e.message || 'Failed to resend OTP', 'error', 5000);
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +112,16 @@ export function LoginVerifyPage() {
               ) : (
                 'Continue'
               )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={resend}
+              disabled={loading || resendLoading || cooldown > 0}
+            >
+              {cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP'}
             </Button>
           </form>
         </CardContent>

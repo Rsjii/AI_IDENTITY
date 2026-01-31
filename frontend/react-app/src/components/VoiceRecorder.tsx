@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Pause, Play } from 'lucide-react';
+import { showToast } from '@/lib/toast';
 
 interface VoiceRecorderProps {
   onUpload: (blob: Blob) => Promise<void>;
@@ -75,7 +76,7 @@ export function VoiceRecorder({ onUpload, onSkip }: VoiceRecorderProps) {
       chunks.current = [];
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Failed to access microphone. Please check permissions.');
+      showToast('Failed to access microphone. Please check permissions.', 'error', 5000);
     }
   };
 

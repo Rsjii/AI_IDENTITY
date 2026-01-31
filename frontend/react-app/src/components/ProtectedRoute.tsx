@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (state.status === 'unauthenticated') {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth?reason=unauthorized" replace />;
   }
 
   return <>{children}</>;

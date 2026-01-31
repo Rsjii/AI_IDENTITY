@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/api';
+import { showToast } from '@/lib/toast';
 
 export function PhoneSetupPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -22,7 +23,7 @@ export function PhoneSetupPage() {
       setStatus({ connected: true, phoneNumber });
       setPhoneNumber('');
     } catch (err: any) {
-      alert(err.message || 'Failed to connect');
+      showToast(err.message || 'Failed to connect', 'error');
     } finally {
       setLoading(false);
     }
@@ -34,7 +35,7 @@ export function PhoneSetupPage() {
       await apiFetch('/api/phone/disconnect', { method: 'POST', body: JSON.stringify({}) });
       setStatus({ connected: false });
     } catch (err: any) {
-      alert(err.message || 'Failed to disconnect');
+      showToast(err.message || 'Failed to disconnect', 'error');
     } finally {
       setLoading(false);
     }

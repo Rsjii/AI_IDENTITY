@@ -7,7 +7,7 @@ import { Layout } from '@/components/Layout';
 import { apiFetch } from '@/lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Chrome, Loader2 } from 'lucide-react';
+import { AlertCircle, Chrome, Loader2, Eye, EyeOff } from 'lucide-react';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -33,10 +33,17 @@ export function AuthPage() {
 
   // ADD: if already logged in, never show auth page (handles Back button too)
   useEffect(() => {
-    if (state.status === 'authenticated') {
+    if (state.status !== 'authenticated') return;
+  
+    const step = state.user?.onboardingStep;
+  
+    // ✅ If completed -> dashboard, else -> onboarding gate
+    if (step === 'done') {
+      navigate('/dashboard', { replace: true });
+    } else {
       navigate('/onboarding', { replace: true });
     }
-  }, [state.status, navigate]);
+  }, [state.status, state.user, navigate]);  
 
   // OPTIONAL: avoid flicker
   if (state.status === 'authenticated') return null;
@@ -45,6 +52,8 @@ export function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState<string>(() => {
+    const reason = q.get('reason');
+    if (reason === 'unauthorized') return 'Please sign in to continue.';
     const code = q.get('error');
     return code ? oauthErrorMessage(code) : '';
   });
@@ -52,11 +61,13 @@ export function AuthPage() {
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   // Signup state
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [signupReferralCode, setSignupReferralCode] = useState('');
   const [emailError, setEmailError] = useState('');
 
@@ -237,15 +248,26 @@ export function AuthPage() {
                         </Link>
                       </div>
 
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                        disabled={loading}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="login-password"
+                          type={showLoginPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          required
+                          disabled={loading}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -301,16 +323,27 @@ export function AuthPage() {
                       <label htmlFor="signup-password" className="text-sm font-medium">
                         Password
                       </label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        required
-                        disabled={loading}
-                        minLength={8}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="signup-password"
+                          type={showSignupPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={signupPassword}
+                          onChange={(e) => setSignupPassword(e.target.value)}
+                          required
+                          disabled={loading}
+                          minLength={8}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSignupPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                       <PasswordStrengthMeter password={signupPassword} />
                     </div>
 
