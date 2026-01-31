@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/Skeleton';
@@ -16,6 +16,15 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import { MirrorPage } from './MirrorPage';
+import { apiFetch, buildApiUrl } from '@/lib/api'; // <-- add buildApiUrl
+
+type RecentConversation = {
+  sessionId: string;
+  label: string;        // e.g. "@handle" or "Visitor ab12"
+  preview: string;      // last user message
+  lastMessageAt: string; // ISO string
+  rating?: 'positive' | 'negative' | null;
+};
 
 interface DashboardData {
   chats: {
@@ -52,111 +61,101 @@ interface DashboardData {
 }
 
 export function CreatorDashboardPage() {
+  const nav = useNavigate();
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'engagement' | 'revenue' | 'content' | 'ai-health' | 'test'>('engagement');
+  const [activeTab, setActiveTab] =
+    useState<'engagement' | 'revenue' | 'content' | 'ai-health' | 'test'>('engagement');
   const [messagesToday, setMessagesToday] = useState(0);
   const [aiStatus, setAiStatus] = useState<'active' | 'training' | 'inactive' | 'not_setup'>('not_setup');
-  const [lastChatCount, setLastChatCount] = useState(0);
-  const [lastRevenue, setLastRevenue] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+
+  // NEW: real recent chats (no more hardcoded demo)
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
+
+  // FIX: polling closure stale state (use refs)
+  const lastChatCountRef = useRef(0);
+  const lastRevenueRef = useRef(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardRes, earningsRes, identityRes] = await Promise.all([
+        const [dashboardRes, earningsRes, identityRes, recentRes] = await Promise.all([
           apiFetch('/api/creator/dashboard'),
           apiFetch('/api/creator/earnings').catch(() => ({ items: [] })),
-          apiFetch('/api/identity/active').catch(() => ({ identity: null }))
+          apiFetch('/api/identity/active').catch(() => ({ identity: null })),
+          apiFetch('/api/creator/chats/recent?limit=3').catch(() => ({ items: [] })), // NEW
         ]);
+
         setData({
           ...dashboardRes,
-          earnings: earningsRes?.items || []
+          earnings: earningsRes?.items || [],
         });
-        setMessagesToday(dashboardRes?.chats?.today || 0);
-        
-        // Determine AI status
-        if (identityRes?.identity?.activeVersionId) {
-          setAiStatus('active');
-        } else if (identityRes?.identity) {
-          setAiStatus('training');
-        } else {
-          setAiStatus('not_setup');
-        }
+
+        const todayChats = dashboardRes?.chats?.today || 0;
+        const monthRevenue = dashboardRes?.revenue?.thisMonthCents || 0;
+
+        setMessagesToday(todayChats);
+        lastChatCountRef.current = todayChats;
+        lastRevenueRef.current = monthRevenue;
+
+        setRecentConversations((recentRes as any)?.items || []);
+
+        if (identityRes?.identity?.activeVersionId) setAiStatus('active');
+        else if (identityRes?.identity) setAiStatus('training');
+        else setAiStatus('not_setup');
       } catch (e) {
         console.error('Dashboard fetch error:', e);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
 
     // ✅ Real-time updates: Poll every 5 seconds + on window focus
     const updateDashboard = async () => {
       try {
         const res = await apiFetch('/api/creator/dashboard');
+
         const newChatCount = res?.chats?.today || 0;
         const newRevenue = res?.revenue?.thisMonthCents || 0;
-        
-        // ✅ Show toast notifications for new chats/payments
-        if (lastChatCount > 0 && newChatCount > lastChatCount) {
-          const diff = newChatCount - lastChatCount;
-          showToast(`New Chat${diff > 1 ? 's' : ''}: ${diff} new conversation${diff > 1 ? 's' : ''}`, 'success');
-          
-          // Browser notification if permitted
-          if (Notification.permission === 'granted') {
-            new Notification(`New Chat${diff > 1 ? 's' : ''}`, {
-              body: `You have ${diff} new conversation${diff > 1 ? 's' : ''}`,
-              icon: '/favicon.ico',
-            });
-          }
+
+        if (lastChatCountRef.current > 0 && newChatCount > lastChatCountRef.current) {
+          const diff = newChatCount - lastChatCountRef.current;
+          showToast(
+            `New Chat${diff > 1 ? 's' : ''}: ${diff} new conversation${diff > 1 ? 's' : ''}`,
+            'success'
+          );
         }
-        
-        if (lastRevenue > 0 && newRevenue > lastRevenue) {
-          const diff = newRevenue - lastRevenue;
-          showToast(`💰 Earned $${(diff / 100).toFixed(2)}!`, 'success');
-          
-          if (Notification.permission === 'granted') {
-            new Notification('💰 New Payment!', {
-              body: `You earned $${(diff / 100).toFixed(2)}`,
-              icon: '/favicon.ico',
-            });
-          }
+
+        if (lastRevenueRef.current > 0 && newRevenue > lastRevenueRef.current) {
+          const diff = newRevenue - lastRevenueRef.current;
+          showToast(`Earned $${(diff / 100).toFixed(2)}!`, 'success');
         }
-        
+
+        lastChatCountRef.current = newChatCount;
+        lastRevenueRef.current = newRevenue;
+
         setMessagesToday(newChatCount);
-        setLastChatCount(newChatCount);
-        setLastRevenue(newRevenue);
-        setData(prev => ({
+        setData((prev) => ({
           ...prev,
           ...res,
           earnings: prev?.earnings || res?.earnings || [],
         }));
-      } catch (e) {
-        // Ignore errors
+      } catch {
+        // ignore
       }
-    };
+    };    
     
-    // Request notification permission on mount
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
-    // Poll every 5 seconds
     const interval = setInterval(updateDashboard, 5000);
-
-    // Update on window focus (user returns to tab)
-    const handleFocus = () => {
-      updateDashboard();
-    };
+    const handleFocus = () => updateDashboard();
     window.addEventListener('focus', handleFocus);
 
-    // Update on visibility change
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        updateDashboard();
-      }
+      if (!document.hidden) updateDashboard();
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -165,7 +164,7 @@ export function CreatorDashboardPage() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, []);  
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -188,16 +187,12 @@ export function CreatorDashboardPage() {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
-  const recentConversations = [
-    { user: 'User 1', preview: 'How do I optimize React performance?', time: '2 mins ago', rating: '👍' },
-    { user: 'User 2', preview: "What's the best way to...", time: '15 mins ago', rating: null },
-    { user: 'User 3', preview: 'Can you explain...', time: '1 hour ago', rating: '👎' },
-  ];
-
   const handleExportChat = async (format: 'csv' | 'json' = 'csv') => {
     setExporting(true);
     try {
-      const res = await fetch(`/api/creator/chats/export?format=${format}`);
+      const res = await fetch(buildApiUrl(`/api/creator/chats/export?format=${format}`), {
+        credentials: 'include',
+      });      
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -217,23 +212,30 @@ export function CreatorDashboardPage() {
   };
 
   // Generate sparkline data (last 7 days) - mock data if not available
-  const sparklineData = data?.analytics?.conversationsOverTime?.slice(-7) || 
-    Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      count: Math.floor(Math.random() * 20) + 10
-    }));
+  const sparklineData =
+    data?.analytics?.conversationsOverTime?.length
+      ? data.analytics.conversationsOverTime.slice(-7)
+      : Array.from({ length: 7 }, (_, i) => ({
+          date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          }),
+          count: 0,
+        }));
 
-  // Calculate trend percentage
-  const trend = data?.chats?.trend || 
-    (data?.chats?.lastWeek ? 
-      Math.round(((data.chats.week - data.chats.lastWeek) / data.chats.lastWeek) * 100) : 
-      12);
+  const trend =
+    typeof data?.chats?.trend === 'number'
+      ? data.chats.trend
+      : data?.chats?.lastWeek
+        ? Math.round(((data.chats.week - data.chats.lastWeek) / Math.max(1, data.chats.lastWeek)) * 100)
+        : 0;
 
-  // Get peak hour
-  const peakHour = data?.analytics?.peakHour || 
-    (data?.analytics?.peakHours?.length ? 
-      data.analytics.peakHours.reduce((max, h) => h.count > max.count ? h : max, data.analytics.peakHours[0]).hour : 
-      15);
+  const peakHour =
+    typeof data?.analytics?.peakHour === 'number'
+      ? data.analytics.peakHour
+      : data?.analytics?.peakHours?.length
+        ? data.analytics.peakHours.reduce((max, h) => (h.count > max.count ? h : max), data.analytics.peakHours[0]).hour
+        : null;      
 
   // Get satisfaction rating (convert score to 5-star)
   const satisfactionRating = data?.analytics?.satisfaction?.score ? 
@@ -302,7 +304,7 @@ export function CreatorDashboardPage() {
           <div className="flex gap-2">
             <Button 
               variant="outline" 
-              onClick={() => window.location.href = '/onboarding/content'}
+              onClick={() => nav('/knowledge')}
               className="border-border-default text-text-secondary hover:text-text-primary"
             >
               <Database className="h-4 w-4 mr-2" />
@@ -310,7 +312,7 @@ export function CreatorDashboardPage() {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => window.location.href = '/identity/edit'}
+              onClick={() => nav('/identity/edit')}
               className="border-border-default text-text-secondary hover:text-text-primary"
             >
               <Settings className="h-4 w-4 mr-2" />
@@ -381,7 +383,7 @@ export function CreatorDashboardPage() {
               </div>
               <div className="text-sm text-text-secondary mb-2">Messages Today</div>
               <div className="text-xs text-text-tertiary">
-                Busiest at {peakHour}:00
+                Busiest at {peakHour === null ? '—' : `${peakHour}:00`}
               </div>
             </CardContent>
           </Card>
@@ -400,7 +402,7 @@ export function CreatorDashboardPage() {
               </div>
               <div className="text-sm text-text-secondary mb-2">Avg Response Time</div>
               <div className="text-xs text-text-tertiary">
-                Model: {data?.analytics?.modelUsed || 'Groq Llama 3.1'}
+                Model: {data?.analytics?.modelUsed || '-'}
               </div>
             </CardContent>
           </Card>
@@ -515,7 +517,9 @@ export function CreatorDashboardPage() {
                   </div>
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Peak Hour</div>
-                    <div className="text-2xl font-bold text-text-primary">{peakHour}:00</div>
+                    <div className="text-2xl font-bold text-text-primary">
+                      {peakHour === null ? '—' : `${peakHour}:00`}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -739,22 +743,28 @@ export function CreatorDashboardPage() {
                     description="Once visitors chat with your AI, recent conversations will show up here."
                   />
                 ) : recentConversations.map((conv, i) => (
-                  <div key={i} className="p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer">
+                  <div
+                    key={conv.sessionId || i}
+                    className="p-3 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
+                  >
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-accent-primary/20 rounded-full flex items-center justify-center text-xs font-semibold text-accent-primary">
-                          {conv.user[5]}
+                          {(conv.label || 'U').replace('@', '').slice(0, 1).toUpperCase()}
                         </div>
-                        <span className="text-sm font-medium text-text-primary">{conv.user}</span>
+                        <span className="text-sm font-medium text-text-primary">{conv.label}</span>
                       </div>
-                      {conv.rating && <span className="text-lg">{conv.rating}</span>}
+                
+                      {conv.rating === 'positive' ? <span className="text-lg">👍</span> : null}
+                      {conv.rating === 'negative' ? <span className="text-lg">👎</span> : null}
                     </div>
+                
                     <p className="text-sm text-text-secondary truncate mb-1">{conv.preview}</p>
-                    <p className="text-xs text-text-tertiary">{conv.time}</p>
+                    <p className="text-xs text-text-tertiary">{formatDate(conv.lastMessageAt)}</p>
                   </div>
-                ))}
+                ))}                
               </div>
-              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary">
+              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary" onClick={() => nav('/history')}>
                 View All
               </Button>
             </CardContent>
@@ -780,7 +790,8 @@ export function CreatorDashboardPage() {
                   <div className="text-sm text-text-secondary">Create content on Redux patterns</div>
                 </div>
               </div>
-              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary">
+              <Button variant="outline" className="w-full mt-4 border-border-default text-text-secondary"
+                onClick={() => showToast('AI Insights report is coming soon.', 'info')}>
                 Generate Report
               </Button>
             </CardContent>
@@ -797,7 +808,7 @@ export function CreatorDashboardPage() {
                   <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                   <div className="flex-1">
                     <div className="text-sm font-semibold text-text-primary">5 negative ratings need review</div>
-                    <Button variant="link" className="p-0 h-auto text-xs text-accent-primary mt-1">
+                    <Button variant="link" className="p-0 h-auto text-xs text-accent-primary mt-1" onClick={() => nav('/history')}>
                       Review now →
                     </Button>
                   </div>

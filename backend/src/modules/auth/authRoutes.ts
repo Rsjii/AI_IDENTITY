@@ -59,15 +59,15 @@ router.post('/refresh', sanitizeInput, async (req, res) => {
     const session = await getSessionByRefreshToken(refreshToken);
     if (!session) {
       // Invalid/expired refresh token => clear cookies
-      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
-      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'none', path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'none', path: '/' });
       return res.status(401).json({ error: 'Invalid or expired refresh token', errorCode: 'INVALID_REFRESH_TOKEN' });
     }
 
     const user = await userQueries.findById(session.userId);
     if (!user || !user.active) {
-      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
-      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'none', path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'none', path: '/' });
       return res.status(401).json({ error: 'User not found or inactive', errorCode: 'UNAUTHORIZED' });
     }
 
@@ -88,7 +88,7 @@ router.post('/refresh', sanitizeInput, async (req, res) => {
     res.cookie('jwtToken', newAccessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: accessTokenMaxAge,
       path: '/',
     });
@@ -96,7 +96,7 @@ router.post('/refresh', sanitizeInput, async (req, res) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });

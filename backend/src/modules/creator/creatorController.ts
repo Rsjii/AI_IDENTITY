@@ -467,3 +467,40 @@ export async function getStripeConnectStatus(req: Request, res: Response) {
     requirements: account.requirements || null,
   });
 }
+
+export async function recentChats(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const limit = Math.min(20, Math.max(1, Number(req.query.limit || 10)));
+
+  const r = await db.query(
+    `
+    SELECT
+      cs.id as "sessionId",
+      COALESCE(u."handle", CONCAT('Visitor ', COALESCE(cs."visitorId",'unknown'))) as "label",
+      COALESCE((
+        SELECT cm."content"
+        FROM "chat_messages" cm
+        WHERE cm."sessionId" = cs.id AND cm."role" = 'user'
+        ORDER BY cm."createdAt" DESC
+        LIMIT 1
+      ), '') as "preview",
+      COALESCE((
+        SELECT cm."createdAt"
+        FROM "chat_messages" cm
+        WHERE cm."sessionId" = cs.id
+        ORDER BY cm."createdAt" DESC
+        LIMIT 1
+      ), cs."createdAt") as "lastMessageAt"
+    FROM "chat_sessions" cs
+    LEFT JOIN "User" u ON u.id = cs."userId"
+    WHERE cs."creatorId" = $1
+    ORDER BY "lastMessageAt" DESC
+    LIMIT $2
+    `,
+    [userId, limit]
+  );
+
+  return res.json({ success: true, items: r.rows });
+}

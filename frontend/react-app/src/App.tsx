@@ -42,6 +42,7 @@ import { MarketplaceManagePage } from './pages/MarketplaceManagePage';
 import { VideoSetupPage } from './pages/VideoSetupPage';
 import { VideoManagePage } from './pages/VideoManagePage';
 import { PhoneSetupPage } from './pages/PhoneSetupPage';
+import { HistoryPage } from './pages/HistoryPage';
 
 
 
@@ -110,6 +111,7 @@ function App() {
               <Route path="/video/setup" element={<ProtectedRoute><VideoSetupPage /></ProtectedRoute>} />
               <Route path="/video/manage" element={<ProtectedRoute><VideoManagePage /></ProtectedRoute>} />
               <Route path="/phone/setup" element={<ProtectedRoute><PhoneSetupPage /></ProtectedRoute>} />
+              <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>

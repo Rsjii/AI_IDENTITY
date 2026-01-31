@@ -13,6 +13,7 @@ import {
   startTrial,
   connectStripeAccount,
   getStripeConnectStatus,
+  recentChats,
 } from './creatorController';
 
 const router = Router();
@@ -28,5 +29,7 @@ router.post('/pricing', sanitizeInput, validateCSRF, asyncHandler(setPricing));
 router.post('/trial/start', sanitizeInput, validateCSRF, asyncHandler(startTrial));
 router.post('/stripe/connect', validateCSRF, asyncHandler(connectStripeAccount));
 router.get('/stripe/status', asyncHandler(getStripeConnectStatus));
+
+router.get('/chats/recent', asyncHandler(recentChats));
 
 export default router;

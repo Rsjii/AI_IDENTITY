@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, BarChart3 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiFetch, apiFetchForm } from '@/lib/api';
+import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
 
 type Tab = 'profile' | 'payment' | 'billing' | 'security' | 'notifications' | 'ab-testing';
 
@@ -225,9 +225,11 @@ export function SettingsPage() {
 
   const handleExportCSV = async () => {
     try {
-      const res = await fetch('/api/creator/earnings/export', {
-        headers: { 'Authorization': `Bearer ${(state as any).token || ''}` }
+      const res = await fetch(buildApiUrl('/api/creator/earnings/export'), {
+        method: 'GET',
+        credentials: 'include',
       });
+      if (!res.ok) throw new Error('Failed to export CSV');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -376,9 +378,9 @@ export function SettingsPage() {
         popularQuestions: popularQuestions.filter(q => q.trim()),
         paymentTriggerRules: paymentTriggerRules,
       };
-      await apiFetch('/api/profile/update', {
+      await apiFetch('/api/creator/pricing', {
         method: 'POST',
-        body: JSON.stringify({ priceConfig: newConfig }),
+        body: JSON.stringify(newConfig),
       });
       await refresh();
       setError('');
@@ -395,7 +397,7 @@ export function SettingsPage() {
     setExportingData(true);
     setError('');
     try {
-      const res = await fetch('/api/profile/export', {
+      const res = await fetch(buildApiUrl('/api/profile/export'), {
         method: 'GET',
         credentials: 'include',
       });
@@ -561,6 +563,9 @@ export function SettingsPage() {
             { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
             { id: 'security' as Tab, label: 'Security', icon: Shield },
             { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
+            ...(planTier === 'scale'
+              ? [{ id: 'ab-testing' as Tab, label: 'A/B Testing', icon: BarChart3 }]
+              : []),
           ]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -1177,7 +1182,7 @@ export function SettingsPage() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => window.location.href = '/api/auth/google'}
+                      onClick={() => window.location.href = buildApiUrl('/api/auth/google')}
                     >
                       Connect
                     </Button>

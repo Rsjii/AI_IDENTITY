@@ -115,6 +115,28 @@ if (!isProd) {
   });
 }
 
+if (isProd) {
+  app.use('/api', (req, res, next) => {
+    const origin = String(req.headers.origin || '');
+
+    // put your real frontend origin here
+    const allowedOrigins = new Set([
+      process.env.FRONTEND_URL || '',
+    ]);
+
+    if (allowedOrigins.has(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+    }
+
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    return next();
+  });
+}
+
 // === EXTENSION CORS (Gmail content-script + Chrome extension) ===
 // Allow Gmail origin (content script) and Chrome extension origins
 app.use('/api/ext', (req, res, next) => {
@@ -315,7 +337,7 @@ app.use(async (req, res, next) => {
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'lax',
+        sameSite: 'none',
         path: '/',
       });
       if (req.session) {

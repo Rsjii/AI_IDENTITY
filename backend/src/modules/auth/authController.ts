@@ -496,14 +496,14 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
       res.cookie('jwtToken', accessToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'lax',
+        sameSite: 'none',
         maxAge: accessTokenMaxAge,
         path: '/',
       });
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: 'lax',
+        sameSite: 'none',
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         path: '/',
       });
@@ -573,7 +573,7 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
     res.cookie('jwtToken', token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
@@ -947,7 +947,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: accessTokenMaxAge,
       path: '/'
     });
@@ -955,7 +955,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/',
     });
@@ -1121,7 +1121,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'lax',
+      sameSite: 'none',
       maxAge: accessTokenMaxAge,
       path: '/'
     });
