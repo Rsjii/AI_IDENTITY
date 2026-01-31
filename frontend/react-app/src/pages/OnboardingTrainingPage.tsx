@@ -16,6 +16,21 @@ export function OnboardingTrainingPage() {
   const [emailNotification, setEmailNotification] = useState(true);
   const [estimatedTime, setEstimatedTime] = useState(18); // hours
 
+  // ✅ Prevent back navigation to profile page
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   useEffect(() => {
     // ✅ Poll for real training status from backend
     const pollInterval = setInterval(async () => {

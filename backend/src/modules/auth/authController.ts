@@ -976,20 +976,35 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     // Get redirect URL
     let nextRedirect: string;
-    if (user.profileCompleted) {
-      // Check onboarding step
-      if (user.onboardingStep === 'done') {
+
+    // ✅ STEP 1: Check if profile is completed first (mandatory)
+    if (!user.profileCompleted) {
+      nextRedirect = `/signup/profile?email=${encodeURIComponent(user.email)}`;
+    }
+    // ✅ STEP 2: Profile done, check onboarding status
+    else {
+      // User has completed onboarding if ANY of these are true:
+      // 1. onboardingStep is explicitly 'done'
+      // 2. User has an active trial (trialEndsAt in future)
+      // 3. User has a paid plan (planTier is not null/starter)
+      const hasActiveTrial = (user as any).trialEndsAt && new Date((user as any).trialEndsAt) > new Date();
+      const hasPaidPlan = (user as any).planTier && (user as any).planTier !== 'starter';
+      const isOnboardingDone = user.onboardingStep === 'done' || hasActiveTrial || hasPaidPlan;
+
+      if (isOnboardingDone) {
+        // ✅ Auto-fix: If user has completed onboarding but step isn't 'done', update it
+        if (user.onboardingStep !== 'done') {
+          await userQueries.updateOnboardingStep(user.id, 'done');
+        }
         nextRedirect = '/dashboard';
       } else {
-        // Continue onboarding flow
+        // Onboarding not complete - redirect to onboarding
         nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
       }
-    } else {
-      nextRedirect = '/onboarding/quiz';
     }
-  
-  res.json({ 
-    message: 'Login successful', 
+
+  res.json({
+    message: 'Login successful',
     redirect: nextRedirect,
     token: accessToken,
     user: {
@@ -998,7 +1013,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       handle: user.handle,
       name: user.name
     }
-  });    
+  });
   } catch (error) {
     logger.error('Login error:', error);
     
@@ -1150,20 +1165,35 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
 
     // Get redirect URL
     let nextRedirect: string;
-    if (user.profileCompleted) {
-      // Check onboarding step
-      if (user.onboardingStep === 'done') {
+
+    // ✅ STEP 1: Check if profile is completed first (mandatory)
+    if (!user.profileCompleted) {
+      nextRedirect = `/signup/profile?email=${encodeURIComponent(user.email)}`;
+    }
+    // ✅ STEP 2: Profile done, check onboarding status
+    else {
+      // User has completed onboarding if ANY of these are true:
+      // 1. onboardingStep is explicitly 'done'
+      // 2. User has an active trial (trialEndsAt in future)
+      // 3. User has a paid plan (planTier is not null/starter)
+      const hasActiveTrial = (user as any).trialEndsAt && new Date((user as any).trialEndsAt) > new Date();
+      const hasPaidPlan = (user as any).planTier && (user as any).planTier !== 'starter';
+      const isOnboardingDone = user.onboardingStep === 'done' || hasActiveTrial || hasPaidPlan;
+
+      if (isOnboardingDone) {
+        // ✅ Auto-fix: If user has completed onboarding but step isn't 'done', update it
+        if (user.onboardingStep !== 'done') {
+          await userQueries.updateOnboardingStep(user.id, 'done');
+        }
         nextRedirect = '/dashboard';
       } else {
-        // Continue onboarding flow
+        // Onboarding not complete - redirect to onboarding
         nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
       }
-    } else {
-      nextRedirect = '/onboarding/quiz';
     }
-  
-  res.json({ 
-    message: 'Login successful', 
+
+  res.json({
+    message: 'Login successful',
     redirect: nextRedirect,
     token: accessToken,
     user: {
@@ -1172,7 +1202,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       handle: user.handle,
       name: user.name
     }
-  });    
+  });
   } catch (error) {
     logger.error({ err: error }, 'Login verify error');
     

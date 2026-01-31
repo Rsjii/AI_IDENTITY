@@ -11,6 +11,7 @@ import {
   requestPayout,
   setPricing,
   startTrial,
+  completeOnboarding,
   connectStripeAccount,
   getStripeConnectStatus,
   recentChats,
@@ -29,6 +30,7 @@ router.post('/earnings/payout', sanitizeInput, validateCSRF, asyncHandler(reques
 
 router.post('/pricing', sanitizeInput, validateCSRF, asyncHandler(setPricing));
 router.post('/trial/start', sanitizeInput, validateCSRF, asyncHandler(startTrial));
+router.post('/onboarding/complete', sanitizeInput, validateCSRF, asyncHandler(completeOnboarding));
 router.post('/stripe/connect', validateCSRF, asyncHandler(connectStripeAccount));
 router.get('/stripe/status', asyncHandler(getStripeConnectStatus));
 

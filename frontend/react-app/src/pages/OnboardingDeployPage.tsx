@@ -47,6 +47,21 @@ export function OnboardingDeployPage() {
 <link rel="stylesheet" href="${apiBase}/embed.css" />`;
   }, [creatorId, slug, apiBase, widgetColor, widgetPosition, widgetTitle, avatarUrl, voiceEnabled, welcomeMessage, popularQuestions]);
 
+  // ✅ Prevent back navigation to profile page
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   // Generate QR code
   useEffect(() => {
     if (standaloneLink) {

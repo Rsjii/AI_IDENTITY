@@ -5,6 +5,7 @@ export interface ApiError {
   errorCode?: string;
   details?: any;
   redirect?: string;
+  fieldErrors?: Record<string, string>;
 }
 
 // Get API base URL from environment variable
@@ -80,7 +81,8 @@ export async function apiFetch<T = any>(
           throw new ApiError(
             retryError.error || 'Request failed',
             retryError.errorCode,
-            retryError
+            retryError,
+            retryError.fieldErrors
           );
         }
 
@@ -148,6 +150,7 @@ if (response.status === 401) {
     apiError.errorCode = errorData.errorCode;
     apiError.details = errorData.details;
     apiError.redirect = errorData.redirect;
+    apiError.fieldErrors = errorData.fieldErrors;
     (apiError as any).status = response.status; // Add status for 404 checks
     throw apiError;
   }
@@ -166,12 +169,14 @@ export class ApiError extends Error {
   errorCode?: string;
   details?: any;
   redirect?: string;
+  fieldErrors?: Record<string, string>;
 
-  constructor(message: string, errorCode?: string, details?: any) {
+  constructor(message: string, errorCode?: string, details?: any, fieldErrors?: Record<string, string>) {
     super(message);
     this.name = 'ApiError';
     this.errorCode = errorCode;
     this.details = details;
+    this.fieldErrors = fieldErrors;
   }
 }
 
@@ -210,6 +215,7 @@ export async function apiFetchForm<T = any>(
     apiError.errorCode = errorData.errorCode;
     apiError.details = errorData.details;
     apiError.redirect = errorData.redirect;
+    apiError.fieldErrors = errorData.fieldErrors;
     throw apiError;
   }
 

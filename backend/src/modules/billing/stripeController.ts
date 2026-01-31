@@ -183,6 +183,13 @@ export async function stripeWebhook(req: Request, res: Response) {
       }
       if (userId && normalizedTier) {
         await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [normalizedTier, userId]);
+
+        // ✅ FIX: Mark onboarding as complete when user subscribes to a paid plan
+        const { userQueries } = await import('../../config/database');
+        await userQueries.updateOnboardingStep(userId, 'done');
+        // ✅ FIX: Also set profileCompleted = true
+        await db.query('UPDATE "User" SET "profileCompleted" = true WHERE id = $1', [userId]);
+
         logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${normalizedTier} from checkout.session.completed`);
       } else if (sess?.metadata?.type === 'marketplace_subscription') {
         const listingId = sess?.metadata?.listingId;

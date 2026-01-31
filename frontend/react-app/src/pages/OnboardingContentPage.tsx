@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Upload, FileText, Link as LinkIcon, Youtube, Twitter,
   Linkedin, Instagram, File, X, CheckCircle2, Loader2, AlertCircle,
@@ -41,6 +42,7 @@ const QUALITY_THRESHOLDS = {
 
 export function OnboardingContentPage() {
   const nav = useNavigate();
+  const { refresh: refreshAuth } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('files');
   const [pasteText, setPasteText] = useState('');
@@ -94,6 +96,21 @@ export function OnboardingContentPage() {
     const r = await apiFetch<{ items: ContentItem[] }>('/api/content/list');
     setItems(r.items || []);
   };
+
+  // ✅ Prevent back navigation to profile page
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     refresh().catch(() => {});
@@ -601,7 +618,21 @@ export function OnboardingContentPage() {
               </Button>
               <div className="flex flex-col items-end gap-2">
                 <Button
-                  onClick={() => nav('/onboarding/plan')}
+                  onClick={async () => {
+                    try {
+                      // ✅ Mark onboarding complete before going to plan page
+                      await apiFetch('/api/creator/onboarding/complete', {
+                        method: 'POST',
+                        body: JSON.stringify({}),
+                      });
+                      await refreshAuth();
+                      nav('/onboarding/plan');
+                    } catch (error) {
+                      console.error('Failed to mark onboarding complete:', error);
+                      // Still navigate even if marking complete fails
+                      nav('/onboarding/plan');
+                    }
+                  }}
                   className="bg-accent-gradient hover:opacity-90 text-white px-8"
                   disabled={!hasMinimumItems}
                 >

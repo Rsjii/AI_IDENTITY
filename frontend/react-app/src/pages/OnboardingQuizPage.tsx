@@ -102,6 +102,20 @@ export function OnboardingQuizPage() {
   const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
 
+  // ✅ Prevent back navigation to profile page
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Auto-save to localStorage
   useEffect(() => {

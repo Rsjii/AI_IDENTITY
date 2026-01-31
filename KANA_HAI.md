@@ -2,3 +2,14 @@
 2. ek wo popup waale jo card hote hai na jo upar aate hai deafult js, usko replace karna custom se
 3. agar koi unauthenticate duser kisi pe authenticated link pe jaaye show error sahi se do not allow
 4. otp resend wala option
+
+
+
+
+#1. files pe max limit lagi hai, uska actual me check bhi hon chahiye, max 25 mb to check bhi chahiye
+#2. Est. Training Time
+~1 hour
+Storage Used, only for 100 kb files , tihs is wrong sahi karo
+#3. upload your content -> isme files select karte hai, tab wo upload nahi honi chahiye ya trained, jab tak user continue na kare,tab nahi hona chahiye, upload matlab just selected, not trained, final change should be done once user confirms by clciking continue
+
+#4. plan update hi nahi hota hai even after payment done ok aa jaaye

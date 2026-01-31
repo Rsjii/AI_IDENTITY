@@ -75,7 +75,7 @@ function App() {
               
               <Route path="/signup/verify" element={<SignupVerifyPage />} />
               <Route path="/login/verify" element={<LoginVerifyPage />} />
-              <Route path="/signup/profile" element={<SignupProfilePage />} />
+              <Route path="/signup/profile" element={<ProtectedRoute><SignupProfilePage /></ProtectedRoute>} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route path="/identity/setup" element={<IdentitySetupPage />} />

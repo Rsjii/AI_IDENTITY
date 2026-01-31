@@ -436,10 +436,28 @@ export async function startTrial(req: Request, res: Response) {
 
   const u = await userQueries.startTrial(userId, 7);
 
-  // ✅ ADD
-  await userQueries.updateOnboardingStep(userId, 'deploy');
+  // ✅ FIX: Mark onboarding as complete when trial starts
+  await userQueries.updateOnboardingStep(userId, 'done');
+  // ✅ FIX: Also set profileCompleted = true
+  await db.query('UPDATE "User" SET "profileCompleted" = true WHERE id = $1', [userId]);
 
   return res.json({ success: true, trialEndsAt: u.trialEndsAt });
+}
+
+/**
+ * Mark onboarding as complete
+ * POST /api/creator/onboarding/complete
+ */
+export async function completeOnboarding(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  await userQueries.updateOnboardingStep(userId, 'done');
+
+  // ✅ FIX: Also set profileCompleted = true when onboarding is done
+  await db.query('UPDATE "User" SET "profileCompleted" = true WHERE id = $1', [userId]);
+
+  return res.json({ success: true, message: 'Onboarding marked as complete' });
 }
 
 export async function connectStripeAccount(req: Request, res: Response) {

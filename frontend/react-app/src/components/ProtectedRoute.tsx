@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -7,6 +7,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { state } = useAuth();
+  const location = useLocation();
 
   if (state.status === 'loading') {
     return (
@@ -18,6 +19,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (state.status === 'unauthenticated') {
     return <Navigate to="/auth?reason=unauthorized" replace />;
+  }
+
+  // ✅ NEW: Enforce profile completion before accessing protected routes
+  // Exception: Allow access to /signup/profile page itself
+  if (state.user && !state.user.profileCompleted && !location.pathname.startsWith('/signup/profile')) {
+    return <Navigate to={`/signup/profile?email=${encodeURIComponent(state.user.email)}`} replace />;
   }
 
   return <>{children}</>;
