@@ -18,7 +18,8 @@ export interface AuthSessionData {
  */
 export async function createOrUpdateAuthSession(data: AuthSessionData): Promise<string> {
   try {
-    const sessionId = generateId.session();
+    // Note: idGenerator doesn't have generateId.session()
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const now = new Date();
     
     // Try to find existing active session for this user/device/IP
@@ -58,7 +59,8 @@ export async function createOrUpdateAuthSession(data: AuthSessionData): Promise<
 
     return sessionId;
   } catch (error) {
-    logger.error('Failed to create/update auth session:', error);
+    // ✅ Ensure Pino serializes the Error correctly (otherwise message/stack can be lost)
+    logger.error({ err: error }, 'Failed to create/update auth session');
     throw error;
   }
 }

@@ -1,1 +1,1 @@
-1. password me view option
+1. password me view option / eye wala icon

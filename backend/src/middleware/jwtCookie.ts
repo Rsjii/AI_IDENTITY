@@ -26,7 +26,7 @@ export const extractJWTFromCookie = (req: Request, res: Response, next: NextFunc
         res.clearCookie('jwtToken', {
           httpOnly: true,
           secure: isProd,
-          sameSite: isProd ? 'lax' : 'strict',
+          sameSite: 'lax',
           path: '/',
         });
       }
@@ -83,7 +83,7 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
             res.clearCookie('jwtToken', {
               httpOnly: true,
               secure: isProd,
-              sameSite: isProd ? 'lax' : 'strict',
+              sameSite: 'lax',
               path: '/',
             });
             if (isApiRequest) {
@@ -153,7 +153,7 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? 'lax' : 'strict',
+        sameSite: 'lax',
         path: '/',
       });
 

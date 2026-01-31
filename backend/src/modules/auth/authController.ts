@@ -461,30 +461,42 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
       const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
       const expiresAt = new Date(Date.now() + accessTokenMaxAge);
 
-      // Create auth session first to get sessionId
-      const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
+      // Create auth session first to get sessionId.
+      // ✅ IMPORTANT: If session creation fails (DB constraints/pooler glitches), do NOT block account activation.
+      // Users must be able to proceed; session tracking is best-effort.
+      const ipAddress =
+        req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.connection.remoteAddress || '';
       const userAgent = req.headers['user-agent'] || '';
-      const sessionId = await createOrUpdateAuthSession({
-        userId: user.id,
-        deviceInfo: userAgent,
-        ipAddress,
-        userAgent,
-        expiresAt,
-        refreshToken,
-        refreshTokenExpiresAt,
-      });
+      let sessionId: string | undefined;
+      try {
+        sessionId = await createOrUpdateAuthSession({
+          userId: user.id,
+          deviceInfo: userAgent,
+          ipAddress,
+          userAgent,
+          expiresAt,
+          refreshToken,
+          refreshTokenExpiresAt,
+        });
+      } catch (sessionErr: any) {
+        logger.warn(
+          { err: sessionErr, userId: user.id, ipAddress, userAgent },
+          'Auth session creation failed during signupVerify; continuing without sessionId'
+        );
+        sessionId = undefined;
+      }
       
       const accessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
         handle: user.handle || '',
-        sessionId: sessionId
+        ...(sessionId ? { sessionId } : {})
       });
 
       res.cookie('jwtToken', accessToken, {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? 'lax' : 'strict',
+        sameSite: 'lax',
         maxAge: accessTokenMaxAge,
         path: '/',
       });
@@ -500,7 +512,8 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
       redirect: '/onboarding/quiz'
     });
   } catch (error: any) {
-    logger.error('Signup verify error:', error);
+    // ✅ Ensure Error is serialized (message/stack) so we can see root cause in logs
+    logger.error({ err: error }, 'Signup verify error');
     
     // Handle Zod validation errors with proper messages
     if (error instanceof z.ZodError) {
@@ -553,7 +566,7 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
     res.cookie('jwtToken', token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'lax' : 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/'
     });
@@ -927,19 +940,17 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'lax' : 'strict',
+      sameSite: 'lax',
       maxAge: accessTokenMaxAge,
       path: '/'
     });
 
-    // Log login event
-    try {
-      await EventLogger.logLogin(user.id, {
-        source: 'direct'
-      });
-    } catch (eventError) {
-      logger.warn('Failed to log login event:', eventError);
-    }
+    // ✅ Log login event in background (non-blocking)
+    EventLogger.logLogin(user.id, {
+      source: 'direct'
+    }).catch((eventError) => {
+      logger.warn({ err: eventError }, 'Failed to log login event');
+    });
 
     // ✅ Identify user in PostHog (optional - can do on first login only)
     identifyPostHogUser(user.id, {
@@ -1095,7 +1106,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     res.cookie('jwtToken', accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'lax' : 'strict',
+      sameSite: 'lax',
       maxAge: accessTokenMaxAge,
       path: '/'
     });
@@ -1105,14 +1116,12 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     req.session!.userEmail = user.email;
     req.session!.userHandle = user.handle;
 
-    // Log login event (for OTP-based login)
-    try {
-      await EventLogger.logLogin(user.id, {
-        source: 'direct'
-      });
-    } catch (eventError) {
-      logger.warn('Failed to log login event:', eventError);
-    }
+    // ✅ Log login event in background (non-blocking)
+    EventLogger.logLogin(user.id, {
+      source: 'direct'
+    }).catch((eventError) => {
+      logger.warn({ err: eventError }, 'Failed to log login event');
+    });
 
     // Get redirect URL
     let nextRedirect: string;
@@ -1496,7 +1505,7 @@ export const logout = (req: Request, res: Response, next: NextFunction) => {
    res.clearCookie('jwtToken', {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? 'lax' : 'strict',
+    sameSite: 'lax',
     path: '/'
   });    
     

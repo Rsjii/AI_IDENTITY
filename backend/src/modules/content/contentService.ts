@@ -41,6 +41,108 @@ function chunkText(text: string, chunkSize = 1200): string[] {
   return out;
 }
 
+function looksLikeHtml(s: string): boolean {
+  const t = (s || '').trim().slice(0, 2000).toLowerCase();
+  return t.includes('<html') || t.includes('<body') || /<p[\s>]/.test(t) || /<div[\s>]/.test(t);
+}
+
+function stripHtmlToText(html: string): { title?: string; text: string } {
+  const raw = html || '';
+  const titleMatch = raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : undefined;
+
+  // remove scripts/styles/noscript/svg
+  let cleaned = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ');
+
+  // add newlines for block-ish tags to preserve structure
+  cleaned = cleaned
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|section|article|br)\s*>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+
+  // strip remaining tags
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+
+  // basic entity decoding (minimal set)
+  cleaned = cleaned
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  // normalize whitespace
+  const text = cleaned
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+
+  return { title, text };
+}
+
+export async function createUrlSource(userId: string, url: string, title?: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let rawText: string | undefined;
+  let resolvedTitle: string | undefined = title;
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        // reduce bot blocks a bit
+        'User-Agent': 'SelflyxBot/1.0 (+local-dev)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+      },
+    });
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const body = await res.text();
+
+    if (contentType.includes('text/plain') && !looksLikeHtml(body)) {
+      rawText = body.trim() || undefined;
+    } else {
+      const parsed = stripHtmlToText(body);
+      resolvedTitle = resolvedTitle || parsed.title || url;
+      rawText = parsed.text || undefined;
+    }
+  } catch (error: any) {
+    logger.warn({ err: error, url }, '[Content] URL fetch/extract failed; storing URL only');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const source = await knowledgeSourceQueries.create({
+    userId,
+    type: 'url',
+    title: resolvedTitle || 'URL',
+    originalUrl: url,
+    rawText: rawText || undefined,
+  });
+
+  const chunks = rawText ? chunkText(rawText) : [];
+  await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+
+  if (chunks.length > 0) {
+    ragService.generateEmbeddingsForUser(userId).catch(err => {
+      logger.warn('[Content] Failed to generate embeddings:', err);
+    });
+  }
+
+  await ensureTrainingJob(userId);
+
+  return source;
+}
+
 async function transcribeAudio(buffer: Buffer, mimeType: string): Promise<string> {
   if (!openaiClient) {
     throw new Error('OpenAI API not configured for audio transcription');

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { knowledgeSourceQueries } from '../../config/database';
-import { createPasteSource, createYoutubeSource, createFileSource } from './contentService';
+import { createPasteSource, createYoutubeSource, createFileSource, createUrlSource } from './contentService';
 
 function getUserId(req: Request): string | null {
   const u: any = (req as any).user;
@@ -14,6 +14,11 @@ const pasteSchema = z.object({
 });
 
 const youtubeSchema = z.object({
+  url: z.string().url(),
+  title: z.string().optional(),
+});
+
+const urlSchema = z.object({
   url: z.string().url(),
   title: z.string().optional(),
 });
@@ -41,6 +46,15 @@ export async function youtube(req: Request, res: Response) {
 
   const { url, title } = youtubeSchema.parse(req.body);
   const source = await createYoutubeSource(userId, url, title);
+  return res.json({ success: true, source });
+}
+
+export async function url(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { url: inputUrl, title } = urlSchema.parse(req.body);
+  const source = await createUrlSource(userId, inputUrl, title);
   return res.json({ success: true, source });
 }
 
@@ -275,22 +289,48 @@ export async function importYoutubeChannel(req: Request, res: Response) {
   }
 }
 
-async function fetchTwitterProfile(handle: string, apiKey?: string): Promise<string> {
-  // Twitter API v2 requires OAuth 2.0 and is more complex
-  // For now, return a placeholder that can be extended
+async function fetchTwitterProfile(handle: string, apiKey?: string): Promise<{ content: string; tweets: any[] }> {
+  const clean = handle.replace(/^@/, '').trim();
+
   if (!apiKey) {
-    return `Twitter Profile: @${handle}\n\nTwitter API integration requires OAuth 2.0 setup. This is a placeholder for future implementation.\n\nTo enable Twitter import:\n1. Create a Twitter Developer account\n2. Set up OAuth 2.0 credentials\n3. Configure TWITTER_BEARER_TOKEN in environment variables\n4. Implement Twitter API v2 endpoints`;
+    return {
+      content: `Twitter Profile: @${clean}\n\nTo enable Twitter import:\n- Configure TWITTER_BEARER_TOKEN (Twitter/X API v2)\n- Or use OAuth flow (Connect button)\n\nNote: Twitter API access depends on your app tier and permissions.`,
+      tweets: [],
+    };
   }
 
-  // Placeholder for future Twitter API v2 implementation
-  // const tweetsUrl = `https://api.twitter.com/2/tweets/search/recent?query=from:${handle}&max_results=100`;
-  // const tweetsRes = await fetch(tweetsUrl, {
-  //   headers: { Authorization: `Bearer ${apiKey}` }
-  // });
-  // const tweetsData = await tweetsRes.json();
-  // ... process tweets
+  // Best-effort v2 public fetch with bearer token
+  // 1) Resolve username -> user id
+  const userRes = await fetch(`https://api.twitter.com/2/users/by/username/${encodeURIComponent(clean)}?user.fields=created_at,public_metrics`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  const userJson: any = await userRes.json().catch(() => ({}));
+  if (!userRes.ok || !userJson?.data?.id) {
+    const msg = userJson?.error?.message || userJson?.title || userJson?.detail || `Failed to resolve Twitter username @${clean}`;
+    throw new Error(msg);
+  }
 
-  return `Twitter Profile: @${handle}\n\nTwitter API integration coming soon.`;
+  const twitterUserId = userJson.data.id as string;
+
+  // 2) Fetch latest tweets (limit 50)
+  const tweetsRes = await fetch(
+    `https://api.twitter.com/2/users/${encodeURIComponent(twitterUserId)}/tweets?max_results=50&tweet.fields=created_at,public_metrics,text&exclude=retweets,replies`,
+    { headers: { Authorization: `Bearer ${apiKey}` } }
+  );
+  const tweetsJson: any = await tweetsRes.json().catch(() => ({}));
+  if (!tweetsRes.ok) {
+    const msg = tweetsJson?.error?.message || tweetsJson?.title || tweetsJson?.detail || `Failed to fetch tweets for @${clean}`;
+    throw new Error(msg);
+  }
+
+  const tweets = Array.isArray(tweetsJson?.data) ? tweetsJson.data : [];
+  const content = [
+    `Twitter Profile: @${clean}`,
+    '',
+    ...tweets.map((t: any) => `Tweet: ${t.text}\nDate: ${t.created_at || ''}\nLikes: ${t.public_metrics?.like_count || 0}\n`),
+  ].join('\n---\n\n');
+
+  return { content, tweets };
 }
 
 export async function importTwitterHandle(req: Request, res: Response) {

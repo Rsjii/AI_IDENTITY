@@ -33,9 +33,11 @@ export function handleErrorWithResponse(
   }
   
   const appError = createError.internal(defaultMessage, error);
+  const isDev = process.env.NODE_ENV !== 'production';
   res.status(appError.statusCode).json({
     error: appError.message,
-    errorCode: appError.errorCode || defaultErrorCode
+    errorCode: appError.errorCode || defaultErrorCode,
+    ...(isDev ? { details: (error as any)?.message || String(error) } : {}),
   });
 }
 

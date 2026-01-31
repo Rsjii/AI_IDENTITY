@@ -33,7 +33,7 @@ export async function getAuth(req: any, res: Response) {
       res.clearCookie('jwtToken', {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? 'lax' : 'strict',
+        sameSite: 'lax',
         path: '/',
       });
 

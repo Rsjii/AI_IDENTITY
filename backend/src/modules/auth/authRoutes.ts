@@ -84,7 +84,7 @@ router.post('/refresh', sanitizeInput, async (req, res) => {
     res.cookie('jwtToken', newAccessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'lax' : 'strict',
+      sameSite: 'lax',
       maxAge: 15 * 60 * 1000, // 15 minutes
       path: '/'
     });

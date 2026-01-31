@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 
@@ -34,6 +34,7 @@ const AuthContext = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null });
+  const didInit = useRef(false);
 
   const refresh = async () => {
     try {
@@ -53,20 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // ✅ Dev noise reduction: React StrictMode can mount effects twice.
+    // Keep auth state updated primarily via real API usage (401 handling),
+    // not background polling, to avoid unnecessary traffic in all envs.
+    if (didInit.current) return;
+    didInit.current = true;
+
     refresh();
-    
-    // Set up periodic refresh (every 5 minutes) to check session validity
-    const refreshInterval = setInterval(() => {
-      refresh().catch(() => {
-        // If refresh fails, user is logged out
-      });
-    }, 5 * 60 * 1000); // 5 minutes
-    
-    // Refresh on window focus
-    const handleFocus = () => {
-      refresh().catch(() => {});
-    };
-    window.addEventListener('focus', handleFocus);
     
     // Listen for session expired events from api.ts
     const handleSessionExpired = () => {
@@ -75,14 +69,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('auth:session-expired', handleSessionExpired);
     
     return () => {
-      clearInterval(refreshInterval);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('auth:session-expired', handleSessionExpired);
     };
   }, []);
 
   // ✅ F2: Session timeout warning with countdown and extend button
   useEffect(() => {
+    if (!import.meta.env.PROD) return;
     if (state.status !== 'authenticated') return;
 
     // Check session expiry (7 days default, 30 days if rememberMe)

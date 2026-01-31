@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireExtensionBearer, ExtensionAuthedRequest } from '../../middleware/extensionAuth';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
+import { knowledgeSourceQueries, knowledgeChunkQueries } from '../../config/database';
 import { logger } from '../../config/logger';
 import { ErrorCodes } from '../../utils/errors';
 import { handleErrorWithResponse } from '../../utils/errorHandler';
@@ -124,6 +125,66 @@ router.get('/identity/active', async (req: ExtensionAuthedRequest, res) => {
   } catch (error: any) {
     logger.error('Extension get identity error:', error);
     handleErrorWithResponse(error, res, 'Failed to get identity.');
+  }
+});
+
+const extLinkedInImportSchema = z.object({
+  profileUrl: z.string().url().optional(),
+  posts: z.array(z.object({
+    text: z.string().min(1),
+    url: z.string().url().optional(),
+    createdAt: z.string().optional(),
+  })).min(1),
+});
+
+router.post('/import/linkedin', async (req: ExtensionAuthedRequest, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized', errorCode: 'UNAUTHORIZED' });
+
+    const { profileUrl, posts } = extLinkedInImportSchema.parse(req.body);
+
+    const rawText =
+      `LinkedIn Import\nProfile: ${profileUrl || 'unknown'}\n\n` +
+      posts.map((p) => `Post: ${p.url || ''}\nDate: ${p.createdAt || ''}\nText:\n${p.text}\n`).join('\n---\n\n');
+
+    const existing = (await knowledgeSourceQueries.listByUserId(userId)).find((s: any) => s.type === 'linkedin');
+
+    let source: any;
+    if (existing) {
+      await knowledgeSourceQueries.update(existing.id, {
+        rawText,
+        lastFetchedAt: new Date(),
+        fetchMetadata: { posts: posts.length, profileUrl: profileUrl || null },
+      });
+      source = existing;
+    } else {
+      source = await knowledgeSourceQueries.create({
+        userId,
+        type: 'linkedin',
+        title: 'LinkedIn (Extension Import)',
+        originalUrl: profileUrl,
+        rawText,
+      });
+    }
+
+    const chunks = (() => {
+      const clean = (rawText || '').trim();
+      if (!clean) return [];
+      const out: string[] = [];
+      for (let i = 0; i < clean.length; i += 1200) out.push(clean.slice(i, i + 1200));
+      return out;
+    })();
+
+    await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+
+    return res.json({ success: true, sourceId: source.id, postsImported: posts.length });
+  } catch (error: any) {
+    logger.error('Extension LinkedIn import error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', errorCode: ErrorCodes.VALIDATION_ERROR, details: error.errors });
+    }
+    handleErrorWithResponse(error, res, 'Failed to import LinkedIn posts.');
   }
 });
 

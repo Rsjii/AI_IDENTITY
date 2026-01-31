@@ -48,29 +48,24 @@ export function AuthPage() {
   const [signupReferralCode, setSignupReferralCode] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  // Real-time email validation on signup
-  useEffect(() => {
+  // ✅ Reduce noisy background calls: check email only when user leaves the field (onBlur).
+  const checkEmailAvailability = async () => {
     if (!signupEmail || !signupEmail.includes('@')) {
       setEmailError('');
       return;
     }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(signupEmail)}`);
-        const data = await res.json();
-        if (data.exists) {
-          setEmailError('This email is already registered. Try logging in instead.');
-        } else {
-          setEmailError('');
-        }
-      } catch (err) {
-        // Ignore errors
+    try {
+      const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(signupEmail)}`);
+      const data = await res.json();
+      if (data.exists) {
+        setEmailError('This email is already registered. Try logging in instead.');
+      } else {
+        setEmailError('');
       }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [signupEmail]);
+    } catch {
+      // ignore
+    }
+  };
 
   const goGoogle = () => {
     // Backend mounted at: /api/auth/google
@@ -278,6 +273,7 @@ export function AuthPage() {
                         placeholder="you@example.com"
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
+                        onBlur={checkEmailAvailability}
                         required
                         disabled={loading}
                         className={emailError ? 'border-red-500' : ''}

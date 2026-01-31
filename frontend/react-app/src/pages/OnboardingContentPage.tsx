@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { apiFetch, apiFetchForm } from '@/lib/api';
 import {
   Upload, FileText, Link as LinkIcon, Youtube, Twitter,
-  Linkedin, File, X, CheckCircle2, Loader2, AlertCircle,
+  Linkedin, Instagram, File, X, CheckCircle2, Loader2, AlertCircle,
   FileImage, FileSpreadsheet, Star, Sparkles, TrendingUp,
   Check, ExternalLink
 } from 'lucide-react';
@@ -40,6 +40,7 @@ const QUALITY_THRESHOLDS = {
 
 export function OnboardingContentPage() {
   const nav = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('files');
   const [pasteText, setPasteText] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -50,8 +51,9 @@ export function OnboardingContentPage() {
   const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([
     { platform: 'youtube', connected: false },
     { platform: 'twitter', connected: false },
-    { platform: 'medium', connected: false },
+    { platform: 'instagram', connected: false },
     { platform: 'linkedin', connected: false },
+    { platform: 'medium', connected: false },
   ]);
 
   // Stats calculation
@@ -152,14 +154,7 @@ export function OnboardingContentPage() {
         });
       }, 200);
 
-      try {
-        const csrfRes = await fetch('/api/csrf', { credentials: 'include' });
-        const csrfData = await csrfRes.json();
-        fd.append('_csrf', csrfData.token);
-      } catch (e) {
-        console.warn('CSRF token fetch failed, continuing anyway');
-      }
-
+      // ✅ apiFetchForm already handles X-CSRF-Token header automatically
       await apiFetchForm('/api/content/upload', { method: 'POST', body: fd });
       setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
 
@@ -217,9 +212,13 @@ export function OnboardingContentPage() {
     if (!youtubeUrl.trim()) return;
     setLoading(true);
     try {
-      await apiFetch('/api/content/youtube', {
+      const input = youtubeUrl.trim();
+      const isYouTube = /(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(input);
+      const endpoint = isYouTube ? '/api/content/youtube' : '/api/content/url';
+
+      await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ url: youtubeUrl, title: 'YouTube' })
+        body: JSON.stringify({ url: input, title: isYouTube ? 'YouTube' : 'URL' })
       });
       setYoutubeUrl('');
       await refresh();
@@ -276,6 +275,20 @@ export function OnboardingContentPage() {
         alert('Failed to connect Twitter.');
         setLoading(false);
       }
+    } else if (platform === 'instagram') {
+      try {
+        setLoading(true);
+        window.location.href = '/api/content/social/instagram/authorize';
+      } catch (err) {
+        console.error(err);
+        alert('Failed to connect Instagram.');
+        setLoading(false);
+      }
+    } else if (platform === 'linkedin') {
+      alert(
+        'LinkedIn import uses Extension (official API is restricted). Go to Account → create Extension Token → install extension → paste token → click Import.'
+      );
+      nav('/account');
     } else {
       alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} import will be added in the next phase.`);
     }
@@ -285,6 +298,7 @@ export function OnboardingContentPage() {
     switch (platform) {
       case 'youtube': return <Youtube className="h-6 w-6" />;
       case 'twitter': return <Twitter className="h-6 w-6" />;
+      case 'instagram': return <Instagram className="h-6 w-6" />;
       case 'medium': return <FileText className="h-6 w-6" />;
       case 'linkedin': return <Linkedin className="h-6 w-6" />;
       default: return <ExternalLink className="h-6 w-6" />;
@@ -295,6 +309,7 @@ export function OnboardingContentPage() {
     switch (platform) {
       case 'youtube': return 'bg-red-600 hover:bg-red-700';
       case 'twitter': return 'bg-black hover:bg-gray-900';
+      case 'instagram': return 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700';
       case 'medium': return 'bg-black hover:bg-gray-900';
       case 'linkedin': return 'bg-blue-600 hover:bg-blue-700';
       default: return 'bg-gray-600 hover:bg-gray-700';
@@ -363,20 +378,22 @@ export function OnboardingContentPage() {
                     <input
                       type="file"
                       multiple
+                      ref={fileInputRef}
                       onChange={(e) => {
                         if (e.target.files) {
                           Array.from(e.target.files).forEach(uploadFile);
                         }
                       }}
                       className="hidden"
-                      id="file-upload"
                       accept=".pdf,.txt,.md,.docx,.doc,.xlsx,.csv"
                     />
-                    <label htmlFor="file-upload">
-                      <Button className="bg-accent-gradient hover:opacity-90 text-white cursor-pointer">
-                        Choose Files
-                      </Button>
-                    </label>
+                    <Button
+                      type="button"
+                      className="bg-accent-gradient hover:opacity-90 text-white"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Choose Files
+                    </Button>
                   </div>
 
                   {/* Uploaded Files List */}

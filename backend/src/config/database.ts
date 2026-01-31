@@ -352,7 +352,7 @@ ALTER TABLE "widget_chat_logs" ADD CONSTRAINT "widget_chat_logs_userId_fkey"
 CREATE TABLE IF NOT EXISTS "knowledge_sources" (
   "id" TEXT PRIMARY KEY,
   "userId" TEXT NOT NULL,
-  "type" TEXT NOT NULL CHECK ("type" IN ('paste','file','youtube','url','twitter','linkedin','medium')),
+  "type" TEXT NOT NULL CHECK ("type" IN ('paste','file','youtube','url','twitter','linkedin','medium','instagram')),
   "title" TEXT,
   "originalUrl" TEXT,
   "storageUrl" TEXT,
