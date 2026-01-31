@@ -45,9 +45,9 @@ router.post('/logout', logout);
 
 // Refresh token endpoint
 router.post('/refresh', sanitizeInput, async (req, res) => {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies?.['refreshToken'];
   if (!refreshToken) {
-    return res.status(400).json({ error: 'Refresh token required' });
+    return res.status(401).json({ error: 'Refresh token missing', errorCode: 'REFRESH_TOKEN_MISSING' });
   }
 
   try {
@@ -56,45 +56,52 @@ router.post('/refresh', sanitizeInput, async (req, res) => {
     const { userQueries } = await import('../../config/database');
     const { isProd } = await import('../../config/env');
 
-    // Get session by refresh token
     const session = await getSessionByRefreshToken(refreshToken);
     if (!session) {
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      // Invalid/expired refresh token => clear cookies
+      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      return res.status(401).json({ error: 'Invalid or expired refresh token', errorCode: 'INVALID_REFRESH_TOKEN' });
     }
 
-    // Get user
     const user = await userQueries.findById(session.userId);
     if (!user || !user.active) {
-      return res.status(401).json({ error: 'User not found or inactive' });
+      res.clearCookie('jwtToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+      return res.status(401).json({ error: 'User not found or inactive', errorCode: 'UNAUTHORIZED' });
     }
 
-    // Generate new access token (15 min)
+    // New access token
+    const accessTokenMaxAge = 15 * 60 * 1000;
     const newAccessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
-      handle: user.handle || ''
+      handle: user.handle || '',
+      sessionId: session.id,
     });
 
-    // Rotate refresh token (generate new, revoke old)
+    // Rotate refresh token + set new cookie
     const newRefreshToken = genRefreshToken();
-    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await rotateRefreshToken(session.id, newRefreshToken, refreshTokenExpiresAt);
 
-    // Set new access token in cookie
     res.cookie('jwtToken', newAccessToken, {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
-      maxAge: 15 * 60 * 1000, // 15 minutes
-      path: '/'
+      maxAge: accessTokenMaxAge,
+      path: '/',
     });
 
-    return res.json({
-      success: true,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken, // Client should store this securely
-      expiresIn: 15 * 60 // 15 minutes in seconds
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
     });
+
+    return res.json({ success: true });
   } catch (error: any) {
     console.error('Refresh token error:', error);
     return res.status(500).json({ error: 'Failed to refresh token' });

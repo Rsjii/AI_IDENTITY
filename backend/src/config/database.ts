@@ -1386,16 +1386,37 @@ export const widgetChatLogQueries = {
 
 // ========== KNOWLEDGE BASE QUERIES ==========
 export const knowledgeSourceQueries = {
-  create: async (params: { userId: string; type: string; title?: string; originalUrl?: string; storageUrl?: string; rawText?: string }) => {
+  // CHANGE: add fetchMetadata optional
+  create: async (params: {
+    userId: string;
+    type: string;
+    title?: string;
+    originalUrl?: string;
+    storageUrl?: string;
+    rawText?: string;
+    fetchMetadata?: any; // <-- ADD
+  }) => {
     const id = `ks_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
     const r = await db.query(
-      `INSERT INTO "knowledge_sources" (id,"userId","type","title","originalUrl","storageUrl","rawText","status","lastFetchedAt","fetchMetadata")
+      `INSERT INTO "knowledge_sources"
+        (id,"userId","type","title","originalUrl","storageUrl","rawText","status","lastFetchedAt","fetchMetadata")
        VALUES ($1,$2,$3,$4,$5,$6,$7,'processed',NOW(),$8)
        RETURNING *`,
-      [id, params.userId, params.type, params.title || null, params.originalUrl || null, params.storageUrl || null, params.rawText || null, JSON.stringify({})]
+      [
+        id,
+        params.userId,
+        params.type,
+        params.title || null,
+        params.originalUrl || null,
+        params.storageUrl || null,
+        params.rawText || null,
+        JSON.stringify(params.fetchMetadata ?? {}), // <-- CHANGE (was always {})
+      ]
     );
+
     return r.rows[0];
-  },
+  },  
   update: async (id: string, updates: { rawText?: string; lastFetchedAt?: Date; fetchMetadata?: any }) => {
     const updatesList: string[] = [];
     const values: any[] = [];

@@ -26,6 +26,7 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { TermsPage } from './pages/TermsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
+import { OnboardingGatePage } from './pages/OnboardingGatePage';
 import { OnboardingQuizPage } from './pages/OnboardingQuizPage';
 import { OnboardingContentPage } from './pages/OnboardingContentPage';
 import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
@@ -93,6 +94,7 @@ function App() {
               <Route path="/404" element={<NotFoundPage />} />
               <Route path="/403" element={<ForbiddenPage />} />
 
+              <Route path="/onboarding" element={<ProtectedRoute><OnboardingGatePage /></ProtectedRoute>} />
               <Route path="/onboarding/quiz" element={<ProtectedRoute><OnboardingQuizPage /></ProtectedRoute>} />
               <Route path="/onboarding/content" element={<ProtectedRoute><OnboardingContentPage /></ProtectedRoute>} />
               <Route path="/onboarding/training" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />

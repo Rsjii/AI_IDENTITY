@@ -34,7 +34,8 @@ export function SignupVerifyPage() {
         { method: 'POST', body: JSON.stringify({ email, code }) }
       );
       await refresh(); // ✅ Refresh auth state after JWT cookie is set
-      if (result.redirect) navigate(result.redirect);
+      if (result.redirect) navigate(result.redirect, { replace: true });
+      else navigate('/onboarding', { replace: true });      
     } catch (err: any) {
       setError(err.message || 'OTP verification failed.');
     } finally {

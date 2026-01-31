@@ -102,6 +102,22 @@ export function OnboardingQuizPage() {
   const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
 
+  // Check if identity already exists on page load - if yes, skip quiz
+  useEffect(() => {
+    (async () => {
+      try {
+        await apiFetch('/api/identity/me'); // if 200 => identity exists
+        // Identity already exists, skip quiz and go to content
+        nav('/onboarding/content', { replace: true });
+      } catch (err: any) {
+        // if 404 => no identity yet, allow quiz to continue
+        if (err?.status === 404) return;
+        // For other errors, log but continue (don't block user)
+        console.warn('Identity check failed:', err);
+      }
+    })();
+  }, [nav]);
+
   // Auto-save to localStorage
   useEffect(() => {
     localStorage.setItem('onboarding-quiz-answers', JSON.stringify({
@@ -194,7 +210,18 @@ export function OnboardingQuizPage() {
       },
     };
 
-    await apiFetch('/api/identity', { method: 'POST', body: JSON.stringify({ identityJson }) });
+    try {
+      await apiFetch('/api/identity', { method: 'POST', body: JSON.stringify({ identityJson }) });
+    } catch (err: any) {
+      // 409 means identity already exists => treat as success and continue/resume
+      if (err?.status === 409) {
+        // Identity already exists, that's fine - continue to content
+        console.log('Identity already exists, continuing to content step');
+      } else {
+        // For other errors, re-throw to show error to user
+        throw err;
+      }
+    }
     localStorage.removeItem('onboarding-quiz-answers');
     nav('/onboarding/content');
   };

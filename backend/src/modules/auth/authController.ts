@@ -500,6 +500,13 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
         maxAge: accessTokenMaxAge,
         path: '/',
       });
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        path: '/',
+      });
       if (req.session) {
         req.session.userId = user.id;
         req.session.userEmail = user.email;
@@ -943,6 +950,14 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       sameSite: 'lax',
       maxAge: accessTokenMaxAge,
       path: '/'
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
     });
 
     // ✅ Log login event in background (non-blocking)
@@ -1508,6 +1523,13 @@ export const logout = (req: Request, res: Response, next: NextFunction) => {
     sameSite: 'lax',
     path: '/'
   });    
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    path: '/',
+  });
     
     // Also clear session if it exists (for backward compatibility)
     if (req.session) {

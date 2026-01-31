@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { knowledgeSourceQueries } from '../../config/database';
 import { createPasteSource, createYoutubeSource, createFileSource, createUrlSource } from './contentService';
+import { logger } from '../../config/logger';
 
 function getUserId(req: Request): string | null {
   const u: any = (req as any).user;
@@ -473,7 +474,7 @@ export async function upload(req: Request, res: Response) {
       message: 'File uploaded successfully. Processing embeddings...',
     });
   } catch (error: any) {
-    logger.error('Upload error:', error);
+    logger.error({ err: error }, 'Upload error');
     
     // ✅ User-friendly error messages
     if (error.message?.includes('S3') || error.message?.includes('upload')) {
@@ -493,7 +494,65 @@ export async function list(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const items = await knowledgeSourceQueries.listByUserId(userId);
-  return res.json({ success: true, items });
+
+  // ADD: helpers
+  const safeParseMeta = (v: any): any => {
+    if (!v) return {};
+    if (typeof v === 'object') return v;
+    if (typeof v === 'string') {
+      try { return JSON.parse(v); } catch { return {}; }
+    }
+    return {};
+  };
+
+  const countWords = (t: string): number => {
+    const s = (t || '').trim();
+    if (!s) return 0;
+    return s.split(/\s+/).filter(Boolean).length;
+  };
+
+  const inferMimeFromTitle = (title: string): string | undefined => {
+    const lower = (title || '').toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.doc')) return 'application/msword';
+    if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (lower.endsWith('.txt')) return 'text/plain';
+    if (lower.endsWith('.md')) return 'text/markdown';
+    if (lower.endsWith('.csv')) return 'text/csv';
+    if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return undefined;
+  };
+
+  // CHANGE: enrich items for frontend stats
+  const enriched = items.map((it: any) => {
+    const meta = safeParseMeta(it.fetchMetadata);
+    const rawText = it.rawText || '';
+
+    const wordCount = countWords(rawText);
+
+    // Prefer real file bytes, else fallback to rawText bytes (so 0 na rahe)
+    const size =
+      (typeof meta.bytes === 'number' && meta.bytes > 0)
+        ? meta.bytes
+        : (rawText ? Buffer.byteLength(rawText, 'utf8') : 0);
+
+    const mimeType =
+      (typeof meta.mimeType === 'string' && meta.mimeType)
+        ? meta.mimeType
+        : (it.type === 'file' ? inferMimeFromTitle(it.title || '') : undefined);
+
+    // IMPORTANT: frontend categorization expects mime-like strings
+    const typeForUi = mimeType || it.type;
+
+    return {
+      ...it,
+      type: typeForUi,
+      size,
+      wordCount,
+    };
+  });
+
+  return res.json({ success: true, items: enriched });
 }
 
 export async function remove(req: Request, res: Response) {

@@ -27,7 +27,8 @@ export function buildApiUrl(path: string): string {
  */
 export async function apiFetch<T = any>(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  _didRetryAuth = false
 ): Promise<T> {
   // Get CSRF token for POST/PUT/PATCH/DELETE
   const method = options.method?.toUpperCase() || 'GET';
@@ -88,18 +89,42 @@ export async function apiFetch<T = any>(
     }
   }
 
-  // Handle 401 (Unauthorized) - session expired
-  if (response.status === 401) {
-    // Dispatch custom event for AuthContext to handle
-    window.dispatchEvent(new CustomEvent('auth:session-expired'));
-    const errorData = await response.json().catch(() => ({
-      error: 'Session expired. Please login again.',
-    }));
-    const apiError = new Error(errorData.error || 'Session expired') as Error & ApiError & { status: number };
-    apiError.errorCode = 'UNAUTHORIZED';
-    apiError.status = 401;
-    throw apiError;
+// Handle 401 (Unauthorized) - try refresh once, then fail
+if (response.status === 401) {
+  // Avoid infinite loops & don't refresh if we're already refreshing
+  const isRefreshCall = url.includes('/api/auth/refresh');
+
+  if (!_didRetryAuth && !isRefreshCall) {
+    try {
+      // Try refresh (cookie-based)
+      await apiFetch('/api/auth/refresh', { method: 'POST', body: JSON.stringify({}) }, true);
+
+      // Retry original request once (with new cookies)
+      const retryResponse = await fetch(buildApiUrl(url), {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+
+      if (retryResponse.ok) {
+        const ct = retryResponse.headers.get('content-type');
+        if (!ct || !ct.includes('application/json')) return {} as T;
+        return retryResponse.json();
+      }
+    } catch {
+      // Refresh failed => fallthrough to session-expired
+    }
   }
+
+  window.dispatchEvent(new CustomEvent('auth:session-expired'));
+  const errorData = await response.json().catch(() => ({
+    error: 'Session expired. Please login again.',
+  }));
+  const apiError = new Error(errorData.error || 'Session expired') as Error & ApiError & { status: number };
+  apiError.errorCode = 'UNAUTHORIZED';
+  apiError.status = 401;
+  throw apiError;
+}  
 
   // Handle other errors
   if (!response.ok) {

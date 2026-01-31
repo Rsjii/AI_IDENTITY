@@ -97,49 +97,6 @@ export const requireJWTFromCookie = async (req: Request, res: Response, next: Ne
         }
       }
 
-      // ✅ NEW: Auto-refresh if token expires in < 5 minutes (non-blocking)
-      const expiresIn = decoded.exp ? (decoded.exp * 1000 - Date.now()) : 0;
-      if (expiresIn > 0 && expiresIn < 5 * 60 * 1000) {
-        // Token expires soon - trigger background refresh (don't block request)
-        setImmediate(async () => {
-          try {
-            const { db } = await import('../config/database');
-            const { generateAccessToken, generateRefreshToken: genRefreshToken } = await import('../services/jwtService');
-            const { rotateRefreshToken } = await import('../services/authSessionService');
-            
-            // Find active session with refresh token
-            const result = await db.query(
-              `SELECT * FROM "auth_sessions"
-               WHERE "userId" = $1
-                 AND "revokedAt" IS NULL
-                 AND "refreshTokenExpiresAt" > NOW()
-               ORDER BY "lastActiveAt" DESC
-               LIMIT 1`,
-              [decoded.userId]
-            );
-
-            if (result.rows[0]?.refreshToken) {
-              const session = result.rows[0];
-              // Generate new access token
-              const newAccessToken = generateAccessToken({
-                userId: decoded.userId,
-                email: decoded.email,
-                handle: decoded.handle || ''
-              });
-
-              // Rotate refresh token
-              const newRefreshToken = genRefreshToken();
-              const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-              await rotateRefreshToken(session.id, newRefreshToken, refreshTokenExpiresAt);
-
-              logger.debug('Token auto-refreshed in background');
-            }
-          } catch (refreshError) {
-            logger.warn('Auto-refresh failed:', refreshError);
-          }
-        });
-      }
-
       req.user = {
         userId: decoded.userId,
         email: decoded.email,

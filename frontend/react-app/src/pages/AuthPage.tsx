@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Chrome, Loader2 } from 'lucide-react';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TabType = 'login' | 'signup';
 
@@ -27,7 +28,18 @@ function oauthErrorMessage(code: string) {
 
 export function AuthPage() {
   const navigate = useNavigate();
+  const { state, refresh } = useAuth();
   const q = useQuery();
+
+  // ADD: if already logged in, never show auth page (handles Back button too)
+  useEffect(() => {
+    if (state.status === 'authenticated') {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [state.status, navigate]);
+
+  // OPTIONAL: avoid flicker
+  if (state.status === 'authenticated') return null;
 
   const [activeTab, setActiveTab] = useState<TabType>('login');
   const [loading, setLoading] = useState(false);
@@ -83,9 +95,11 @@ export function AuthPage() {
         body: JSON.stringify({ email: loginEmail, password: loginPassword, rememberMe }),
       });
 
+      await refresh(); // ✅ IMPORTANT: update auth state using /api/auth/me
+
       if (result.redirect) {
         const redirectPath = result.redirect.startsWith('/') ? result.redirect : '/' + result.redirect;
-        navigate(redirectPath);
+        navigate(redirectPath, { replace: true }); // ✅ avoid back button weirdness
       } else {
         setError('Login successful but no redirect provided.');
       }
@@ -113,7 +127,7 @@ export function AuthPage() {
 
       if (result.redirect) {
         const redirectPath = result.redirect.startsWith('/') ? result.redirect : '/' + result.redirect;
-        navigate(redirectPath);
+        navigate(redirectPath, { replace: true });
       } else {
         setError('Signup successful but no redirect provided.');
       }

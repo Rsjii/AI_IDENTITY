@@ -299,6 +299,11 @@ export async function createFileSource(userId: string, file: Express.Multer.File
     title: title || file.originalname,
     storageUrl: upload.url,
     rawText: extractedText || undefined,
+    fetchMetadata: {
+      mimeType: file.mimetype,
+      bytes: file.size, // multer provides this
+      originalName: file.originalname,
+    },
   });
 
   const chunks = extractedText ? chunkText(extractedText) : [];
