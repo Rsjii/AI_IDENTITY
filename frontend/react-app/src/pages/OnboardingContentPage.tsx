@@ -23,6 +23,12 @@ interface ContentItem {
   wordCount?: number;
 }
 
+interface StagedFile {
+  file: File;
+  id: string;
+  estimatedWords: number;
+}
+
 interface SocialConnection {
   platform: string;
   connected: boolean;
@@ -48,6 +54,7 @@ export function OnboardingContentPage() {
   const [pasteText, setPasteText] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [items, setItems] = useState<ContentItem[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -59,11 +66,23 @@ export function OnboardingContentPage() {
     { platform: 'medium', connected: false },
   ]);
 
-  // Stats calculation
-  const totalFiles = items.length;
-  const totalWords = items.reduce((sum, item) => sum + (item.wordCount || 0), 0);
-  const totalSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
-  const estimatedHours = Math.ceil(totalWords / 500);
+  // Stats calculation - combine uploaded items + staged files
+  const uploadedWords = items.reduce((sum, item) => sum + (item.wordCount || 0), 0);
+  const uploadedSize = items.reduce((sum, item) => sum + (item.size || 0), 0);
+
+  const stagedWords = stagedFiles.reduce((sum, sf) => sum + sf.estimatedWords, 0);
+  const stagedSize = stagedFiles.reduce((sum, sf) => sum + sf.file.size, 0);
+
+  const totalFiles = items.length + stagedFiles.length;
+  const totalWords = uploadedWords + stagedWords;
+  const totalSize = uploadedSize + stagedSize;
+
+  // ✅ FIXED: Realistic training time based on file size (not word count)
+  // Formula: ~5 minutes per MB, minimum 5 minutes
+  const totalSizeMB = totalSize / (1024 * 1024);
+  const estimatedMinutes = Math.max(5, Math.ceil(totalSizeMB * 5));
+  const estimatedHours = estimatedMinutes >= 60 ? (estimatedMinutes / 60).toFixed(1) : null;
+
   const minimumItemsRequired = 3;
   const hasMinimumItems = totalFiles >= minimumItemsRequired;
 
@@ -97,6 +116,47 @@ export function OnboardingContentPage() {
     setItems(r.items || []);
   };
 
+  // ✅ Stage file for upload (NOT upload immediately)
+  const stageFile = (file: File) => {
+    // Validate file type
+    const allowedTypes = ['.pdf', '.txt', '.md', '.docx', '.doc', '.xlsx', '.csv'];
+    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedTypes.includes(fileExt)) {
+      showToast(`File type ${fileExt} not supported. Allowed: ${allowedTypes.join(', ')}`, 'error');
+      return;
+    }
+
+    // Validate file size (25MB limit)
+    if (file.size > 25 * 1024 * 1024) {
+      showToast('File size exceeds 25 MB limit', 'error');
+      return;
+    }
+
+    // Check if already staged
+    if (stagedFiles.some(sf => sf.file.name === file.name && sf.file.size === file.size)) {
+      showToast('File already added', 'warning');
+      return;
+    }
+
+    // Estimate word count: 1 word ≈ 5-6 characters (with spaces)
+    // More conservative: assume 6 bytes per word
+    const estimatedWords = Math.ceil(file.size / 6);
+
+    const stagedFile: StagedFile = {
+      file,
+      id: `staged-${Date.now()}-${file.name}`,
+      estimatedWords,
+    };
+
+    setStagedFiles(prev => [...prev, stagedFile]);
+    showToast(`${file.name} added (will upload on Continue)`, 'success', 2000);
+  };
+
+  // Remove staged file
+  const removeStagedFile = (id: string) => {
+    setStagedFiles(prev => prev.filter(sf => sf.id !== id));
+  };
+
   // ✅ Prevent back navigation to profile page
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
@@ -126,16 +186,14 @@ export function OnboardingContentPage() {
     }
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const files = Array.from(e.dataTransfer.files);
-      for (const file of files) {
-        await uploadFile(file);
-      }
+      files.forEach(stageFile);
     }
   }, []);
 
@@ -401,7 +459,8 @@ export function OnboardingContentPage() {
                       ref={fileInputRef}
                       onChange={(e) => {
                         if (e.target.files) {
-                          Array.from(e.target.files).forEach(uploadFile);
+                          Array.from(e.target.files).forEach(stageFile);
+                          e.target.value = ''; // Reset input to allow re-selecting same file
                         }
                       }}
                       className="hidden"
@@ -416,13 +475,58 @@ export function OnboardingContentPage() {
                     </Button>
                   </div>
 
+                  {/* Staged Files (Not yet uploaded) */}
+                  {stagedFiles.length > 0 && (
+                    <div className="p-6 space-y-3 border-t border-border-default">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-yellow-500" />
+                          Ready to Upload ({stagedFiles.length})
+                        </h3>
+                        <Badge variant="outline" className="text-xs bg-yellow-500/10 border-yellow-500/20">
+                          Click Continue to upload
+                        </Badge>
+                      </div>
+                      {stagedFiles.map((stagedFile) => (
+                        <div
+                          key={stagedFile.id}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
+                        >
+                          <div className="flex-shrink-0">
+                            {getFileIcon(stagedFile.file.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate">{stagedFile.file.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                {formatFileSize(stagedFile.file.size)}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs bg-accent-primary/10">
+                                ~{stagedFile.estimatedWords.toLocaleString()} words
+                              </Badge>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeStagedFile(stagedFile.id)}
+                            className="p-1 hover:bg-bg-elevated rounded transition-colors"
+                          >
+                            <X className="h-4 w-4 text-text-tertiary hover:text-error" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Uploaded Files List */}
                   {items.length > 0 && (
                     <div className="p-6 space-y-3 border-t border-border-default">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold">Uploaded Content ({items.length})</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {formatFileSize(totalSize)} total
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          Uploaded & Training ({items.length})
+                        </h3>
+                        <Badge variant="outline" className="text-xs bg-green-500/10 border-green-500/20">
+                          {formatFileSize(uploadedSize)} total
                         </Badge>
                       </div>
                       {items.map((item) => {
@@ -620,27 +724,66 @@ export function OnboardingContentPage() {
                 <Button
                   onClick={async () => {
                     try {
-                      // ✅ Mark onboarding complete before going to plan page
+                      setLoading(true);
+
+                      // ✅ STEP 1: Upload all staged files first
+                      if (stagedFiles.length > 0) {
+                        showToast(`Uploading ${stagedFiles.length} file(s)...`, 'info', 2000);
+
+                        for (const stagedFile of stagedFiles) {
+                          await uploadFile(stagedFile.file);
+                        }
+
+                        // Clear staged files after successful upload
+                        setStagedFiles([]);
+                        showToast('All files uploaded successfully!', 'success', 2000);
+                      }
+
+                      // ✅ STEP 2: Mark onboarding complete
                       await apiFetch('/api/creator/onboarding/complete', {
                         method: 'POST',
                         body: JSON.stringify({}),
                       });
+
+                      // ✅ STEP 3: Refresh auth state
                       await refreshAuth();
+
+                      // ✅ STEP 4: Navigate to plan page
                       nav('/onboarding/plan');
                     } catch (error) {
-                      console.error('Failed to mark onboarding complete:', error);
-                      // Still navigate even if marking complete fails
-                      nav('/onboarding/plan');
+                      console.error('Failed during continue:', error);
+                      showToast('Something went wrong. Please try again.', 'error');
+                    } finally {
+                      setLoading(false);
                     }
                   }}
                   className="bg-accent-gradient hover:opacity-90 text-white px-8"
-                  disabled={!hasMinimumItems}
+                  disabled={!hasMinimumItems || loading}
                 >
-                  Continue
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      {stagedFiles.length > 0 && (
+                        <span className="ml-2 text-xs opacity-75">
+                          (Upload {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </>
+                  )}
                 </Button>
                 {!hasMinimumItems && (
                   <span className="text-xs text-text-tertiary">
                     Add at least {minimumItemsRequired} items to continue
+                  </span>
+                )}
+                {stagedFiles.length > 0 && (
+                  <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                    {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''} will be uploaded when you click Continue
                   </span>
                 )}
               </div>
@@ -725,7 +868,11 @@ export function OnboardingContentPage() {
                     <span className="text-sm">Est. Training Time</span>
                   </div>
                   <div className="text-2xl font-bold text-text-primary">
-                    ~{estimatedHours} {estimatedHours === 1 ? 'hour' : 'hours'}
+                    {estimatedHours ? (
+                      <>~{estimatedHours} {parseFloat(estimatedHours) === 1 ? 'hour' : 'hours'}</>
+                    ) : (
+                      <>~{estimatedMinutes} {estimatedMinutes === 1 ? 'min' : 'mins'}</>
+                    )}
                   </div>
                 </div>
 

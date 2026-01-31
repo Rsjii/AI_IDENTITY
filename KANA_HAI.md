@@ -13,3 +13,12 @@ Storage Used, only for 100 kb files , tihs is wrong sahi karo
 #3. upload your content -> isme files select karte hai, tab wo upload nahi honi chahiye ya trained, jab tak user continue na kare,tab nahi hona chahiye, upload matlab just selected, not trained, final change should be done once user confirms by clciking continue
 
 #4. plan update hi nahi hota hai even after payment done ok aa jaaye
+
+flow explain karna
+
+1. maine file upload kari, wo calcultae hogi , staged hogi not uploaded, tarining abhi nahi hogi
+2. stage file ki caclulation sahi hogi na, how will be doing it
+3. user beech me file haat bhi sakta hai, wo calculation se hat jaani chahiye
+4. upload karne pe actual me finally upload honic ahiye , and after trainign shuru
+
+sab sahi chalega na , stage ki calulation kasie sahi hogi, delte waali hat jaayegi an sab confiem karo soch keee
