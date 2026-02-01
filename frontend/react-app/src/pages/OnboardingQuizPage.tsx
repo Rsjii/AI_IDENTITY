@@ -99,7 +99,7 @@ function loadQuizState(key: string) {
 
 export function OnboardingQuizPage() {
   const nav = useNavigate();
-  const { state } = useAuth();
+  const { state, refresh } = useAuth();
 
   const userId = useMemo(() => {
     return state.status === 'authenticated' ? state.user.id : 'anon';
@@ -230,8 +230,12 @@ export function OnboardingQuizPage() {
         throw err;
       }
     }
+    
+    // ✅ CRITICAL: Refresh auth state to get updated onboardingStep='content' from backend
+    await refresh();
+    
     localStorage.removeItem(key);
-    nav('/onboarding/content');
+    nav('/onboarding/content', { replace: true });
   };
 
   const canProceed = () => {

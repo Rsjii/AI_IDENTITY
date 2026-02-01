@@ -162,7 +162,7 @@ these changes aint done yet, see the code fuly analyze and as per it final batao
 
 
 #1. same pc se multiple users aaye to alag hona chahiye be careful, bahi maine dusre user se login kiya, first waale onboarding se start ho gaya
-#2. onboarding step 7 me text ke upaar aa raha meter
+#2. onboarding step 1 and 7 me text ke upaar aa raha meter
 #3. unauthenticted user agar koi bhi authenticated page ko access karne ka try kare, show him loign directly not that page, same for users jinhone onboarding / profile / upload incomplete hai, if they try to access any other authenitication requieed page, dont allo them , redirect to the current page where they left from ( profile / onboarding / upload / plan)
 #4. upload section  right side calculation kaafi galat hai sahi karo
 #5. annoynmous banda chat kaise kar paa rah, matlab waha aur kuch link wagerah to hai hi nahi par login wagerah ye sab bhi to dikahana chahiye
