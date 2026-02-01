@@ -79,8 +79,8 @@ function App() {
               <Route path="/signup/profile" element={<ProtectedRoute><SignupProfilePage /></ProtectedRoute>} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-              <Route path="/identity/setup" element={<IdentitySetupPage />} />
-              <Route path="/identity/edit" element={<IdentityEditPage />} />
+              <Route path="/identity/setup" element={<ProtectedRoute><IdentitySetupPage /></ProtectedRoute>} />
+              <Route path="/identity/edit" element={<ProtectedRoute><IdentityEditPage /></ProtectedRoute>} />
               <Route path="/mirror" element={<ProtectedRoute><MirrorPage /></ProtectedRoute>} />
               {FLAGS.voice && (
                 <>
@@ -94,7 +94,7 @@ function App() {
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/users/:userId" element={<AdminUserPage />} />
               <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
-              <Route path="/account" element={<AccountPage />} />
+              <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/pricing" element={<PricingPage />} />
 
@@ -106,6 +106,7 @@ function App() {
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingGatePage /></ProtectedRoute>} />
               <Route path="/onboarding/quiz" element={<ProtectedRoute><OnboardingQuizPage /></ProtectedRoute>} />
               <Route path="/onboarding/content" element={<ProtectedRoute><OnboardingContentPage /></ProtectedRoute>} />
+              <Route path="/onboarding/voice" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/training" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />

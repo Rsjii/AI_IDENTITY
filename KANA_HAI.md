@@ -1,3 +1,158 @@
+http://localhost:5173/identity/edit 
+
+
+ab musno 
+
+
+non authenticated /logout user jab is page pe aaya to usko ye dikha hai
+
+
+Selflyx.
+Toggle theme
+Sign in
+Edit AI Personality
+Fine-tune your AI's behavior, voice, and knowledge boundaries
+
+Show Advanced
+Authentication required
+
+Core Identity
+Display Name *
+Your name
+Primary Use / Role
+founder, manager, consultant, etc.
+
+Response Behavior
+Response Style🎯🎯 Concise
+⚖️⚖️ Balanced
+📚📚 Comprehensive
+Controls verbosity in responses
+
+Tone of Voice
+Casual
+50
+Professional
+
+Reserved
+50
+Energetic
+
+Objective
+50
+Compassionate
+
+Serious
+50
+Playful
+
+Certainty Level
+
+Always confident (never say "I think")
+
+Balanced (show uncertainty when appropriate)
+
+Cautious (hedge when unsure)
+Use of Examples
+
+How many examples per answer? (1-5)
+2
+
+Safety & Boundaries
+Content Filters
+What AI should refuse to discuss
+
+Medical advice
+
+Legal advice
+
+Financial advice
+
+Political opinions
+
+Personal attacks
+
+Competitor mentions
+
+Pricing/discount negotiations
+
+Prohibited Topics (Custom)
+Max 20 topics, 50 chars each
+
+Type topic and press Enter
+Add
+Redirect Message
+I focus on [your expertise]. Let me help with that instead!
+Message shown when user asks about prohibited topics
+
+
+Legacy Settings
+Save changes
+Cancel
+System Prompt Preview
+Test AI
+Live preview of your AI's system prompt
+
+Prompt Quality Score
+5/100
+Estimated Cost
+$0.01 per 1K queries
+Based on context window and model selection
+
+Preview
+You are [Your Name], a [expertise] expert.
+
+## YOUR CORE IDENTITY
+- Expertise: [your expertise]
+- Communication style: balanced
+- Response style: balanced
+- Response length: medium
+
+## YOUR VOICE
+- Tone: Semi-formal (50/100 formality)
+- Enthusiasm: Moderate (50/100)
+- Empathy: Balanced (50/100)
+- Humor: Moderate (50/100)
+- Certainty: balanced
+- Use 2 practical examples per answer
+- Emoji usage: moderate
+
+## KNOWLEDGE & CONTEXT
+- Context window: medium
+- Knowledge freshness: hybrid
+- Fallback behavior: dont-know
+
+Copy Prompt
+Quick Stats
+Prohibited Topics
+0/20
+Content Filters
+3/7
+Custom Prompt
+No
+Temperature
+0.7
+© 2026 Selflyx
+Privacy
+Terms
+
+
+
+
+but this is wrong na, jaisa plan hua tha, that if a non login user try to access a authenticated endpoitn he should redirect automatically to the auth page, not show this
+
+
+also, if a login user hasnt completed either of the profile / onboarding / upload / select ur pan phase ( ie the flow that runs after users signup) , the user is not allowed to access any tother enpoint authentivated, if he trys to, simply redirect him to the last time where he left that is ( profile/onborading/..)
+
+
+these changes aint done yet, see the code fuly analyze and as per it final batao sahi se kya karna, kaise , give final line wise filwsie chaneg go man cdoe wise full give
+
+
+
+#3. unauthenticted user agar koi bhi authenticated page ko access karne ka try kare, show him loign directly not that page, same for users jinhone onboarding / profile / upload incomplete hai, if they try to access any other authenitication requieed page, dont allo them , redirect to the current page where they left from ( profile / onboarding / upload / plan)
+
+
+
+
 1. password me view option / eye wala icon
 2. ek wo popup waale jo card hote hai na jo upar aate hai deafult js, usko replace karna custom se
 3. agar koi unauthenticate duser kisi pe authenticated link pe jaaye show error sahi se do not allow
@@ -7,9 +162,9 @@
 
 
 #1. same pc se multiple users aaye to alag hona chahiye be careful, bahi maine dusre user se login kiya, first waale onboarding se start ho gaya
-#2. step 7 me text ke upaar aa raha meter
+#2. onboarding step 7 me text ke upaar aa raha meter
 #3. unauthenticted user agar koi bhi authenticated page ko access karne ka try kare, show him loign directly not that page, same for users jinhone onboarding / profile / upload incomplete hai, if they try to access any other authenitication requieed page, dont allo them , redirect to the current page where they left from ( profile / onboarding / upload / plan)
-#4. upload right side calculation
+#4. upload section  right side calculation kaafi galat hai sahi karo
 #5. annoynmous banda chat kaise kar paa rah, matlab waha aur kuch link wagerah to hai hi nahi par login wagerah ye sab bhi to dikahana chahiye
 
 

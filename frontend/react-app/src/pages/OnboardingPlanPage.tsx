@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function OnboardingPlanPage() {
   const nav = useNavigate();
+  const { refresh } = useAuth();
   const [loading, setLoading] = useState(false);
 
   // ✅ Redirect to dashboard if onboarding is already complete
@@ -19,8 +21,13 @@ export function OnboardingPlanPage() {
 
   const startTrial = async () => {
     setLoading(true);
-    await apiFetch('/api/creator/trial/start', { method: 'POST', body: JSON.stringify({}) });
-    nav('/onboarding/deploy');
+    try {
+      await apiFetch('/api/creator/trial/start', { method: 'POST', body: JSON.stringify({}) });
+      await refresh(); // ✅ pulls onboardingStep='deploy'
+      nav('/onboarding/deploy', { replace: true });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const checkout = async (tier: 'pro' | 'growth' | 'scale') => {

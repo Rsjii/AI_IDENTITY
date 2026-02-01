@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { showToast } from '@/lib/toast';
 
 // Question types based on spec
 interface QuizAnswers {
@@ -364,9 +365,8 @@ export function OnboardingQuizPage() {
                   <Button
                     variant="ghost"
                     onClick={() => {
-                      if (confirm('Skip this question? You can come back to it later.')) {
-                        next();
-                      }
+                      showToast('Skipped. You can come back to this later.', 'info', 3500);
+                      next();
                     }}
                     disabled={isAnimating}
                     className="text-text-secondary hover:text-text-primary transition-colors"

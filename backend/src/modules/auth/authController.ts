@@ -1004,19 +1004,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
     // ✅ STEP 2: Profile done, check onboarding status
     else {
-      // User has completed onboarding if ANY of these are true:
-      // 1. onboardingStep is explicitly 'done'
-      // 2. User has an active trial (trialEndsAt in future)
-      // 3. User has a paid plan (planTier is not null/starter)
-      const hasActiveTrial = (user as any).trialEndsAt && new Date((user as any).trialEndsAt) > new Date();
-      const hasPaidPlan = (user as any).planTier && (user as any).planTier !== 'starter';
-      const isOnboardingDone = user.onboardingStep === 'done' || hasActiveTrial || hasPaidPlan;
+      // User has completed onboarding ONLY if onboardingStep is explicitly 'done'
+      const isOnboardingDone = user.onboardingStep === 'done';
 
       if (isOnboardingDone) {
-        // ✅ Auto-fix: If user has completed onboarding but step isn't 'done', update it
-        if (user.onboardingStep !== 'done') {
-          await userQueries.updateOnboardingStep(user.id, 'done');
-        }
         nextRedirect = '/dashboard';
       } else {
         // Onboarding not complete - redirect to onboarding
@@ -1193,19 +1184,10 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     }
     // ✅ STEP 2: Profile done, check onboarding status
     else {
-      // User has completed onboarding if ANY of these are true:
-      // 1. onboardingStep is explicitly 'done'
-      // 2. User has an active trial (trialEndsAt in future)
-      // 3. User has a paid plan (planTier is not null/starter)
-      const hasActiveTrial = (user as any).trialEndsAt && new Date((user as any).trialEndsAt) > new Date();
-      const hasPaidPlan = (user as any).planTier && (user as any).planTier !== 'starter';
-      const isOnboardingDone = user.onboardingStep === 'done' || hasActiveTrial || hasPaidPlan;
+      // User has completed onboarding ONLY if onboardingStep is explicitly 'done'
+      const isOnboardingDone = user.onboardingStep === 'done';
 
       if (isOnboardingDone) {
-        // ✅ Auto-fix: If user has completed onboarding but step isn't 'done', update it
-        if (user.onboardingStep !== 'done') {
-          await userQueries.updateOnboardingStep(user.id, 'done');
-        }
         nextRedirect = '/dashboard';
       } else {
         // Onboarding not complete - redirect to onboarding

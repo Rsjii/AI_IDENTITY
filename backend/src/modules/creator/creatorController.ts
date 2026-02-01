@@ -436,10 +436,8 @@ export async function startTrial(req: Request, res: Response) {
 
   const u = await userQueries.startTrial(userId, 7);
 
-  // ✅ FIX: Mark onboarding as complete when trial starts
-  await userQueries.updateOnboardingStep(userId, 'done');
-  // ✅ FIX: Also set profileCompleted = true
-  await db.query('UPDATE "User" SET "profileCompleted" = true WHERE id = $1', [userId]);
+  // ✅ FIX: Plan chosen => next step is deploy (NOT done yet)
+  await userQueries.updateOnboardingStep(userId, 'deploy');
 
   return res.json({ success: true, trialEndsAt: u.trialEndsAt });
 }

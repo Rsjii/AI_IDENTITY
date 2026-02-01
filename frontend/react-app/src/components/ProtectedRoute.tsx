@@ -14,9 +14,12 @@ function getRequiredOnboardingPath(user: any): string {
   const map: Record<string, string> = {
     quiz: '/onboarding/quiz',
     content: '/onboarding/content',
+    voice: '/onboarding/voice',
     plan: '/onboarding/plan',
     deploy: '/onboarding/deploy',
     done: '/dashboard',
+    // Backward compatibility: some older code might use 'training'
+    training: '/onboarding/training',
   };
   return map[step] || '/onboarding/quiz';
 }

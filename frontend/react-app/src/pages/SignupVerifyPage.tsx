@@ -21,12 +21,16 @@ export function SignupVerifyPage() {
   const q = useQuery();
   const { refresh } = useAuth();
 
-  const [email, setEmail] = useState(q.get('email') || '');
+  const initialEmail = q.get('email') || '';
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  
+  // start timer immediately after first OTP (when arriving with email)
+  const [lastSentEmail, setLastSentEmail] = useState(initialEmail);
+  const [cooldown, setCooldown] = useState(initialEmail ? 30 : 0);
 
   // ✅ Prevent back navigation during signup flow
   usePreventBack();
@@ -46,6 +50,7 @@ export function SignupVerifyPage() {
         body: JSON.stringify({ email, type: 'signup' }),
       });
       showToast('OTP sent to your email', 'success', 4000);
+      setLastSentEmail(email);
       setCooldown(30);
     } catch (e: any) {
       showToast(e.message || 'Failed to resend OTP', 'error', 5000);
@@ -122,9 +127,9 @@ export function SignupVerifyPage() {
               variant="outline"
               className="w-full"
               onClick={resend}
-              disabled={loading || resendLoading || cooldown > 0}
+              disabled={loading || resendLoading || (cooldown > 0 && email === lastSentEmail)}
             >
-              {cooldown > 0 ? `Resend OTP (${cooldown}s)` : 'Resend OTP'}
+              {cooldown > 0 && email === lastSentEmail ? `Resend OTP (${cooldown}s)` : 'Resend OTP'}
             </Button>
           </form>
         </CardContent>
