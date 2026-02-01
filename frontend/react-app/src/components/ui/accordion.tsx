@@ -57,9 +57,6 @@ const AccordionItem = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { value: string }
 >(({ className, value, children, ...props }, ref) => {
-  const { openItems } = React.useContext(AccordionContext)
-  const isOpen = openItems.has(value)
-
   return (
     <div
       ref={ref}

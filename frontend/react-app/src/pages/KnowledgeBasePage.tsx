@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { apiFetch } from '@/lib/api';
 import { useRedirectBack } from '@/hooks/useOnboardingGuard';
 
 export function KnowledgeBasePage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const [items, setItems] = useState<any[]>([]);
 

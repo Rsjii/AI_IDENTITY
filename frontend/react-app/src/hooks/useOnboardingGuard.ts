@@ -7,19 +7,20 @@ import { useAuth } from '@/contexts/AuthContext';
  * Redirects to dashboard if onboarding is marked as done
  */
 export function useOnboardingGuard() {
-  const { user, loading } = useAuth();
+  const { state } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     // Wait for auth to load
-    if (loading) return;
+    if (state.status === 'loading') return;
 
+    const user = state.status === 'authenticated' ? state.user : null;
     // If onboarding is done (check both flags for safety), redirect to dashboard
     if (user?.onboardingStep === 'done' || (user as any)?.onboardingCompleted === true) {
       console.log('[useOnboardingGuard] Onboarding complete, redirecting to dashboard');
       navigate('/dashboard', { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [state, navigate]);
 }
 
 /**

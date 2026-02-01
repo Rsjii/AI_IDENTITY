@@ -46,9 +46,7 @@ export function QuizQuestion({
         return (
           <Select value={value || ''} onValueChange={(val) => onChange(val)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={placeholder || 'Select an option'}>
-                {value || placeholder || 'Select an option'}
-              </SelectValue>
+              <SelectValue placeholder={placeholder || 'Select an option'} />
             </SelectTrigger>
             <SelectContent>
               {options.map((opt) => (
@@ -167,8 +165,8 @@ export function QuizQuestion({
                 <Checkbox
                   id={opt}
                   checked={selected.includes(opt)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       onChange([...selected, opt]);
                     } else {
                       onChange(selected.filter((s) => s !== opt));
@@ -192,8 +190,8 @@ export function QuizQuestion({
                 <Checkbox
                   id={opt}
                   checked={checkboxes.includes(opt)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       onChange([...checkboxes, opt]);
                     } else {
                       onChange(checkboxes.filter((s) => s !== opt));

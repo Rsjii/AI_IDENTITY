@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement>
 >(({ className, children, ...props }, ref) => {
-  const { value, open, setOpen } = React.useContext(SelectContext)
+  const { open, setOpen } = React.useContext(SelectContext)
   return (
     <button
       ref={ref}
