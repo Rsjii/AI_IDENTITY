@@ -5,36 +5,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, BarChart3, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, UserCog } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { showToast } from '@/lib/toast';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
 
-type Tab = 'profile' | 'payment' | 'billing' | 'security' | 'notifications' | 'ab-testing';
+type Tab = 'profile' | 'account' | 'security' | 'appearance' | 'notifications' | 'billing' | 'advanced';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const [activeTab, setActiveTab] = useState<Tab>(tabParam && ['profile', 'payment', 'billing', 'security', 'notifications', 'ab-testing'].includes(tabParam) ? tabParam : 'profile');
-  
+  const validTabs: Tab[] = ['profile', 'account', 'security', 'appearance', 'notifications', 'billing', 'advanced'];
+  const [activeTab, setActiveTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'profile');
+
   useEffect(() => {
-    if (tabParam && ['profile', 'payment', 'billing', 'security', 'notifications', 'ab-testing'].includes(tabParam)) {
+    if (tabParam && validTabs.includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
 
   const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
   const [phone, setPhone] = useState('');
   const [timeZone, setTimeZone] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  // Privacy settings
+  const [allowSearchEngineIndexing, setAllowSearchEngineIndexing] = useState(true);
+  const [showInPublicDirectory, setShowInPublicDirectory] = useState(true);
+  const [allowAnalytics, setAllowAnalytics] = useState(true);
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
+
+  // Appearance settings
+  const [language, setLanguage] = useState('en');
+  const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
+  const [timeFormat, setTimeFormat] = useState('12h');
+  const [highContrast, setHighContrast] = useState(false);
+  const [reduceAnimations, setReduceAnimations] = useState(false);
+  const [largerText, setLargerText] = useState(false);
   
   // Social links
   const [socialLinks, setSocialLinks] = useState({
@@ -119,10 +137,27 @@ export function SettingsPage() {
   useEffect(() => {
     if (state.status === 'authenticated') {
       setName(state.user.name || '');
+      setBio(state.user.bio || '');
       setPhone(state.user.phone || '');
       setTimeZone((state.user as any).timeZone || '');
       setPlanTier((state.user as any).planTier || 'free');
       setTrialEndsAt((state.user as any).trialEndsAt || null);
+
+      // Load privacy settings
+      const privacy = (state.user as any).privacySettings || {};
+      setAllowSearchEngineIndexing(privacy.allowSearchEngineIndexing !== false);
+      setShowInPublicDirectory(privacy.showInPublicDirectory !== false);
+      setAllowAnalytics(privacy.allowAnalytics !== false);
+      setProfileVisibility(privacy.profileVisibility || 'public');
+
+      // Load appearance settings
+      const appearance = (state.user as any).appearanceSettings || {};
+      setLanguage(appearance.language || 'en');
+      setDateFormat(appearance.dateFormat || 'MM/DD/YYYY');
+      setTimeFormat(appearance.timeFormat || '12h');
+      setHighContrast(appearance.highContrast || false);
+      setReduceAnimations(appearance.reduceAnimations || false);
+      setLargerText(appearance.largerText || false);
       
       // Load social links
       const links = (state.user as any).socialLinks || {};
@@ -344,12 +379,13 @@ export function SettingsPage() {
       if (socialLinks.instagram) socialLinksData.instagram = socialLinks.instagram;
       if (socialLinks.youtube) socialLinksData.youtube = socialLinks.youtube;
       if (socialLinks.website) socialLinksData.website = socialLinks.website;
-      
+
       await apiFetch('/api/profile/update', {
         method: 'POST',
-        body: JSON.stringify({ 
-          name, 
-          phone: phone || undefined, 
+        body: JSON.stringify({
+          name,
+          bio: bio || undefined,
+          phone: phone || undefined,
           timeZone,
           socialLinks: Object.keys(socialLinksData).length > 0 ? socialLinksData : undefined,
         }),
@@ -359,6 +395,58 @@ export function SettingsPage() {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setError(e.message || 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onSavePrivacySettings = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch('/api/profile/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          privacySettings: {
+            allowSearchEngineIndexing,
+            showInPublicDirectory,
+            allowAnalytics,
+            profileVisibility,
+          }
+        }),
+      });
+      await refresh();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to save privacy settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onSaveAppearanceSettings = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch('/api/profile/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          appearanceSettings: {
+            language,
+            dateFormat,
+            timeFormat,
+            highContrast,
+            reduceAnimations,
+            largerText,
+          }
+        }),
+      });
+      await refresh();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to save appearance settings.');
     } finally {
       setSaving(false);
     }
@@ -560,16 +648,15 @@ export function SettingsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b">
+        <div className="flex gap-2 border-b overflow-x-auto">
           {([
             { id: 'profile' as Tab, label: 'Profile', icon: User },
-            { id: 'payment' as Tab, label: 'Payment', icon: DollarSign },
-            { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
+            { id: 'account' as Tab, label: 'Account', icon: UserCog },
             { id: 'security' as Tab, label: 'Security', icon: Shield },
+            { id: 'appearance' as Tab, label: 'Appearance', icon: Palette },
             { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
-            ...(planTier === 'scale'
-              ? [{ id: 'ab-testing' as Tab, label: 'A/B Testing', icon: BarChart3 }]
-              : []),
+            { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
+            { id: 'advanced' as Tab, label: 'Advanced', icon: Zap },
           ]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -600,70 +687,10 @@ export function SettingsPage() {
         {activeTab === 'profile' && (
           <Card className="glass">
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information</CardDescription>
+              <CardTitle>Public Profile</CardTitle>
+              <CardDescription>Manage your public-facing identity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input value={state.user.email} readOnly disabled />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Name</label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone (optional)</label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Timezone</label>
-                <Input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="Asia/Kolkata" />
-              </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-semibold text-text-primary">Social Links</h3>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Twitter/X</label>
-                  <Input 
-                    value={socialLinks.twitter} 
-                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })} 
-                    placeholder="https://twitter.com/yourhandle" 
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Instagram</label>
-                  <Input 
-                    value={socialLinks.instagram} 
-                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })} 
-                    placeholder="https://instagram.com/yourhandle" 
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">YouTube</label>
-                  <Input 
-                    value={socialLinks.youtube} 
-                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })} 
-                    placeholder="https://youtube.com/@yourhandle" 
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Website</label>
-                  <Input 
-                    value={socialLinks.website} 
-                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })} 
-                    placeholder="https://yourwebsite.com" 
-                    type="url"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <label className="text-sm font-medium">Avatar</label>
                 <Input
@@ -696,6 +723,68 @@ export function SettingsPage() {
                 </Button>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Display Name</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Bio (160 characters)</label>
+                <textarea
+                  className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, 160))}
+                  placeholder="Tell people about yourself..."
+                  maxLength={160}
+                />
+                <p className="text-xs text-muted-foreground">{bio.length}/160 characters</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Timezone</label>
+                <Input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="UTC-5" />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-semibold">Social Links</h3>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Twitter/X</label>
+                  <Input
+                    value={socialLinks.twitter}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+                    placeholder="https://twitter.com/yourhandle"
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Instagram</label>
+                  <Input
+                    value={socialLinks.instagram}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                    placeholder="https://instagram.com/yourhandle"
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">YouTube</label>
+                  <Input
+                    value={socialLinks.youtube}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
+                    placeholder="https://youtube.com/@yourhandle"
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Website</label>
+                  <Input
+                    value={socialLinks.website}
+                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
+                    placeholder="https://yourwebsite.com"
+                    type="url"
+                  />
+                </div>
+              </div>
+
               <Button className="w-full" onClick={onSaveProfile} disabled={saving}>
                 {saving ? (
                   <>
@@ -715,8 +804,354 @@ export function SettingsPage() {
           </Card>
         )}
 
-        {/* Payment Tab */}
-        {activeTab === 'payment' && (
+        {/* Account Tab */}
+        {activeTab === 'account' && (
+          <div className="space-y-6">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Email & Authentication</CardTitle>
+                <CardDescription>Manage your email and login methods</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email Address</label>
+                  <Input value={state.user.email} readOnly disabled />
+                  <p className="text-xs text-muted-foreground">Contact support to change your email</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone (optional)</label>
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold mb-3">Password</h3>
+                  {passwordError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{passwordError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {passwordSuccess && (
+                    <Alert className="mb-4">
+                      <Check className="h-4 w-4" />
+                      <AlertDescription>{passwordSuccess}</AlertDescription>
+                    </Alert>
+                  )}
+                  {state.user.hasPassword ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Current Password</Label>
+                        <div className="relative">
+                          <Input
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          >
+                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>New Password</Label>
+                        <div className="relative">
+                          <Input
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <PasswordStrengthMeter password={newPassword} />
+                      </div>
+                      <Button
+                        onClick={handleChangePassword}
+                        disabled={passwordSaving || !currentPassword || !newPassword}
+                      >
+                        {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Change Password
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription>
+                          You're using Google login. Set a password to enable email/password login.
+                        </AlertDescription>
+                      </Alert>
+                      <Button
+                        variant="outline"
+                        onClick={handleRequestSetPasswordOTP}
+                        disabled={passwordSaving || otpSent}
+                      >
+                        {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Send OTP to {state.user.email}
+                      </Button>
+                      {otpSent && (
+                        <>
+                          <Input
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="Enter 6-digit OTP"
+                            maxLength={6}
+                          />
+                          <div className="relative">
+                            <Input
+                              type={showSetPassword ? 'text' : 'password'}
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              placeholder="Enter new password"
+                              className="pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSetPassword((v) => !v)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            >
+                              {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          <PasswordStrengthMeter password={newPassword} />
+                          <Button
+                            onClick={handleSetPassword}
+                            disabled={passwordSaving || !otpCode || !newPassword || otpCode.length !== 6}
+                          >
+                            {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Set Password
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold mb-3">Connected Accounts</h3>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Globe className="h-5 w-5" />
+                      <div>
+                        <div className="font-medium">Google</div>
+                        <div className="text-sm text-muted-foreground">
+                          {state.user.hasGoogle ? 'Connected' : 'Not connected'}
+                        </div>
+                      </div>
+                    </div>
+                    {state.user.hasGoogle ? (
+                      <Button variant="outline" size="sm" disabled>
+                        Connected
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.location.href = buildApiUrl('/api/auth/google')}
+                      >
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <Button className="w-full" onClick={async () => {
+                  setSaving(true);
+                  setError('');
+                  try {
+                    await apiFetch('/api/profile/update', {
+                      method: 'POST',
+                      body: JSON.stringify({ phone: phone || undefined }),
+                    });
+                    await refresh();
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3000);
+                  } catch (e: any) {
+                    setError(e.message || 'Failed to save.');
+                  } finally {
+                    setSaving(false);
+                  }
+                }} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Privacy Settings</CardTitle>
+                <CardDescription>Control how your profile is visible to others</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Search Engine Indexing</label>
+                    <p className="text-xs text-muted-foreground">Allow search engines to index your profile</p>
+                  </div>
+                  <Switch checked={allowSearchEngineIndexing} onCheckedChange={setAllowSearchEngineIndexing} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Public Directory</label>
+                    <p className="text-xs text-muted-foreground">Show profile in public directory</p>
+                  </div>
+                  <Switch checked={showInPublicDirectory} onCheckedChange={setShowInPublicDirectory} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Analytics Tracking</label>
+                    <p className="text-xs text-muted-foreground">Allow analytics tracking for improvements</p>
+                  </div>
+                  <Switch checked={allowAnalytics} onCheckedChange={setAllowAnalytics} />
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <label className="text-sm font-medium">Profile Visibility</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="visibility"
+                        checked={profileVisibility === 'public'}
+                        onChange={() => setProfileVisibility('public')}
+                      />
+                      <div>
+                        <div className="text-sm font-medium">Public</div>
+                        <div className="text-xs text-muted-foreground">Anyone can view your profile</div>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="visibility"
+                        checked={profileVisibility === 'unlisted'}
+                        onChange={() => setProfileVisibility('unlisted')}
+                      />
+                      <div>
+                        <div className="text-sm font-medium">Unlisted</div>
+                        <div className="text-xs text-muted-foreground">Only people with the link can view</div>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="visibility"
+                        checked={profileVisibility === 'private'}
+                        onChange={() => setProfileVisibility('private')}
+                      />
+                      <div>
+                        <div className="text-sm font-medium">Private</div>
+                        <div className="text-xs text-muted-foreground">Only you can view</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <Button className="w-full" onClick={onSavePrivacySettings} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Privacy Settings'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>Irreversible actions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Export Account Data</h3>
+                  <p className="text-sm text-muted-foreground">Download your profile, chats, payments, and uploads in a ZIP file.</p>
+                  <Button variant="outline" onClick={handleExportData} disabled={exportingData}>
+                    {exportingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Download Export
+                  </Button>
+                </div>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-destructive">Delete Account</h3>
+                  <p className="text-sm text-muted-foreground">Soft delete with a 30-day grace period. Login will be blocked.</p>
+                  {deleteError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{deleteError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {deleteSuccess && (
+                    <Alert>
+                      <Check className="h-4 w-4" />
+                      <AlertDescription>{deleteSuccess}</AlertDescription>
+                    </Alert>
+                  )}
+                  <Button variant="outline" onClick={requestDeleteOtp} disabled={deleteInProgress || deleteOtpSent}>
+                    {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Send OTP
+                  </Button>
+                  {deleteOtpSent && (
+                    <div className="space-y-2 pt-2">
+                      <Label>OTP Code</Label>
+                      <Input
+                        value={deleteOtpCode}
+                        onChange={(e) => setDeleteOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Enter 6-digit OTP"
+                        maxLength={6}
+                      />
+                      <Button
+                        variant="destructive"
+                        onClick={confirmDeleteAccount}
+                        disabled={deleteInProgress || deleteOtpCode.length !== 6}
+                      >
+                        {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Confirm Delete
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Security Tab */}
+        {activeTab === 'security' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
@@ -1051,191 +1486,36 @@ export function SettingsPage() {
         {/* Security Tab */}
         {activeTab === 'security' && (
           <div className="space-y-6">
-            {/* Password Section */}
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>Password</CardTitle>
-                <CardDescription>
-                  {state.user.hasPassword 
-                    ? 'Change your password' 
-                    : 'Set a password for your account (currently using Google login)'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {passwordError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{passwordError}</AlertDescription>
-                  </Alert>
-                )}
-                {passwordSuccess && (
-                  <Alert>
-                    <Check className="h-4 w-4" />
-                    <AlertDescription>{passwordSuccess}</AlertDescription>
-                  </Alert>
-                )}
-                {state.user.hasPassword ? (
-                  // Change Password Form
-                  <>
-                    <div className="space-y-2">
-                      <Label>Current Password</Label>
-                      <div className="relative">
-                        <Input
-                          type={showCurrentPassword ? 'text' : 'password'}
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          placeholder="Enter current password"
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                          aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>New Password</Label>
-                      <div className="relative">
-                        <Input
-                          type={showNewPassword ? 'text' : 'password'}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Enter new password"
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                          aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <PasswordStrengthMeter password={newPassword} />
-                    </div>
-                    <Button 
-                      onClick={handleChangePassword} 
-                      disabled={passwordSaving || !currentPassword || !newPassword}
-                    >
-                      {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Change Password
-                    </Button>
-                  </>
-                ) : (
-                  // Set Password Form (for OAuth users)
-                  <>
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        You're currently using Google login. Set a password to enable email/password login.
-                      </AlertDescription>
-                    </Alert>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Request OTP</Label>
-                        <Button 
-                          variant="outline" 
-                          onClick={handleRequestSetPasswordOTP}
-                          disabled={passwordSaving || otpSent}
-                        >
-                          {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          Send OTP to {state.user.email}
-                        </Button>
-                      </div>
-                      {otpSent && (
-                        <>
-                          <div className="space-y-2">
-                            <Label>OTP Code</Label>
-                            <Input
-                              value={otpCode}
-                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              placeholder="Enter 6-digit OTP"
-                              maxLength={6}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>New Password</Label>
-                            <div className="relative">
-                              <Input
-                                type={showSetPassword ? 'text' : 'password'}
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="Enter new password"
-                                className="pr-10"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowSetPassword((v) => !v)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                                aria-label={showSetPassword ? 'Hide password' : 'Show password'}
-                              >
-                                {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
-                            </div>
-                            <PasswordStrengthMeter password={newPassword} />
-                          </div>
-                          <Button 
-                            onClick={handleSetPassword} 
-                            disabled={passwordSaving || !otpCode || !newPassword || otpCode.length !== 6}
-                          >
-                            {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Set Password
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Connected Accounts */}
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>Connected Accounts</CardTitle>
-                <CardDescription>Manage your connected authentication methods</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Chrome className="h-5 w-5" />
-                    <div>
-                      <div className="font-medium">Google</div>
-                      <div className="text-sm text-muted-foreground">
-                        {state.user.hasGoogle ? 'Connected' : 'Not connected'}
-                      </div>
-                    </div>
-                  </div>
-                  {state.user.hasGoogle ? (
-                    <Button variant="outline" size="sm" disabled>
-                      Connected
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.location.href = buildApiUrl('/api/auth/google')}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Two-Factor Authentication */}
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Two-Factor Authentication</CardTitle>
                 <CardDescription>Add an extra layer of security to your account</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">2FA is coming soon.</p>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                  <div>
+                    <div className="font-medium">Status: Not Enabled</div>
+                    <div className="text-sm text-muted-foreground mt-1">Protect your account with 2FA</div>
+                  </div>
+                  <Lock className="h-8 w-8 text-muted-foreground" />
+                </div>
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Two-factor authentication will be available soon. When enabled, you'll need to enter a code from your authenticator app in addition to your password.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2 p-4 border rounded-lg bg-muted/10">
+                  <h4 className="font-medium text-sm">Planned Options:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                    <li>• Authenticator app (Google Authenticator, Authy)</li>
+                    <li>• SMS backup (optional)</li>
+                    <li>• Recovery codes for account recovery</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
 
@@ -1243,7 +1523,7 @@ export function SettingsPage() {
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Active Sessions</CardTitle>
-                <CardDescription>Manage your active login sessions</CardDescription>
+                <CardDescription>Manage your active login sessions across devices</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {activeSessions.length > 1 && (
@@ -1254,7 +1534,6 @@ export function SettingsPage() {
                       onClick={async () => {
                         try {
                           await apiFetch('/api/auth/sessions/all-other', { method: 'DELETE' });
-                          // Reload sessions
                           const res = await apiFetch<{ success: boolean; sessions: any[] }>('/api/auth/sessions');
                           if (res.success && Array.isArray(res.sessions)) {
                             setActiveSessions(res.sessions);
@@ -1269,42 +1548,36 @@ export function SettingsPage() {
                   </div>
                 )}
                 {loadingSessions ? (
-                  <p className="text-sm text-muted-foreground">Loading active sessions…</p>
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
                 ) : activeSessions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
+                  <div className="text-center py-8 text-muted-foreground">
                     No active login sessions found.
-                  </p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {activeSessions.map((s: any) => (
                       <div
                         key={s.id}
-                        className={`flex items-center justify-between p-3 border rounded-lg bg-bg-secondary ${
-                          s.isCurrent ? 'border-primary' : ''
+                        className={`flex items-center justify-between p-3 border rounded-lg ${
+                          s.isCurrent ? 'border-primary bg-primary/5' : ''
                         }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium text-text-primary">
+                            <div className="text-sm font-medium">
                               {s.device || s.deviceInfo || 'Unknown Device'}
                             </div>
                             {s.isCurrent && (
-                              <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded">
-                                Current Session
+                              <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded-full">
+                                Current
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-text-tertiary mt-1">
-                            IP: {s.ipAddress || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-text-tertiary">
-                            Last active: {s.lastActiveAt 
-                              ? new Date(s.lastActiveAt).toLocaleString() 
-                              : 'Unknown'}
-                          </div>
-                          <div className="text-xs text-text-tertiary">
-                            Logged in: {s.createdAt 
-                              ? new Date(s.createdAt).toLocaleString() 
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {s.ipAddress || 'Unknown IP'} • Active {s.lastActiveAt
+                              ? new Date(s.lastActiveAt).toLocaleString()
                               : 'Unknown'}
                           </div>
                         </div>
@@ -1321,7 +1594,7 @@ export function SettingsPage() {
                               }
                             }}
                           >
-                            End Session
+                            End
                           </Button>
                         )}
                       </div>
@@ -1331,60 +1604,206 @@ export function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Activity Log */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Data Export</CardTitle>
-                <CardDescription>Download your profile, chats, payments, and uploads in a ZIP file.</CardDescription>
+                <CardTitle>Activity Log</CardTitle>
+                <CardDescription>Monitor your account activity (last 30 days)</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button onClick={handleExportData} disabled={exportingData}>
-                  {exportingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Download Export
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Activity logging will be available soon. Track login attempts, password changes, and important account events.
+                  </AlertDescription>
+                </Alert>
+                <div className="mt-4 space-y-2 opacity-50">
+                  <div className="flex items-start gap-3 p-3 border rounded-lg">
+                    <Check className="h-4 w-4 mt-0.5 text-green-500" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Login successful</div>
+                      <div className="text-xs text-muted-foreground">Chrome • 192.168.1.1 • 2 minutes ago</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 border rounded-lg">
+                    <Check className="h-4 w-4 mt-0.5 text-green-500" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Password changed</div>
+                      <div className="text-xs text-muted-foreground">Chrome • 192.168.1.1 • 2 days ago</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 border rounded-lg">
+                    <AlertCircle className="h-4 w-4 mt-0.5 text-yellow-500" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">Failed login attempt</div>
+                      <div className="text-xs text-muted-foreground">Unknown • 45.67.89.10 • 3 days ago</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Appearance Tab */}
+        {activeTab === 'appearance' && (
+          <div className="space-y-6">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Theme</CardTitle>
+                <CardDescription>Customize the look and feel</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Color Mode</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => {
+                        if (theme === 'dark') toggleTheme();
+                      }}
+                      className={`p-4 border-2 rounded-lg text-center transition-all ${
+                        theme === 'light' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">☀️</div>
+                      <div className="text-sm font-medium">Light</div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (theme === 'light') toggleTheme();
+                      }}
+                      className={`p-4 border-2 rounded-lg text-center transition-all ${
+                        theme === 'dark' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">🌙</div>
+                      <div className="text-sm font-medium">Dark</div>
+                    </button>
+                    <button
+                      disabled
+                      className="p-4 border-2 rounded-lg text-center opacity-50 cursor-not-allowed"
+                    >
+                      <div className="text-2xl mb-2">💻</div>
+                      <div className="text-sm font-medium">Auto</div>
+                      <div className="text-xs text-muted-foreground mt-1">Soon</div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Current theme: <span className="font-medium capitalize">{theme}</span>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Language & Region</CardTitle>
+                <CardDescription>Set your preferred language and formats</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Language</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2 bg-background"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español (Coming soon)</option>
+                    <option value="fr">Français (Coming soon)</option>
+                    <option value="de">Deutsch (Coming soon)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date Format</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2 bg-background"
+                    value={dateFormat}
+                    onChange={(e) => setDateFormat(e.target.value)}
+                  >
+                    <option value="MM/DD/YYYY">MM/DD/YYYY (US)</option>
+                    <option value="DD/MM/YYYY">DD/MM/YYYY (Europe)</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time Format</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2 bg-background"
+                    value={timeFormat}
+                    onChange={(e) => setTimeFormat(e.target.value)}
+                  >
+                    <option value="12h">12-hour (AM/PM)</option>
+                    <option value="24h">24-hour</option>
+                  </select>
+                </div>
+
+                <Button className="w-full" onClick={onSaveAppearanceSettings} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Preferences'
+                  )}
                 </Button>
               </CardContent>
             </Card>
 
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Delete Account</CardTitle>
-                <CardDescription>Soft delete with a 30‑day grace period. Login will be blocked.</CardDescription>
+                <CardTitle>Accessibility</CardTitle>
+                <CardDescription>Adjust settings for better accessibility</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {deleteError && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{deleteError}</AlertDescription>
-                  </Alert>
-                )}
-                {deleteSuccess && (
-                  <Alert>
-                    <Check className="h-4 w-4" />
-                    <AlertDescription>{deleteSuccess}</AlertDescription>
-                  </Alert>
-                )}
-                <Button variant="outline" onClick={requestDeleteOtp} disabled={deleteInProgress || deleteOtpSent}>
-                  {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Send OTP
-                </Button>
-                {deleteOtpSent && (
-                  <div className="space-y-2">
-                    <Label>OTP Code</Label>
-                    <Input
-                      value={deleteOtpCode}
-                      onChange={(e) => setDeleteOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 6-digit OTP"
-                      maxLength={6}
-                    />
-                    <Button
-                      variant="destructive"
-                      onClick={confirmDeleteAccount}
-                      disabled={deleteInProgress || deleteOtpCode.length !== 6}
-                    >
-                      {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Confirm Delete
-                    </Button>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">High Contrast Mode</label>
+                    <p className="text-xs text-muted-foreground">Increase contrast for better visibility</p>
                   </div>
-                )}
+                  <Switch checked={highContrast} onCheckedChange={setHighContrast} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Reduce Animations</label>
+                    <p className="text-xs text-muted-foreground">Minimize motion effects</p>
+                  </div>
+                  <Switch checked={reduceAnimations} onCheckedChange={setReduceAnimations} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Larger Text</label>
+                    <p className="text-xs text-muted-foreground">Increase base font size</p>
+                  </div>
+                  <Switch checked={largerText} onCheckedChange={setLargerText} />
+                </div>
+
+                <Button className="w-full" onClick={onSaveAppearanceSettings} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Accessibility Settings'
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -1392,231 +1811,545 @@ export function SettingsPage() {
 
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Choose how you want to be notified</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">New Chat Notifications</div>
-                  <div className="text-sm text-muted-foreground">Get notified when someone starts a chat</div>
-                </div>
-                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Payment Notifications</div>
-                  <div className="text-sm text-muted-foreground">Get notified when you receive a payment</div>
-                </div>
-                <Switch checked={paymentNotifications} onCheckedChange={setPaymentNotifications} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Weekly Summary</div>
-                  <div className="text-sm text-muted-foreground">Receive weekly stats and insights</div>
-                </div>
-                <Switch checked={weeklySummary} onCheckedChange={setWeeklySummary} />
-              </div>
-              <Button 
-                onClick={async () => {
-                  setSavingNotifications(true);
-                  setError('');
-                  try {
-                    await apiFetch('/api/profile/update', {
-                      method: 'POST',
-                      body: JSON.stringify({
-                        notificationPreferences: {
-                          emailNotifications,
-                          paymentNotifications,
-                          weeklySummary,
-                        }
-                      }),
-                    });
-                    await refresh();
-                    setError('');
-                  } catch (e: any) {
-                    setError(e.message || 'Failed to save notification preferences.');
-                  } finally {
-                    setSavingNotifications(false);
-                  }
-                }}
-                disabled={savingNotifications}
-                className="w-full"
-              >
-                {savingNotifications ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  'Save Preferences'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* A/B Testing Tab (Scale plan only) */}
-        {activeTab === 'ab-testing' && planTier === 'scale' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
-                <CardTitle>A/B Testing</CardTitle>
-                <CardDescription>Test different AI identity variants to see which performs better</CardDescription>
+                <CardTitle>Email Notifications</CardTitle>
+                <CardDescription>Choose what emails you receive and how often</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Chat & Messages</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-medium text-sm mb-2">New Chat Messages</div>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="chatNotifications"
+                              checked={!emailNotifications}
+                              onChange={() => setEmailNotifications(false)}
+                            />
+                            <span className="text-sm">Off</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="chatNotifications"
+                              checked={emailNotifications}
+                              onChange={() => setEmailNotifications(true)}
+                            />
+                            <span className="text-sm">Instant</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer opacity-50">
+                            <input type="radio" name="chatNotifications" disabled />
+                            <span className="text-sm">Daily digest (Soon)</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-semibold mb-3">Payments & Billing</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-medium text-sm mb-2">Payment Received</div>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="paymentNotifications"
+                              checked={!paymentNotifications}
+                              onChange={() => setPaymentNotifications(false)}
+                            />
+                            <span className="text-sm">Off</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="paymentNotifications"
+                              checked={paymentNotifications}
+                              onChange={() => setPaymentNotifications(true)}
+                            />
+                            <span className="text-sm">Instant</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer opacity-50">
+                            <input type="radio" name="paymentNotifications" disabled />
+                            <span className="text-sm">Daily digest (Soon)</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-semibold mb-3">Activity & Insights</h3>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-sm">Weekly Activity Summary</div>
+                        <div className="text-xs text-muted-foreground">Receive weekly stats every Monday</div>
+                      </div>
+                      <Switch checked={weeklySummary} onCheckedChange={setWeeklySummary} />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-semibold mb-3">Product & Features</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-medium text-sm mb-2">Product Updates</div>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="productUpdates" defaultChecked />
+                            <span className="text-sm">Important only</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="productUpdates" />
+                            <span className="text-sm">All updates</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <div>
+                          <div className="font-medium text-sm">Security Alerts</div>
+                          <div className="text-xs text-muted-foreground">Cannot be disabled</div>
+                        </div>
+                        <Switch checked={true} disabled />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={async () => {
+                    setSavingNotifications(true);
+                    setError('');
+                    try {
+                      await apiFetch('/api/profile/update', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          notificationPreferences: {
+                            emailNotifications,
+                            paymentNotifications,
+                            weeklySummary,
+                          }
+                        }),
+                      });
+                      await refresh();
+                      setSaveSuccess(true);
+                      setTimeout(() => setSaveSuccess(false), 3000);
+                    } catch (e: any) {
+                      setError(e.message || 'Failed to save notification preferences.');
+                    } finally {
+                      setSavingNotifications(false);
+                    }
+                  }}
+                  disabled={savingNotifications}
+                  className="w-full"
+                >
+                  {savingNotifications ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Preferences'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Marketing Preferences</CardTitle>
+                <CardDescription>Optional promotional communications</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    Create variant groups to test different versions of your AI identity. Variants are selected randomly based on weights you set.
-                  </AlertDescription>
-                </Alert>
-
-                {/* Load variant groups */}
-                {variantGroups.length === 0 && !loadingVariants && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No variant groups yet. Create one to start A/B testing.
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-sm">Newsletter & Tips</div>
+                    <div className="text-xs text-muted-foreground">Best practices and success stories</div>
                   </div>
-                )}
-
-                {variantGroups.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Variant Groups</h3>
-                    {variantGroups.map((group: any) => (
-                      <Card key={group.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{group.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {group.variants.length} variants
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            onClick={async () => {
-                              setSelectedGroup(group.id);
-                              setLoadingVariants(true);
-                              try {
-                                const res = await apiFetch(`/api/identity/variants/${group.id}/metrics`);
-                                if (res.success) {
-                                  setVariantMetrics(res.metrics);
-                                }
-                              } catch (e: any) {
-                                setError(e.message || 'Failed to load metrics');
-                              } finally {
-                                setLoadingVariants(false);
-                              }
-                            }}
-                          >
-                            View Metrics
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
+                  <Switch defaultChecked={false} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-sm">Special Offers</div>
+                    <div className="text-xs text-muted-foreground">Promotions and discounts</div>
                   </div>
-                )}
-
-                {/* Metrics display */}
-                {selectedGroup && variantMetrics.length > 0 && (
-                  <Card className="mt-4">
-                    <CardHeader>
-                      <CardTitle>Variant Metrics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">Variant</th>
-                              <th className="text-right p-2">Chats</th>
-                              <th className="text-right p-2">Rating</th>
-                              <th className="text-right p-2">Conversion</th>
-                              <th className="text-right p-2">Response Time</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {variantMetrics.map((metric: any) => (
-                              <tr key={metric.variantId} className="border-b">
-                                <td className="p-2 font-medium">Variant {metric.label}</td>
-                                <td className="p-2 text-right">{metric.totalChats}</td>
-                                <td className="p-2 text-right">
-                                  {metric.avgRating > 0 ? metric.avgRating.toFixed(2) : 'N/A'}
-                                </td>
-                                <td className="p-2 text-right">{metric.conversionRate.toFixed(1)}%</td>
-                                <td className="p-2 text-right">{metric.avgResponseTime}ms</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Create new variant */}
-                <div className="pt-4 border-t">
-                  <h3 className="font-semibold mb-4">Create New Variant</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Base Version ID</Label>
-                      <Input
-                        value={baseVersionId}
-                        onChange={(e) => setBaseVersionId(e.target.value)}
-                        placeholder="Enter identity version ID"
-                      />
-                    </div>
-                    <div>
-                      <Label>Variant Name</Label>
-                      <Input
-                        value={newVariantName}
-                        onChange={(e) => setNewVariantName(e.target.value)}
-                        placeholder="e.g., Variant B"
-                      />
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        if (!baseVersionId || !newVariantName) {
-                          setError('Please fill in all fields');
-                          return;
-                        }
-                        setSaving(true);
-                        setError('');
-                        try {
-                          const res = await apiFetch('/api/identity/variants/create', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                              baseVersionId,
-                              variantName: newVariantName,
-                            }),
-                          });
-                          if (res.success) {
-                            setNewVariantName('');
-                            setBaseVersionId('');
-                            // Reload variant groups
-                            const groupsRes = await apiFetch('/api/identity/variants/list');
-                            if (groupsRes.success) {
-                              setVariantGroups(groupsRes.groups);
-                            }
-                          }
-                        } catch (e: any) {
-                          setError(e.message || 'Failed to create variant');
-                        } finally {
-                          setSaving(false);
-                        }
-                      }}
-                      disabled={saving || !baseVersionId || !newVariantName}
-                    >
-                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Create Variant
-                    </Button>
+                  <Switch defaultChecked={false} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-sm">Partner Recommendations</div>
+                    <div className="text-xs text-muted-foreground">Curated tools and services</div>
                   </div>
+                  <Switch defaultChecked={false} />
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
+
+        {/* Advanced Tab */}
+        {activeTab === 'advanced' && (
+          <div className="space-y-6">
+            {/* Pay-Per-Chat Configuration */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Pay-Per-Chat Settings</CardTitle>
+                <CardDescription>Configure pricing for detailed answers</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="enablePayments"
+                    checked={enablePayments}
+                    onChange={(e) => setEnablePayments(e.target.checked)}
+                    className="rounded"
+                  />
+                  <label htmlFor="enablePayments" className="text-sm font-medium cursor-pointer">
+                    Enable pay-per-chat
+                  </label>
+                </div>
+
+                {enablePayments && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Select tiers</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {payTierOptions.map((opt) => (
+                          <label key={opt.value} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={payPerChatTiers.includes(opt.value)}
+                              onChange={() => toggleTier(opt.value)}
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          step="0.01"
+                          value={customTierInput}
+                          onChange={(e) => setCustomTierInput(e.target.value)}
+                          placeholder="Custom amount (USD)"
+                        />
+                        <Button type="button" variant="outline" onClick={addCustomTier}>
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Default tier</label>
+                      <select
+                        className="w-full border rounded-md px-3 py-2 bg-background"
+                        value={defaultTierCents}
+                        onChange={(e) => setDefaultTierCents(Number(e.target.value))}
+                      >
+                        {payPerChatTiers.map((amount) => (
+                          <option key={amount} value={amount}>
+                            {formatCurrency(amount)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Welcome Message</label>
+                      <Input
+                        value={welcomeMessage}
+                        onChange={(e) => setWelcomeMessage(e.target.value)}
+                        placeholder="Hey! I'm here to help. Ask me anything!"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Popular Questions</label>
+                      {popularQuestions.map((q, i) => (
+                        <Input
+                          key={i}
+                          value={q}
+                          onChange={(e) => {
+                            const newQs = [...popularQuestions];
+                            newQs[i] = e.target.value;
+                            setPopularQuestions(newQs);
+                          }}
+                          placeholder={`Question ${i + 1}`}
+                          className="mb-2"
+                        />
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPopularQuestions([...popularQuestions, ''])}
+                      >
+                        Add Question
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t">
+                      <label className="text-sm font-medium">Payment Trigger Rules</label>
+                      <p className="text-xs text-muted-foreground">
+                        Configure when payment should be required (in addition to the 3 free messages limit)
+                      </p>
+
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="alwaysRequire"
+                          checked={paymentTriggerRules.alwaysRequire}
+                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, alwaysRequire: e.target.checked })}
+                          className="rounded"
+                        />
+                        <label htmlFor="alwaysRequire" className="text-sm cursor-pointer">
+                          Always require payment (after free messages)
+                        </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Keywords (comma-separated)</label>
+                        <Input
+                          value={paymentTriggerRules.keywords.join(', ')}
+                          onChange={(e) => {
+                            const keywords = e.target.value.split(',').map(k => k.trim()).filter(Boolean);
+                            setPaymentTriggerRules({ ...paymentTriggerRules, keywords });
+                          }}
+                          placeholder="consultation, detailed, premium, urgent"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Questions containing these keywords will require payment
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Minimum Length (characters)</label>
+                        <Input
+                          type="number"
+                          value={paymentTriggerRules.minLength || 0}
+                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, minLength: parseInt(e.target.value) || 0 })}
+                          min={0}
+                          placeholder="0 = disabled"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Questions longer than this will require payment (0 to disable)
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <Button className="w-full" onClick={onSavePaymentSettings} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Payment Settings'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* A/B Testing (Scale plan only) */}
+            {planTier === 'scale' && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>A/B Testing</CardTitle>
+                  <CardDescription>Test different AI identity variants (Scale plan only)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Create variant groups to test different versions of your AI identity. Variants are selected randomly based on weights you set.
+                    </AlertDescription>
+                  </Alert>
+
+                  {variantGroups.length === 0 && !loadingVariants && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No variant groups yet. Create one to start A/B testing.
+                    </div>
+                  )}
+
+                  {variantGroups.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="font-semibold">Variant Groups</h3>
+                      {variantGroups.map((group: any) => (
+                        <Card key={group.id} className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{group.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {group.variants.length} variants
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                setSelectedGroup(group.id);
+                                setLoadingVariants(true);
+                                try {
+                                  const res = await apiFetch(`/api/identity/variants/${group.id}/metrics`);
+                                  if (res.success) {
+                                    setVariantMetrics(res.metrics);
+                                  }
+                                } catch (e: any) {
+                                  setError(e.message || 'Failed to load metrics');
+                                } finally {
+                                  setLoadingVariants(false);
+                                }
+                              }}
+                            >
+                              View Metrics
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedGroup && variantMetrics.length > 0 && (
+                    <Card className="mt-4">
+                      <CardHeader>
+                        <CardTitle>Variant Metrics</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left p-2">Variant</th>
+                                <th className="text-right p-2">Chats</th>
+                                <th className="text-right p-2">Rating</th>
+                                <th className="text-right p-2">Conversion</th>
+                                <th className="text-right p-2">Response Time</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {variantMetrics.map((metric: any) => (
+                                <tr key={metric.variantId} className="border-b">
+                                  <td className="p-2 font-medium">Variant {metric.label}</td>
+                                  <td className="p-2 text-right">{metric.totalChats}</td>
+                                  <td className="p-2 text-right">
+                                    {metric.avgRating > 0 ? metric.avgRating.toFixed(2) : 'N/A'}
+                                  </td>
+                                  <td className="p-2 text-right">{metric.conversionRate.toFixed(1)}%</td>
+                                  <td className="p-2 text-right">{metric.avgResponseTime}ms</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="pt-4 border-t">
+                    <h3 className="font-semibold mb-4">Create New Variant</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Base Version ID</Label>
+                        <Input
+                          value={baseVersionId}
+                          onChange={(e) => setBaseVersionId(e.target.value)}
+                          placeholder="Enter identity version ID"
+                        />
+                      </div>
+                      <div>
+                        <Label>Variant Name</Label>
+                        <Input
+                          value={newVariantName}
+                          onChange={(e) => setNewVariantName(e.target.value)}
+                          placeholder="e.g., Variant B"
+                        />
+                      </div>
+                      <Button
+                        onClick={async () => {
+                          if (!baseVersionId || !newVariantName) {
+                            setError('Please fill in all fields');
+                            return;
+                          }
+                          setSaving(true);
+                          setError('');
+                          try {
+                            const res = await apiFetch('/api/identity/variants/create', {
+                              method: 'POST',
+                              body: JSON.stringify({
+                                baseVersionId,
+                                variantName: newVariantName,
+                              }),
+                            });
+                            if (res.success) {
+                              setNewVariantName('');
+                              setBaseVersionId('');
+                              const groupsRes = await apiFetch('/api/identity/variants/list');
+                              if (groupsRes.success) {
+                                setVariantGroups(groupsRes.groups);
+                              }
+                            }
+                          } catch (e: any) {
+                            setError(e.message || 'Failed to create variant');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        disabled={saving || !baseVersionId || !newVariantName}
+                      >
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Create Variant
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* API & Integrations (Placeholder) */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>API & Integrations</CardTitle>
+                <CardDescription>Manage API keys and webhooks (Coming soon)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    API access and webhook integrations will be available in a future update. These features will allow you to:
+                  </AlertDescription>
+                </Alert>
+                <div className="mt-4 space-y-2 text-sm text-muted-foreground pl-4">
+                  <div>• Generate API keys for programmatic access</div>
+                  <div>• Configure webhooks for real-time events</div>
+                  <div>• Monitor rate limits and usage</div>
+                  <div>• Integrate with third-party services</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
       </div>
     </Layout>
   );

@@ -6,12 +6,17 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
-import { Copy, Eye, FileCode, MessageCircle } from 'lucide-react';
+import { Copy, Eye, FileCode, MessageCircle, QrCode, Check, ExternalLink, Download } from 'lucide-react';
 import { FLAGS } from '@/lib/flags';
+import QRCode from 'qrcode';
 
 export function IntegrationsPage() {
   const { state } = useAuth();
   const user = state.status === 'authenticated' ? state.user : null;
+
+  // QR Code & Sharing state
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [copied, setCopied] = useState<string | null>(null);
 
   // Widget state
   const [color, setColor] = useState('#2563eb');
@@ -66,6 +71,15 @@ export function IntegrationsPage() {
   const publicSlug = (user as any)?.publicSlug || user?.handle || '';
   const standaloneLink = publicSlug ? `${window.location.origin}/chat/${publicSlug}` : '';
   const apiBase = window.location.origin;
+
+  // Social share templates
+  const shareTemplates = [
+    { label: 'Twitter', text: `Chat with my AI! ${standaloneLink}`, icon: '𝕏' },
+    { label: 'Instagram', text: `Chat with my AI! Link in bio`, icon: '📸' },
+    { label: 'WhatsApp', text: `Hey! I cloned myself. Ask me anything: ${standaloneLink}`, icon: '💬' },
+    { label: 'LinkedIn', text: `I created an AI version of myself. Try it out: ${standaloneLink}`, icon: '💼' },
+    { label: 'Facebook', text: `Check out my AI clone! Chat with it here: ${standaloneLink}`, icon: '📘' },
+  ];
 
   // Generate embed code client-side
   const embedCode = useMemo(() => {
@@ -158,6 +172,15 @@ export function IntegrationsPage() {
       setPricingSaving(false);
     }
   };
+
+  // Generate QR code
+  useEffect(() => {
+    if (standaloneLink) {
+      QRCode.toDataURL(standaloneLink, { width: 256, margin: 2 })
+        .then(setQrDataUrl)
+        .catch(console.error);
+    }
+  }, [standaloneLink]);
 
   // Load platform statuses (only if features are enabled)
   useEffect(() => {
@@ -264,32 +287,158 @@ export function IntegrationsPage() {
     }
   };
 
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    showToast('Copied to clipboard!', 'success');
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
-          <p className="text-muted-foreground mt-1">Connect platforms + generate website widget embed code.</p>
+          <h1 className="text-3xl font-bold tracking-tight">🚀 Integrations & Deployment</h1>
+          <p className="text-muted-foreground mt-1">Complete deployment toolkit + ongoing management</p>
         </div>
 
-        {/* Standalone Link + Pricing (only if pay-per-chat enabled) */}
-        {FLAGS.payPerChat && (
-        <Card className="glass">
+        {/* 1️⃣ YOUR CHAT LINK & SHARING */}
+        <Card className="glass border-2 border-primary/20">
           <CardHeader>
-            <CardTitle>Standalone Link + Pricing</CardTitle>
-            <CardDescription>Your public chat page + pay-per-chat pricing.</CardDescription>
+            <CardTitle className="text-xl">1️⃣ Your Chat Link & Sharing</CardTitle>
+            <CardDescription>Share your AI with the world - all the tools you need</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <div className="text-sm font-medium mb-1">Standalone link</div>
+          <CardContent className="space-y-6">
+            {/* Standalone Link */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Standalone Link</label>
               <div className="flex gap-2">
-                <Input value={standaloneLink} readOnly />
-                <Button variant="outline" onClick={() => navigator.clipboard.writeText(standaloneLink)} disabled={!standaloneLink}>
-                  Copy
+                <Input
+                  value={standaloneLink || 'Set your public handle in Settings first'}
+                  readOnly
+                  className="font-mono"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => standaloneLink && copyToClipboard(standaloneLink, 'standalone-link')}
+                  disabled={!standaloneLink}
+                >
+                  {copied === 'standalone-link' ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => standaloneLink && window.open(standaloneLink, '_blank')}
+                  disabled={!standaloneLink}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Test
                 </Button>
               </div>
             </div>
 
+            {/* QR Code */}
+            {qrDataUrl && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">📱 QR Code</label>
+                <div className="flex items-start gap-4">
+                  <div className="bg-white p-3 rounded-lg border-2">
+                    <img src={qrDataUrl} alt="QR Code" className="w-32 h-32" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Print this QR code on business cards, flyers, or anywhere you want people to scan and chat with your AI instantly.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.download = `${publicSlug || 'chat'}-qr-code.png`;
+                          link.href = qrDataUrl;
+                          link.click();
+                          showToast('QR Code downloaded!', 'success');
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PNG
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(qrDataUrl, 'qr-code')}
+                      >
+                        {copied === 'qr-code' ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Image
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Social Share Templates */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">📢 Social Share Templates</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {shareTemplates.map((t) => (
+                  <Button
+                    key={t.label}
+                    variant="outline"
+                    className="justify-start h-auto py-3"
+                    onClick={() => copyToClipboard(t.text, t.label)}
+                  >
+                    <span className="mr-2 text-lg">{t.icon}</span>
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm">{t.label}</div>
+                      <div className="text-xs text-muted-foreground truncate">{t.text}</div>
+                    </div>
+                    {copied === t.label ? (
+                      <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    ) : (
+                      <Copy className="h-4 w-4 flex-shrink-0" />
+                    )}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                💡 Click to copy the template, then paste it on your social media post
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 4️⃣ Pricing Configuration (only if pay-per-chat enabled) */}
+        {FLAGS.payPerChat && (
+        <>
+          <div className="pt-4">
+            <h2 className="text-2xl font-bold mb-4">4️⃣ Pricing Configuration</h2>
+          </div>
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Pay-Per-Chat Pricing</CardTitle>
+              <CardDescription>Configure your pay-per-chat pricing tiers and default tier.</CardDescription>
+            </CardHeader>
+          <CardContent className="space-y-3">
             <div className="space-y-2">
               <div className="text-sm font-medium mb-1">Select tiers</div>
               <div className="grid grid-cols-2 gap-2">
@@ -333,6 +482,7 @@ export function IntegrationsPage() {
             </Button>
           </CardContent>
         </Card>
+        </>
         )}
 
         {/* Widget Analytics */}
@@ -390,10 +540,10 @@ export function IntegrationsPage() {
           </CardContent>
         </Card>
 
-        {/* Website Widget */}
+        {/* 2️⃣ Website Widget */}
         <Card className="glass">
           <CardHeader>
-            <CardTitle>Website Embed Widget</CardTitle>
+            <CardTitle>2️⃣ Website Embed Widget</CardTitle>
             <CardDescription>Customize and copy-paste the widget code into any website.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -536,11 +686,18 @@ export function IntegrationsPage() {
           </CardContent>
         </Card>
 
+        {/* 3️⃣ PLATFORM INTEGRATIONS */}
+        {(FLAGS.instagram || FLAGS.whatsapp) && (
+          <div className="pt-4">
+            <h2 className="text-2xl font-bold mb-4">3️⃣ Platform Integrations</h2>
+          </div>
+        )}
+
         {/* Instagram (only if enabled) */}
         {FLAGS.instagram && (
         <Card className="glass">
           <CardHeader>
-            <CardTitle>Instagram DM</CardTitle>
+            <CardTitle>📸 Instagram DM Auto-Reply</CardTitle>
             <CardDescription>Auto-reply to Instagram Direct Messages with your AI clone.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -575,7 +732,7 @@ export function IntegrationsPage() {
         {FLAGS.whatsapp && (
         <Card className="glass">
           <CardHeader>
-            <CardTitle>WhatsApp</CardTitle>
+            <CardTitle>💬 WhatsApp Business</CardTitle>
             <CardDescription>Auto-reply to WhatsApp messages with text + voice.</CardDescription>
           </CardHeader>
           <CardContent>

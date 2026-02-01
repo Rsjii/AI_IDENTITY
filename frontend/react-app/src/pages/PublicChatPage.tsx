@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ThumbsUp, ThumbsDown, Send, Loader2, X } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Send, Loader2, X, Copy, Check, RotateCcw, Lock, Star, MessageCircle, Zap } from 'lucide-react';
 import { PaymentPrompt } from '@/components/PaymentPrompt';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
+import { showToast } from '@/lib/toast';
 
-type Msg = { 
-  role: 'user' | 'assistant'; 
+type Msg = {
+  role: 'user' | 'assistant';
   content: string;
   timestamp?: Date;
   id?: string;
@@ -28,18 +29,15 @@ function getCookie(name: string): string | null {
 }
 
 function setCookie(name: string, value: string, maxAgeSeconds: number): void {
-  // Keep it simple + predictable for Phase-1: JS-readable cookie, 30-day max-age, Lax.
   document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; SameSite=Lax`;
 }
 
 function getOrCreateVisitorId(): string {
-  // Phase-1 spec: session stored in browser (cookie) and persists up to ~30 days.
   const k = 'selflyx_visitor_id';
   const existingCookie = getCookie(k);
   const existingLocal = localStorage.getItem(k);
   const existing = existingCookie || existingLocal;
   if (existing) {
-    // Ensure cookie is set for Phase-1 spec compliance
     if (!existingCookie) setCookie(k, existing, THIRTY_DAYS_SECONDS);
     return existing;
   }
@@ -66,7 +64,7 @@ function formatTimeAgo(date: Date): string {
 function shouldShowTimestamp(current: Date, previous?: Date): boolean {
   if (!previous) return true;
   const diffMins = (current.getTime() - previous.getTime()) / 60000;
-  return diffMins >= 1; // Show if 1+ minutes apart
+  return diffMins >= 1;
 }
 
 export function PublicChatPage() {
@@ -77,13 +75,16 @@ export function PublicChatPage() {
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
   const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
   const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
+
   const [creator, setCreator] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [text, setText] = useState('');
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [typing, setTyping] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [paymentData, setPaymentData] = useState<{
     creatorId: string;
@@ -94,30 +95,22 @@ export function PublicChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Fetch creator info
   useEffect(() => {
     fetch(`/api/public/creator/${encodeURIComponent(slug)}`)
       .then((r) => r.json())
-      .then((d) => {
-        setCreator(d.creator);
-        // Store creator ID for payment flow
-        if (d.creator?.id) {
-          // Creator object might not have id, but we'll get it from chat response
-        }
-      })
+      .then((d) => setCreator(d.creator))
       .catch(() => setCreator(null));
   }, [slug]);
 
-  // Load previous session history if available
+  // Load previous session history if available and user is logged in
   useEffect(() => {
-    if (!sessionKey) return;
+    if (!sessionKey || !isAuthed) return;
 
-    // Prefer cookie (spec), fallback to localStorage (backward compatibility)
     const cookieSessionId = getCookie(sessionKey);
     const savedSessionId = cookieSessionId || localStorage.getItem(sessionKey);
     const savedTs = Number(localStorage.getItem(sessionTsKey) || '0');
 
-    // Enforce "history persists for 30 days" behavior from spec:
-    // - If we only have a stale localStorage entry, clear it and start fresh.
     if (!cookieSessionId && savedSessionId) {
       const isFresh = savedTs > 0 && Date.now() - savedTs < THIRTY_DAYS_MS;
       if (!isFresh) {
@@ -125,20 +118,18 @@ export function PublicChatPage() {
         localStorage.removeItem(sessionTsKey);
         return;
       }
-      // Re-establish cookie for the remaining window (sliding, based on last activity).
       setCookie(sessionKey, savedSessionId, THIRTY_DAYS_SECONDS);
     }
 
     if (!savedSessionId) return;
 
     fetch(`/api/public/history?sessionId=${encodeURIComponent(savedSessionId)}&visitorId=${encodeURIComponent(visitorId)}`, {
-      credentials: 'include', // ✅ required now
+      credentials: 'include',
     })
       .then((r) => r.json())
       .then((d) => {
         if (!d?.success) return;
         setSessionId(d.sessionId || savedSessionId);
-        // Touch last-activity timestamp (sliding 30-day window)
         localStorage.setItem(sessionTsKey, String(Date.now()));
         const historyMsgs: Msg[] = (d.messages || []).map((m: any) => ({
           id: m.id,
@@ -149,24 +140,28 @@ export function PublicChatPage() {
         setMsgs(historyMsgs);
       })
       .catch(() => {});
-  }, [sessionKey, sessionTsKey, visitorId]);
+  }, [sessionKey, sessionTsKey, visitorId, isAuthed]);
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, typing]);
 
+  const handleLogin = () => {
+    nav(`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`);
+  };
+
   const send = async () => {
     if (!isAuthed) {
-      nav(`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`, { replace: true });
+      setShowLoginModal(true);
       return;
     }
 
     const m = text.trim();
     if (!m) return;
     setText('');
-    const userMsg: Msg = { 
-      role: 'user', 
+    const userMsg: Msg = {
+      role: 'user',
       content: m,
       timestamp: new Date(),
       id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -178,7 +173,7 @@ export function PublicChatPage() {
       const r = await fetch('/api/public/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // ✅ required now
+        credentials: 'include',
         body: JSON.stringify({ slug, message: m, visitorId, sessionId: sessionId || undefined, voiceEnabled }),
       });
       const d = await r.json();
@@ -189,11 +184,9 @@ export function PublicChatPage() {
         localStorage.setItem(sessionTsKey, String(Date.now()));
         setCookie(sessionKey, newSessionId, THIRTY_DAYS_SECONDS);
       }
-      
-      // Check if payment is required (only if pay-per-chat is enabled)
+
       if (FLAGS.payPerChat && d.requiresPayment) {
         setTyping(false);
-        // Show preview message
         const previewMsg: Msg = {
           role: 'assistant',
           content: d.previewReply || 'This answer requires payment to unlock the full response.',
@@ -202,8 +195,7 @@ export function PublicChatPage() {
           mirrorRunId: d.mirrorRunId,
         };
         setMsgs((x) => [...x, previewMsg]);
-        
-        // Get creator ID from response
+
         const creatorId = d.creatorId || '';
         if (creatorId) {
           setPaymentData({
@@ -216,10 +208,9 @@ export function PublicChatPage() {
         }
         return;
       }
-      
-      // Normal reply
-      const aiMsg: Msg = { 
-        role: 'assistant', 
+
+      const aiMsg: Msg = {
+        role: 'assistant',
         content: d.reply || '...',
         timestamp: new Date(),
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -243,11 +234,10 @@ export function PublicChatPage() {
 
   const handlePaymentSuccess = async (reply?: string) => {
     setShowPaymentModal(false);
-    
-    // ✅ Use the reply returned from payment confirmation if available
+
     if (reply) {
-      const aiMsg: Msg = { 
-        role: 'assistant', 
+      const aiMsg: Msg = {
+        role: 'assistant',
         content: reply,
         timestamp: new Date(),
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -257,17 +247,15 @@ export function PublicChatPage() {
       setText('');
       return;
     }
-    
-    // Fallback: If no reply provided, re-send the pending message
+
     if (pendingMessage) {
       const messageToSend = pendingMessage;
       setPendingMessage('');
       setText('');
-      
-      // Small delay to ensure payment is processed
+
       setTimeout(async () => {
-        const userMsg: Msg = { 
-          role: 'user', 
+        const userMsg: Msg = {
+          role: 'user',
           content: messageToSend,
           timestamp: new Date(),
           id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -279,14 +267,14 @@ export function PublicChatPage() {
           const r = await fetch('/api/public/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ slug, message: messageToSend, visitorId, sessionId: sessionId || undefined, voiceEnabled }),
           });
           const d = await r.json();
           setSessionId(d.sessionId || sessionId);
-          
-          // After payment, should get full reply
-          const aiMsg: Msg = { 
-            role: 'assistant', 
+
+          const aiMsg: Msg = {
+            role: 'assistant',
             content: d.reply || '...',
             timestamp: new Date(),
             id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -314,28 +302,72 @@ export function PublicChatPage() {
 
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     if (feedbackSent.has(messageId)) return;
-    
+
     setFeedbackSent(prev => new Set(prev).add(messageId));
-    
-    // Find the message to get mirrorRunId
+
     const msg = msgs.find(m => m.id === messageId);
     const mirrorRunId = msg?.mirrorRunId;
-    
-    // Send feedback to backend
+
     try {
       await fetch('/api/public/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messageId, 
-          feedback, 
+        credentials: 'include',
+        body: JSON.stringify({
+          messageId,
+          feedback,
           sessionId,
           visitorId,
           mirrorRunId: mirrorRunId || undefined,
         }),
       });
+      showToast(feedback === 'positive' ? 'Thanks for your feedback!' : 'Feedback received', 'success');
     } catch (error) {
       console.error('Feedback error:', error);
+    }
+  };
+
+  const copyMessage = (content: string, messageId: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(messageId);
+    showToast('Message copied!', 'success');
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
+  const regenerateResponse = async (messageIndex: number) => {
+    if (messageIndex === 0) return;
+
+    const userMsg = msgs[messageIndex - 1];
+    if (!userMsg || userMsg.role !== 'user') return;
+
+    const messagesToKeep = msgs.slice(0, messageIndex);
+    setMsgs(messagesToKeep);
+    setTyping(true);
+
+    try {
+      const r = await fetch('/api/public/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ slug, message: userMsg.content, visitorId, sessionId, voiceEnabled }),
+      });
+      const d = await r.json();
+
+      const aiMsg: Msg = {
+        role: 'assistant',
+        content: d.reply || '...',
+        timestamp: new Date(),
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        mirrorRunId: d.mirrorRunId,
+        audioUrl: d.audioUrl || null,
+      };
+      setMsgs((x) => [...x, aiMsg]);
+      showToast('Response regenerated', 'success');
+    } catch (error) {
+      console.error('Regenerate error:', error);
+      showToast('Failed to regenerate response', 'error');
+    } finally {
+      setTyping(false);
     }
   };
 
@@ -346,23 +378,218 @@ export function PublicChatPage() {
     }
   };
 
+  const handlePopularQuestionClick = (question: string) => {
+    if (!isAuthed) {
+      setShowLoginModal(true);
+      return;
+    }
+    setText(question);
+    setTimeout(() => send(), 100);
+  };
+
+  // LOGGED OUT USER - Preview Mode
+  if (!isAuthed) {
+    return (
+      <div className="theme-light min-h-screen bg-bg-primary flex flex-col">
+        {/* Header */}
+        <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link to="/" className="text-lg font-bold">SELFLYX</Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                className="px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                className="px-4 py-2 text-sm font-medium bg-accent-gradient text-white rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Sign Up - It's Free!
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Creator Profile Preview */}
+        <div className="flex-1 overflow-y-auto px-4 py-8">
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* Creator Card */}
+            <div className="bg-bg-secondary border border-border-default rounded-xl p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                {creator?.avatarUrl && (
+                  <img
+                    src={creator.avatarUrl}
+                    alt={creator.displayName}
+                    className="w-16 h-16 rounded-full border-2 border-accent-primary/20"
+                  />
+                )}
+                <div className="flex-1">
+                  <h1 className="text-2xl font-bold text-text-primary mb-1">
+                    {creator?.displayName || slug}
+                  </h1>
+                  <p className="text-text-secondary mb-3">
+                    {creator?.meta?.expertise || 'AI Assistant'}
+                  </p>
+                  <div className="flex items-center gap-4 text-sm text-text-secondary">
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <span>{creator?.rating || '4.8'}/5</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MessageCircle className="h-4 w-4" />
+                      <span>{creator?.totalChats?.toLocaleString() || '0'} chats</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Zap className="h-4 w-4 text-green-500" />
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                        ~2s response
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Try Chatting Card */}
+            <div className="bg-gradient-to-br from-accent-primary/10 to-accent-secondary/10 border border-accent-primary/20 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="h-5 w-5 text-accent-primary" />
+                <h2 className="text-lg font-semibold text-text-primary">
+                  Try chatting with {creator?.displayName || slug}'s AI clone
+                </h2>
+              </div>
+              <p className="text-text-secondary mb-4">
+                "{creator?.meta?.description || 'I help with various topics and can answer your questions!'}"
+              </p>
+
+              {creator?.popularQuestions && creator.popularQuestions.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-text-secondary mb-3">POPULAR QUESTIONS:</p>
+                  <div className="grid gap-2">
+                    {creator.popularQuestions.slice(0, 3).map((q: string, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setShowLoginModal(true)}
+                        className="px-4 py-3 bg-bg-secondary hover:bg-bg-elevated border border-border-default rounded-lg text-left text-sm text-text-primary transition-all hover:shadow-md group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{q}</span>
+                          <Lock className="h-4 w-4 text-text-tertiary group-hover:text-accent-primary transition-colors" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pricing (if enabled) */}
+            {FLAGS.payPerChat && creator?.priceTiers && creator.priceTiers.length > 0 && (
+              <div className="bg-bg-secondary border border-border-default rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Pricing</h3>
+                <div className="flex items-center gap-2 text-text-secondary">
+                  <span>💳 Free: 3 messages</span>
+                  <span>•</span>
+                  <span>${(creator.priceTiers[0]?.amount / 100).toFixed(2)}: Unlimited session</span>
+                </div>
+              </div>
+            )}
+
+            {/* Login CTA */}
+            <div className="bg-bg-secondary border border-border-default rounded-xl p-6">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Lock className="h-5 w-5 text-accent-primary" />
+                <h3 className="text-lg font-semibold text-text-primary">Sign in to start chatting</h3>
+              </div>
+              <div className="relative mb-4">
+                <textarea
+                  placeholder="Type your message..."
+                  disabled
+                  className="w-full resize-none rounded-lg border border-border-default bg-bg-tertiary px-4 py-3 text-text-muted placeholder:text-text-muted opacity-60 cursor-not-allowed"
+                  rows={2}
+                />
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <Link
+                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                  className="flex-1 px-6 py-3 bg-accent-gradient text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+                >
+                  Sign Up - It's Free!
+                </Link>
+                <Link
+                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                  className="flex-1 px-6 py-3 bg-bg-tertiary border border-border-default text-text-primary rounded-lg font-medium text-center hover:bg-bg-elevated transition-colors"
+                >
+                  Login
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Login Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-bg-secondary rounded-xl p-6 max-w-md w-full relative">
+              <button
+                onClick={() => setShowLoginModal(false)}
+                className="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <h3 className="text-xl font-bold text-text-primary mb-2">
+                Sign in to chat with {creator?.displayName || slug}
+              </h3>
+              <p className="text-text-secondary mb-6">
+                Create a free account to start chatting
+              </p>
+              <div className="space-y-3">
+                <Link
+                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                  className="block w-full px-6 py-3 bg-accent-gradient text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+                >
+                  Continue with Email
+                </Link>
+                <Link
+                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                  className="block w-full px-6 py-3 bg-bg-tertiary border border-border-default text-text-primary rounded-lg font-medium text-center hover:bg-bg-elevated transition-colors"
+                >
+                  Continue with Google
+                </Link>
+              </div>
+              <p className="text-center text-xs text-text-tertiary mt-4">
+                New here? <Link to="/auth" className="text-accent-primary hover:underline">Sign Up</Link>
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // LOGGED IN USER - Full Chat Experience
   return (
     <div className="theme-light min-h-screen bg-bg-primary flex flex-col">
       {/* Header */}
       <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
           {creator?.avatarUrl && (
-            <img 
-              src={creator.avatarUrl} 
-              alt={creator.displayName} 
+            <img
+              src={creator.avatarUrl}
+              alt={creator.displayName}
               className="w-10 h-10 rounded-full"
             />
           )}
           <div className="flex-1">
             <div className="font-semibold text-text-primary">{creator?.displayName || slug}</div>
-            <div className="text-sm text-text-secondary">
-              {creator?.meta?.expertise || 'AI Assistant'} • 
-              <span className="ml-1 flex items-center gap-1">
+            <div className="text-sm text-text-secondary flex items-center gap-2">
+              {creator?.meta?.expertise || 'AI Assistant'}
+              <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
                 Responds in ~2s
               </span>
@@ -371,22 +598,8 @@ export function PublicChatPage() {
         </div>
       </div>
 
-      {!isAuthed && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3 text-sm">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-            <div className="text-yellow-900">Login required to chat.</div>
-            <Link
-              className="px-3 py-2 rounded bg-black text-white"
-              to={`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`}
-            >
-              Login
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* Chat Area */}
-      <div 
+      <div
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto px-4 py-6 pb-24 md:pb-6"
         style={{ scrollBehavior: 'smooth' }}
@@ -396,9 +609,9 @@ export function PublicChatPage() {
             <div className="text-center py-12 animate-fade-in">
               <div className="mb-6">
                 {creator?.avatarUrl && (
-                  <img 
-                    src={creator.avatarUrl} 
-                    alt={creator.displayName} 
+                  <img
+                    src={creator.avatarUrl}
+                    alt={creator.displayName}
                     className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-accent-primary/20 shadow-lg"
                   />
                 )}
@@ -414,10 +627,7 @@ export function PublicChatPage() {
                   {creator.popularQuestions.slice(0, 4).map((q: string, idx: number) => (
                     <button
                       key={idx}
-                      onClick={() => {
-                        setText(q);
-                        setTimeout(() => send(), 100);
-                      }}
+                      onClick={() => handlePopularQuestionClick(q)}
                       className="px-4 py-2 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/30 rounded-full text-sm text-text-primary transition-all hover:scale-105 active:scale-95"
                     >
                       {q}
@@ -475,9 +685,9 @@ export function PublicChatPage() {
                           ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
                           li: ({ children }) => <li className="text-sm">{children}</li>,
                           a: ({ href, children }) => (
-                            <a 
-                              href={href} 
-                              target="_blank" 
+                            <a
+                              href={href}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="text-accent-primary hover:underline"
                             >
@@ -496,7 +706,7 @@ export function PublicChatPage() {
                     </div>
                   </div>
 
-                  {/* Timestamp and Feedback */}
+                  {/* Timestamp and Actions */}
                   <div className={`flex items-center gap-2 mt-1 ${isUser ? 'flex-row-reverse' : ''}`}>
                     {m.timestamp && showTimestamp && (
                       <span className="text-xs text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
@@ -504,7 +714,25 @@ export function PublicChatPage() {
                       </span>
                     )}
                     {!isUser && m.id && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => copyMessage(m.content, m.id!)}
+                          className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-accent-primary transition-colors"
+                          title="Copy message"
+                        >
+                          {copiedMessageId === m.id ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => regenerateResponse(i)}
+                          className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-accent-primary transition-colors"
+                          title="Regenerate response"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleFeedback(m.id!, 'positive')}
                           disabled={feedbackSent.has(m.id!)}
@@ -566,7 +794,7 @@ export function PublicChatPage() {
         </div>
       </div>
 
-      {/* Payment Modal - Only show if pay-per-chat is enabled */}
+      {/* Payment Modal */}
       {FLAGS.payPerChat && showPaymentModal && paymentData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
           <div className="bg-bg-secondary w-full md:max-w-md md:rounded-lg rounded-t-2xl md:rounded-lg relative max-h-[92vh] md:max-h-[80vh] overflow-y-auto">
@@ -610,15 +838,15 @@ export function PublicChatPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={isAuthed ? 'Type your message...' : 'Login to start chatting...'}
+              placeholder="Type your message..."
               rows={1}
-              disabled={!isAuthed || typing}
+              disabled={typing}
               className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
             <button
               onClick={send}
-              disabled={!isAuthed || !text.trim() || typing}
+              disabled={!text.trim() || typing}
               className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center gap-2 font-medium min-h-[44px] min-w-[44px]"
             >
               {typing ? (
@@ -626,7 +854,7 @@ export function PublicChatPage() {
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Send
+                  <span className="hidden md:inline">Send</span>
                 </>
               )}
             </button>
