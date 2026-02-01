@@ -27,7 +27,7 @@ const CheckoutForm: React.FC<{
   creatorId: string;
   sessionId: string;
   paymentOptions: PaymentPromptProps['paymentOptions'];
-  onSuccess: () => void;
+  onSuccess: (reply?: string) => void;
   onCancel: () => void;
   onClientSecretChange: (secret: string | null) => void;
 }> = ({ creatorId, sessionId, paymentOptions, onSuccess, onCancel, onClientSecretChange }) => {

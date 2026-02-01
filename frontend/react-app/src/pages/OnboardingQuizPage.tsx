@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
-import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
   Briefcase, Code, Palette, TrendingUp, Heart, GraduationCap,

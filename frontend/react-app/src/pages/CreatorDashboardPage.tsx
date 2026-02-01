@@ -16,7 +16,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import { MirrorPage } from './MirrorPage';
-import { apiFetch, buildApiUrl } from '@/lib/api'; // <-- add buildApiUrl
+import { apiFetch } from '@/lib/api';
 
 type RecentConversation = {
   sessionId: string;

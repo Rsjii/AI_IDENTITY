@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,7 +71,7 @@ export function SignupProfilePage() {
     setError('');
     setFieldErrors({});
     try {
-      const result = await apiFetch<{ redirect?: string }>(
+      await apiFetch<{ redirect?: string }>(
         '/api/auth/signup/profile',
         {
           method: 'POST',

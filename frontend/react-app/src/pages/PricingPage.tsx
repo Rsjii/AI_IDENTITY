@@ -6,7 +6,6 @@ import { Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FLAGS } from '@/lib/flags';
 
 export function PricingPage() {
   const { state } = useAuth();

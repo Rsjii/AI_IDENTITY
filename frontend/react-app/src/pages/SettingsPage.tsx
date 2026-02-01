@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, BarChart3 } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, DollarSign, Check, FileText, Info, Chrome, Bell, BarChart3, Eye, EyeOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { showToast } from '@/lib/toast';

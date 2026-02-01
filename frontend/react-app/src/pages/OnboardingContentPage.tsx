@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Upload, FileText, Link as LinkIcon, Youtube, Twitter,
   Linkedin, Instagram, File, X, CheckCircle2, Loader2, AlertCircle,
-  FileImage, FileSpreadsheet, Star, Sparkles, TrendingUp,
+  FileSpreadsheet, Star, Sparkles, TrendingUp,
   Check, ExternalLink
 } from 'lucide-react';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
