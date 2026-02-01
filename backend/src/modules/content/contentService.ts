@@ -2,7 +2,6 @@ import { uploadPublicBuffer } from '../../services/s3Service';
 import { knowledgeSourceQueries, knowledgeChunkQueries } from '../../config/database';
 import { logger } from '../../config/logger';
 import { YoutubeTranscript } from 'youtube-transcript';
-import { ragService } from '../../services/ragService';
 import { ensureTrainingJob } from '../../services/trainingJobService';
 
 // PDF parsing
@@ -132,12 +131,7 @@ export async function createUrlSource(userId: string, url: string, title?: strin
   const chunks = rawText ? chunkText(rawText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-  if (chunks.length > 0) {
-    ragService.generateEmbeddingsForUser(userId).catch(err => {
-      logger.warn('[Content] Failed to generate embeddings:', err);
-    });
-  }
-
+  // ✅ FIX: Only ensureTrainingJob (embeddings will be generated in background via training job)
   await ensureTrainingJob(userId);
 
   return source;
@@ -225,11 +219,7 @@ export async function createPasteSource(userId: string, title: string | undefine
   const chunks = chunkText(rawText);
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-  // Generate embeddings for RAG (async, don't block)
-  ragService.generateEmbeddingsForUser(userId).catch(err => {
-    logger.warn('[Content] Failed to generate embeddings:', err);
-  });
-
+  // ✅ FIX: Only ensureTrainingJob (embeddings will be generated in background via training job)
   await ensureTrainingJob(userId);
 
   return source;
@@ -254,13 +244,7 @@ export async function createYoutubeSource(userId: string, url: string, title?: s
   const chunks = transcribedText ? chunkText(transcribedText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-  // Generate embeddings for RAG (async, don't block)
-  if (chunks.length > 0) {
-    ragService.generateEmbeddingsForUser(userId).catch(err => {
-      logger.warn('[Content] Failed to generate embeddings:', err);
-    });
-  }
-
+  // ✅ FIX: Only ensureTrainingJob (embeddings will be generated in background via training job)
   await ensureTrainingJob(userId);
 
   return source;
@@ -309,13 +293,7 @@ export async function createFileSource(userId: string, file: Express.Multer.File
   const chunks = extractedText ? chunkText(extractedText) : [];
   await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-  // Generate embeddings for RAG (async, don't block)
-  if (chunks.length > 0) {
-    ragService.generateEmbeddingsForUser(userId).catch(err => {
-      logger.warn('[Content] Failed to generate embeddings:', err);
-    });
-  }
-
+  // ✅ FIX: Only ensureTrainingJob (embeddings will be generated in background via training job)
   await ensureTrainingJob(userId);
 
   return source;

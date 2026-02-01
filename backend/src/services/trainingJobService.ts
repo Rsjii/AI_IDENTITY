@@ -1,7 +1,8 @@
-import { trainingJobQueries, userQueries } from '../config/database';
+import { trainingJobQueries, userQueries, db } from '../config/database';
 import { logger } from '../config/logger';
 import { ragService } from './ragService';
 import { EmailService } from '../modules/auth/authService';
+import { isProd } from '../config/env';
 
 let isProcessing = false;
 
@@ -24,12 +25,30 @@ export async function processTrainingJobs(): Promise<void> {
         await ragService.generateEmbeddingsForUser(job.userId);
         await trainingJobQueries.markCompleted(job.id);
 
-        // Notify user (best effort)
+        // ✅ FIX: Notify user (prod-only, idempotent)
         try {
           const user = await userQueries.findById(job.userId);
-          if (user?.email) {
-            const emailService = new EmailService();
-            await emailService.sendTrainingReady(user.email);
+          if (isProd && user?.email) {
+            // ✅ Idempotent: send only once
+            const sentCheck = await db.query(
+              `SELECT 1 FROM "Event" WHERE "userId"=$1 AND "type"='training_ready_email_sent' LIMIT 1`,
+              [job.userId]
+            );
+
+            if (!sentCheck.rows[0]) {
+              const emailService = new EmailService();
+              await emailService.sendTrainingReady(user.email);
+
+              await db.query(
+                `INSERT INTO "Event" (id, "userId", "type", "meta") VALUES ($1, $2, $3, $4)`,
+                [
+                  `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+                  job.userId,
+                  'training_ready_email_sent',
+                  JSON.stringify({ source: 'training_job' })
+                ]
+              );
+            }
           }
         } catch (emailError: any) {
           logger.warn('[TrainingJobs] Email notification failed:', emailError?.message || emailError);

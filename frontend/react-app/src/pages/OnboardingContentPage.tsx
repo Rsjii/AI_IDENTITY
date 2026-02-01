@@ -164,7 +164,11 @@ export function OnboardingContentPage() {
   // ✅ Prevent back navigation to profile page
   usePreventBack();
 
+  // ✅ FIX: Prevent double API calls in React StrictMode
+  const didInit = useRef(false);
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
     refresh().catch(() => {});
   }, []);
 
