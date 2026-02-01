@@ -14,6 +14,7 @@ import { EVENT_TYPES, ADMIN_EMAILS } from '../../config/constants';
 import { identifyPostHogUser } from '../../services/posthogService';
 import { tokenizeId } from '../../utils/idTokenization';
 import { createOrUpdateAuthSession } from '../../services/authSessionService';
+import { generateRandomHandle } from '../../utils/idGenerator';
 
 const cookieSameSite = isProd ? 'none' : 'lax';
 
@@ -53,38 +54,44 @@ const completeProfileSchema = z.object({
     .min(1, 'Name is required')
     .min(3, 'Name must be at least 3 characters')
     .max(50, 'Name is too long'),
+  username: z.string()
+    .min(1, 'Username is required')
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be at most 30 characters')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
+    .refine((val) => !val.startsWith('_') && !val.endsWith('_'), 'Username cannot start or end with underscore'),
   phone: z.string()
     .optional()
     .refine((value) => {
       // ✅ Optional field - allow empty
       if (!value || value.trim() === '') return true;
-      
+
       // ✅ MUST start with +
       if (!value.trim().startsWith('+')) {
         return false;
       }
-      
+
       // ✅ Split by space: +[country code] [phone number]
       const parts = value.trim().split(/\s+/);
-      
+
       // ✅ Must have exactly 2 parts: [+countryCode] and [phoneNumber]
       if (parts.length !== 2) {
         return false;
       }
-      
+
       const countryCodePart = parts[0]; // e.g. "+91"
       const phoneNumberPart = parts[1];  // e.g. "1234567890"
-      
+
       // ✅ Country code part: must be + followed by 1-3 digits
       if (!/^\+[1-9]\d{0,2}$/.test(countryCodePart)) {
         return false; // +1, +91, +123 valid; +0, +01, +0123 invalid
       }
-      
+
       // ✅ Phone number part: must be exactly 10 digits
       if (!/^\d{10}$/.test(phoneNumberPart)) {
         return false;
       }
-      
+
       return true;
     }, 'Phone number must be in format: +[country code] [10 digits] (e.g. +91 1234567890 or +1 1234567890)'),
   profileImage: z.string().nullable().optional(),
@@ -540,20 +547,32 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
 
 export const completeProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, name, phone, profileImage, timeZone } = completeProfileSchema.parse(req.body);
-    
-    // Update user profile (minimal fields only)
+    const { email, name, username, phone, profileImage, timeZone } = completeProfileSchema.parse(req.body);
+
+    // Check if username is already taken
+    const existingUser = await userQueries.findByHandle(username.toLowerCase());
+    if (existingUser) {
+      return res.status(409).json({
+        error: 'Username is already taken',
+        errorCode: 'USERNAME_TAKEN',
+        fieldErrors: {
+          username: 'This username is already taken. Please choose another.',
+        },
+      });
+    }
+
+    // Update user profile with user-provided username
     await userQueries.updateProfile(
-      email.toLowerCase(), 
-      name, 
-      '', // handle - not used
+      email.toLowerCase(),
+      name,
+      username.toLowerCase(), // handle - user provided username
       null, // dob - not used
-      phone || '', 
+      phone || '',
       '', // bio - not used
       profileImage || null,
       timeZone || null
     );
-    
+
     // Find user and generate JWT
     const user = await userQueries.findByEmail(email.toLowerCase());
     if (!user) {

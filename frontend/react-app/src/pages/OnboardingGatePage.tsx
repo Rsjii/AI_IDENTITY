@@ -20,15 +20,22 @@ export function OnboardingGatePage() {
       try {
         // ✅ Step 0: trust server onboardingStep first
         try {
-          const me = await apiFetch<{ success: true; user: { onboardingStep?: string } }>('/api/auth/me');
+          const me = await apiFetch<{
+            success: true;
+            user: { onboardingStep?: string; onboardingCompleted?: boolean };
+          }>('/api/auth/me');
           const step = me?.user?.onboardingStep;
+          const completed = me?.user?.onboardingCompleted;
 
+          // If onboarding is marked as complete, go to dashboard
+          if (step === 'done' || completed === true) {
+            nav('/dashboard', { replace: true });
+            return;
+          }
+
+          // If step exists, go to that step
           if (step) {
-            if (step === 'done') {
-              nav('/dashboard', { replace: true });
-            } else {
-              nav(`/onboarding/${step}`, { replace: true });
-            }
+            nav(`/onboarding/${step}`, { replace: true });
             return;
           }
         } catch {

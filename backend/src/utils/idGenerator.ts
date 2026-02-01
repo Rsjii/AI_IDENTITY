@@ -29,3 +29,14 @@ export const generateId = {
   marketplaceSubscription: () => `mkt_sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
   videoAvatar: () => `vid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 };
+
+/**
+ * Generate a random unique handle for users
+ * Format: user_[random alphanumeric string]
+ * Example: user_k9x2m5p7q
+ */
+export function generateRandomHandle(): string {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substr(2, 9);
+  return `user_${timestamp}${randomStr}`;
+}

@@ -1,7 +1,15 @@
 1. password me view option / eye wala icon
 2. ek wo popup waale jo card hote hai na jo upar aate hai deafult js, usko replace karna custom se
 3. agar koi unauthenticate duser kisi pe authenticated link pe jaaye show error sahi se do not allow
-4. otp resend wala option
+4. bro first otp jaane ke baad time shuri ho jaanc ahhiye resend ka 
+
+
+
+
+#1. same pc se multiple users aaye to alag hona chahiye be careful, bahi maine dusre user se login kiya, first waale onboarding se start ho gaya
+#2. step 7 me text ke upaar aa raha meter
+#3. unauthenticted user agar koi bhi authenticated page ko access karne ka try kare, show him loign directly not that page, same for users jinhone onboarding / profile / upload incomplete hai, if they try to access any other authenitication requieed page, dont allo them , redirect to the current page where they left from ( profile / onboarding / upload / plan)
+#4. upload right side calculation
 
 
 

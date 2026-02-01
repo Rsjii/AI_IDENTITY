@@ -14,6 +14,7 @@ import {
   FileImage, FileSpreadsheet, Star, Sparkles, TrendingUp,
   Check, ExternalLink
 } from 'lucide-react';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 
 interface ContentItem {
   id: string;
@@ -157,20 +158,11 @@ export function OnboardingContentPage() {
     setStagedFiles(prev => prev.filter(sf => sf.id !== id));
   };
 
+  // ✅ Redirect to dashboard if onboarding is already complete
+  useOnboardingGuard();
+
   // ✅ Prevent back navigation to profile page
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  usePreventBack();
 
   useEffect(() => {
     refresh().catch(() => {});
@@ -712,14 +704,7 @@ export function OnboardingContentPage() {
             </div>
 
             {/* Navigation */}
-            <div className="flex justify-between pt-6 border-t border-border-default">
-              <Button
-                variant="ghost"
-                onClick={() => nav('/onboarding/quiz')}
-                className="text-text-secondary hover:text-text-primary"
-              >
-                Back
-              </Button>
+            <div className="flex justify-end pt-6 border-t border-border-default">
               <div className="flex flex-col items-end gap-2">
                 <Button
                   onClick={async () => {
@@ -739,16 +724,10 @@ export function OnboardingContentPage() {
                         showToast('All files uploaded successfully!', 'success', 2000);
                       }
 
-                      // ✅ STEP 2: Mark onboarding complete
-                      await apiFetch('/api/creator/onboarding/complete', {
-                        method: 'POST',
-                        body: JSON.stringify({}),
-                      });
-
-                      // ✅ STEP 3: Refresh auth state
+                      // ✅ STEP 2: Refresh auth state
                       await refreshAuth();
 
-                      // ✅ STEP 4: Navigate to plan page
+                      // ✅ STEP 3: Navigate to plan page (onboarding NOT complete yet!)
                       nav('/onboarding/plan');
                     } catch (error) {
                       console.error('Failed during continue:', error);

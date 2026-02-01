@@ -5,25 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 
 export function OnboardingPlanPage() {
   const nav = useNavigate();
   const [loading, setLoading] = useState(false);
 
+  // ✅ Redirect to dashboard if onboarding is already complete
+  useOnboardingGuard();
+
   // ✅ Prevent back navigation to profile page
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  usePreventBack();
 
   const startTrial = async () => {
     setLoading(true);

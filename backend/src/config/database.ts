@@ -151,7 +151,9 @@ CREATE TABLE IF NOT EXISTS "trust_events" (
 -- ========== INDEXES ==========
 
 CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
-CREATE UNIQUE INDEX IF NOT EXISTS "User_handle_key" ON "User"("handle");
+-- Unique index on handle, but allows multiple NULL values (partial index)
+DROP INDEX IF EXISTS "User_handle_key";
+CREATE UNIQUE INDEX IF NOT EXISTS "User_handle_key" ON "User"("handle") WHERE "handle" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "User_referralCode_idx" ON "User"("referralCode");
 CREATE INDEX IF NOT EXISTS "idx_user_onboarding_completed" ON "User"("onboardingCompleted");
 CREATE UNIQUE INDEX IF NOT EXISTS "User_googleId_key" ON "User"("googleId");
@@ -803,6 +805,12 @@ export async function initializeDatabase() {
   try {
     await db.query(createTablesSQL);
     logger.info('✅ Database tables initialized (MVP only)');
+
+    // Migrate existing empty string handles to NULL to avoid unique constraint violations
+    const result = await db.query(`UPDATE "User" SET handle = NULL WHERE handle = '' OR handle IS NULL`);
+    if (result.rowCount && result.rowCount > 0) {
+      logger.info(`✅ Migrated ${result.rowCount} user(s) with empty handles to NULL`);
+    }
   } catch (error) {
     logger.error('Error initializing database:', error);
     throw error;
@@ -825,6 +833,14 @@ export const userQueries = {
     const result = await db.query(
       'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "deletedAt", "deletionScheduledAt" FROM "User" WHERE email = $1',
       [email]
+    );
+    return result.rows[0];
+  },
+
+  findByHandle: async (handle: string) => {
+    const result = await db.query(
+      'SELECT id, email, handle, name, active, "profileCompleted" FROM "User" WHERE LOWER(handle) = LOWER($1)',
+      [handle]
     );
     return result.rows[0];
   },

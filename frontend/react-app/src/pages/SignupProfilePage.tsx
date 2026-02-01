@@ -8,6 +8,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreventBack } from '@/hooks/useOnboardingGuard';
 
 function useQuery() {
   const { search } = useLocation();
@@ -22,25 +23,47 @@ export function SignupProfilePage() {
   const email = q.get('email') || '';
 
   // ✅ Prevent back navigation - profile is mandatory
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  usePreventBack();
 
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setFieldErrors({ ...fieldErrors, profileImage: 'Image must be less than 5MB' });
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setFieldErrors({ ...fieldErrors, profileImage: 'File must be an image' });
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      // Convert to base64 for now (you can implement actual file upload to S3/Cloudinary later)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result as string);
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setFieldErrors({ ...fieldErrors, profileImage: 'Failed to upload image' });
+      setUploadingImage(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +78,9 @@ export function SignupProfilePage() {
           body: JSON.stringify({
             email,
             name,
+            username: username.toLowerCase(),
             phone: phone || undefined,
-            profileImage: null,
+            profileImage: profileImage || null,
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         }
@@ -102,6 +126,47 @@ export function SignupProfilePage() {
               <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Your full name" />
               {fieldErrors.name && (
                 <p className="text-xs text-destructive">{fieldErrors.name}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Username</label>
+              <Input
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                required
+                placeholder="yourname"
+                maxLength={30}
+              />
+              {fieldErrors.username ? (
+                <p className="text-xs text-destructive">{fieldErrors.username}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Your profile will be: /@{username || 'username'} • Only letters, numbers, and underscores
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Profile Image (optional)</label>
+              <div className="flex items-center gap-4">
+                {profileImage && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-muted">
+                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                />
+              </div>
+              {uploadingImage && (
+                <p className="text-xs text-muted-foreground">Uploading...</p>
+              )}
+              {fieldErrors.profileImage && (
+                <p className="text-xs text-destructive">{fieldErrors.profileImage}</p>
               )}
             </div>
 

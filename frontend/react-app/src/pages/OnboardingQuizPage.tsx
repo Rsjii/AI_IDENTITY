@@ -8,6 +8,7 @@ import {
   Briefcase, Code, Palette, TrendingUp, Heart, GraduationCap,
   DollarSign, Target, Sparkles
 } from 'lucide-react';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 
 // Question types based on spec
 interface QuizAnswers {
@@ -102,20 +103,11 @@ export function OnboardingQuizPage() {
   const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
 
+  // ✅ Redirect to dashboard if onboarding is already complete
+  useOnboardingGuard();
+
   // ✅ Prevent back navigation to profile page
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  usePreventBack();
 
   // Auto-save to localStorage
   useEffect(() => {

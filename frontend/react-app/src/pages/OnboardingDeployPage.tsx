@@ -1,14 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { Copy, Check, ExternalLink, QrCode, Code, MessageCircle, Instagram } from 'lucide-react';
+import { Copy, Check, ExternalLink, QrCode, Code, MessageCircle, Instagram, Loader2 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { apiFetch } from '@/lib/api';
 
 export function OnboardingDeployPage() {
-  const { state } = useAuth();
+  const navigate = useNavigate();
+  const { state, refresh } = useAuth();
   const user: any = state.status === 'authenticated' ? state.user : null;
 
   const [copied, setCopied] = useState<string | null>(null);
@@ -18,6 +22,7 @@ export function OnboardingDeployPage() {
   const [widgetPosition, setWidgetPosition] = useState('bottom-right');
   const [widgetTitle, setWidgetTitle] = useState('Chat with AI');
   const [welcomeMessage, setWelcomeMessage] = useState('Hey! Ask me anything!');
+  const [completing, setCompleting] = useState(false);
 
   const slug = user?.publicSlug || user?.handle || '';
   const creatorId = (user as any)?.publicId || user?.id || '';
@@ -47,20 +52,11 @@ export function OnboardingDeployPage() {
 <link rel="stylesheet" href="${apiBase}/embed.css" />`;
   }, [creatorId, slug, apiBase, widgetColor, widgetPosition, widgetTitle, avatarUrl, voiceEnabled, welcomeMessage, popularQuestions]);
 
+  // ✅ Redirect to dashboard if onboarding is already complete
+  useOnboardingGuard();
+
   // ✅ Prevent back navigation to profile page
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  usePreventBack();
 
   // Generate QR code
   useEffect(() => {
@@ -84,6 +80,29 @@ export function OnboardingDeployPage() {
     { label: 'LinkedIn', text: `I created an AI version of myself. Try it out: ${standaloneLink}`, icon: '💼' },
   ];
 
+  const handleCompleteOnboarding = async () => {
+    setCompleting(true);
+    try {
+      // Mark onboarding as complete
+      await apiFetch('/api/creator/onboarding/complete', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+
+      // Refresh auth to update onboardingCompleted flag
+      await refresh();
+
+      // Redirect to dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error);
+      // Still redirect to dashboard even if API fails
+      navigate('/dashboard');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
@@ -101,6 +120,64 @@ export function OnboardingDeployPage() {
             <div key={step} className={`h-2 flex-1 rounded ${i <= 4 ? 'bg-primary' : 'bg-muted'}`} />
           ))}
         </div>
+
+        {/* 🎯 YOUR CHAT LINK - PROMINENT DISPLAY */}
+        {standaloneLink && (
+          <Card className="glass bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20">
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Check className="h-6 w-6 text-green-500" />
+                🎉 Your AI Clone is Ready!
+              </CardTitle>
+              <CardDescription className="text-base">
+                Share this link with your audience - they can now chat with your AI instantly
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Chat Link - Large & Copyable */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-green-700 dark:text-green-400">
+                  Your Chat Link
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={standaloneLink}
+                    readOnly
+                    className="font-mono text-lg bg-white dark:bg-gray-900 border-2 border-green-500/30"
+                  />
+                  <Button
+                    onClick={() => copyToClipboard(standaloneLink, 'main-link')}
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {copied === 'main-link' ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => window.open(standaloneLink, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Test Chat
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  👆 This is your unique link - share it on social media, in your bio, or anywhere you want people to chat with your AI!
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Option A: Website Embed */}
@@ -317,8 +394,19 @@ export function OnboardingDeployPage() {
                 Track your earnings
               </div>
             </div>
-            <Button className="w-full" onClick={() => (window.location.href = '/dashboard')}>
-              Go to Dashboard
+            <Button
+              className="w-full bg-gradient-to-r from-primary to-primary/80"
+              onClick={handleCompleteOnboarding}
+              disabled={completing}
+            >
+              {completing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                'Complete Setup & Go to Dashboard'
+              )}
             </Button>
           </CardContent>
         </Card>

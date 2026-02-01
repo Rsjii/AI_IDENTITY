@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
+import { usePreventBack } from '@/hooks/useOnboardingGuard';
 
 function useQuery() {
   const { search } = useLocation();
@@ -26,6 +27,9 @@ export function SignupVerifyPage() {
   const [error, setError] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+
+  // ✅ Prevent back navigation during signup flow
+  usePreventBack();
 
   useEffect(() => {
     if (cooldown <= 0) return;

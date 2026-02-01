@@ -454,8 +454,11 @@ export async function completeOnboarding(req: Request, res: Response) {
 
   await userQueries.updateOnboardingStep(userId, 'done');
 
-  // ✅ FIX: Also set profileCompleted = true when onboarding is done
-  await db.query('UPDATE "User" SET "profileCompleted" = true WHERE id = $1', [userId]);
+  // ✅ Set both onboardingCompleted AND profileCompleted when onboarding is done
+  await db.query(
+    'UPDATE "User" SET "onboardingCompleted" = true, "profileCompleted" = true WHERE id = $1',
+    [userId]
+  );
 
   return res.json({ success: true, message: 'Onboarding marked as complete' });
 }

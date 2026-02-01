@@ -1,11 +1,30 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
+import { useRedirectBack } from '@/hooks/useOnboardingGuard';
 
 export function KnowledgeBasePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState<any[]>([]);
+
+  // ✅ Clear history stack - replace current entry to prevent going back to onboarding
+  useEffect(() => {
+    // Replace current history entry so back button goes to dashboard
+    if (location.key !== 'default') {
+      window.history.replaceState(
+        { from: 'knowledge' },
+        '',
+        window.location.pathname
+      );
+    }
+  }, [location.key]);
+
+  // ✅ Redirect back button to dashboard instead of allowing navigation to onboarding
+  useRedirectBack('/dashboard');
 
   const refresh = async () => {
     const r = await apiFetch<{ items: any[] }>('/api/content/list');
