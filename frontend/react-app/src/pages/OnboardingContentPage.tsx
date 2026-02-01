@@ -78,10 +78,11 @@ export function OnboardingContentPage() {
   const totalWords = uploadedWords + stagedWords;
   const totalSize = uploadedSize + stagedSize;
 
-  // ✅ FIXED: Realistic training time based on file size (not word count)
-  // Formula: ~5 minutes per MB, minimum 5 minutes
+  // ✅ IMPROVED: More realistic training time estimation
+  // Formula: Base 2 minutes + ~2 minutes per MB (accounts for processing overhead)
+  // This gives: 1MB≈4min, 5MB≈12min, 10MB≈22min, 25MB≈52min
   const totalSizeMB = totalSize / (1024 * 1024);
-  const estimatedMinutes = Math.max(5, Math.ceil(totalSizeMB * 5));
+  const estimatedMinutes = Math.max(2, Math.ceil(2 + totalSizeMB * 2));
   const estimatedHours = estimatedMinutes >= 60 ? (estimatedMinutes / 60).toFixed(1) : null;
 
   const minimumItemsRequired = 3;
@@ -139,9 +140,25 @@ export function OnboardingContentPage() {
       return;
     }
 
-    // Estimate word count: 1 word ≈ 5-6 characters (with spaces)
-    // More conservative: assume 6 bytes per word
-    const estimatedWords = Math.ceil(file.size / 6);
+    // ✅ IMPROVED: More accurate word count estimation based on file type
+    let estimatedWords: number;
+
+    if (fileExt === '.txt' || fileExt === '.md') {
+      // Plain text: ~5 bytes per word (including spaces)
+      estimatedWords = Math.ceil(file.size / 5);
+    } else if (fileExt === '.pdf') {
+      // PDF has significant metadata overhead: ~15-20 bytes per word
+      estimatedWords = Math.ceil(file.size / 18);
+    } else if (fileExt === '.docx' || fileExt === '.doc') {
+      // Word docs are compressed XML: ~10-12 bytes per word
+      estimatedWords = Math.ceil(file.size / 11);
+    } else if (fileExt === '.xlsx' || fileExt === '.csv') {
+      // Spreadsheets have structured data: ~8-10 bytes per word
+      estimatedWords = Math.ceil(file.size / 9);
+    } else {
+      // Default fallback: conservative estimate
+      estimatedWords = Math.ceil(file.size / 10);
+    }
 
     const stagedFile: StagedFile = {
       file,

@@ -1,5 +1,4 @@
 import { Component, type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -24,18 +23,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('ErrorBoundary caught:', error, errorInfo);
-    
+
     // Auto-report frontend errors to backend
     this.reportError(error, errorInfo).catch(() => {
       // Silently fail if reporting fails
     });
+
+    // ✅ FIX: Use window.location instead of Navigate to avoid Router context issues
+    // Redirect to appropriate error page based on status
+    if (this.state.status === 403) {
+      window.location.href = '/403';
+      return;
+    }
+    if (this.state.status === 404) {
+      window.location.href = '/404';
+      return;
+    }
+    // Default to 404 for unknown errors
+    window.location.href = '/404';
   }
 
   private async reportError(error: Error, errorInfo: any) {
     try {
       // Get userId from localStorage or session if available
       const userId = localStorage.getItem('userId') || undefined;
-      
+
       await apiFetch('/api/admin/errors/log', {
         method: 'POST',
         body: JSON.stringify({
@@ -60,15 +72,23 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Redirect to appropriate error page based on status
-      if (this.state.status === 403) {
-        return <Navigate to="/403" replace />;
-      }
-      if (this.state.status === 404) {
-        return <Navigate to="/404" replace />;
-      }
-      // Default to 404 for unknown errors
-      return <Navigate to="/404" replace />;
+      // Show fallback UI instead of redirecting during render
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+          <div className="text-center space-y-4 p-8">
+            <h1 className="text-4xl font-bold text-text-primary">Oops!</h1>
+            <p className="text-text-secondary">Something went wrong. We're redirecting you...</p>
+            <div className="mt-4">
+              <button
+                onClick={() => window.location.href = '/dashboard'}
+                className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:opacity-90"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      );
     }
 
     return this.props.children;

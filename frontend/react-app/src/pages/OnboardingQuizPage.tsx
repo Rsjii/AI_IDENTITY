@@ -277,7 +277,7 @@ export function OnboardingQuizPage() {
       {/* Full-screen modal */}
       <div className="w-full h-full flex flex-col relative z-10">
         {/* Header with Progress Bar */}
-        <div className="w-full px-6 pt-6 pb-4">
+        <div className="w-full px-6 pt-6 pb-8">
           <div className="max-w-4xl mx-auto">
             {/* Step indicators */}
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -296,7 +296,7 @@ export function OnboardingQuizPage() {
             </div>
 
             {/* Progress text */}
-            <div className="flex justify-between text-sm text-text-secondary">
+            <div className="flex justify-between text-sm text-text-secondary mt-4">
               <span className="flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent-primary/10 text-accent-primary text-xs font-medium">
                   {currentStep + 1}
@@ -312,7 +312,7 @@ export function OnboardingQuizPage() {
             </div>
 
             {/* Progress bar */}
-            <div className="h-1.5 w-full bg-bg-tertiary rounded-full overflow-hidden mt-2">
+            <div className="h-1.5 w-full bg-bg-tertiary rounded-full overflow-hidden mt-3">
               <div
                 className="h-full bg-gradient-to-r from-accent-primary to-purple-500 transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
@@ -322,7 +322,7 @@ export function OnboardingQuizPage() {
         </div>
 
         {/* Question Content - Center */}
-        <div className="flex-1 flex items-center justify-center px-6 py-8 overflow-hidden">
+        <div className="flex-1 flex items-center justify-center px-6 py-12 overflow-hidden">
           <div className="max-w-4xl w-full">
             <div
               ref={questionRef}
@@ -420,7 +420,7 @@ export function OnboardingQuizPage() {
       case 0:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               What's your primary expertise?
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
@@ -464,7 +464,7 @@ export function OnboardingQuizPage() {
       case 1:
         return (
           <div className="space-y-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               How would you describe your communication style?
             </h2>
             <div className="space-y-6">
@@ -516,7 +516,7 @@ export function OnboardingQuizPage() {
       case 2:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Who is your target audience?
             </h2>
             <p className="text-text-secondary text-center">Select 1-3 options</p>
@@ -556,7 +556,7 @@ export function OnboardingQuizPage() {
       case 3:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               What topics do you primarily talk about?
             </h2>
             <textarea
@@ -576,7 +576,7 @@ export function OnboardingQuizPage() {
       case 4:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Are there any topics you want to avoid?
             </h2>
             <p className="text-text-secondary text-center">(Optional)</p>
@@ -596,7 +596,7 @@ export function OnboardingQuizPage() {
       case 5:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               What languages do you communicate in?
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-8">
@@ -626,7 +626,7 @@ export function OnboardingQuizPage() {
       case 6:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Give 3 examples of questions your audience asks you
             </h2>
             {[0, 1, 2].map((idx) => (
@@ -654,7 +654,7 @@ export function OnboardingQuizPage() {
       case 7:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Your ideal response length?
             </h2>
             <div className="flex flex-col md:flex-row gap-4 mt-8">
@@ -687,7 +687,7 @@ export function OnboardingQuizPage() {
       case 8:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Should your AI use emojis?
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
@@ -721,7 +721,7 @@ export function OnboardingQuizPage() {
       case 9:
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center" style={{ fontSize: '24px' }}>
+            <h2 className="text-2xl md:text-3xl font-bold text-text-primary text-center mb-2" style={{ fontSize: '24px' }}>
               Your AI's personality in 3 words
             </h2>
             <div className="flex gap-3 mt-8">
