@@ -31,6 +31,12 @@ export function AuthPage() {
   const { state, refresh } = useAuth();
   const q = useQuery();
 
+  const nextParam = q.get('next') || '';
+  const safeNext = useMemo(() => {
+    // only allow internal paths
+    return nextParam.startsWith('/') ? nextParam : '';
+  }, [nextParam]);
+
   // ADD: if already logged in, never show auth page (handles Back button too)
   useEffect(() => {
     if (state.status !== 'authenticated') return;
@@ -108,6 +114,13 @@ export function AuthPage() {
 
       await refresh(); // ✅ IMPORTANT: update auth state using /api/auth/me
 
+      // ✅ If user came here from a protected page, go back there.
+      // ProtectedRoute will still block them if profile/onboarding incomplete.
+      if (safeNext) {
+        navigate(safeNext, { replace: true });
+        return;
+      }
+
       if (result.redirect) {
         const redirectPath = result.redirect.startsWith('/') ? result.redirect : '/' + result.redirect;
         navigate(redirectPath, { replace: true }); // ✅ avoid back button weirdness
@@ -135,6 +148,12 @@ export function AuthPage() {
           referralCode: signupReferralCode || undefined,
         }),
       });
+
+      // ✅ preserve next for signup too
+      if (safeNext) {
+        navigate(safeNext, { replace: true });
+        return;
+      }
 
       if (result.redirect) {
         const redirectPath = result.redirect.startsWith('/') ? result.redirect : '/' + result.redirect;

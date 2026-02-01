@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
@@ -9,6 +9,7 @@ import {
   DollarSign, Target, Sparkles
 } from 'lucide-react';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Question types based on spec
 interface QuizAnswers {
@@ -64,8 +65,12 @@ const LANGUAGE_OPTIONS = [
   { code: 'ru', name: 'Russian', flag: '🇷🇺' },
 ];
 
-function loadQuizState() {
-  const saved = localStorage.getItem('onboarding-quiz-answers');
+function quizStorageKey(userId: string) {
+  return `onboarding-quiz-answers:${userId}`;
+}
+
+function loadQuizState(key: string) {
+  const saved = localStorage.getItem(key);
   if (!saved) {
     return {
       lastStep: 0,
@@ -93,7 +98,15 @@ function loadQuizState() {
 
 export function OnboardingQuizPage() {
   const nav = useNavigate();
-  const saved = loadQuizState();
+  const { state } = useAuth();
+
+  const userId = useMemo(() => {
+    return state.status === 'authenticated' ? state.user.id : 'anon';
+  }, [state.status, state.user?.id]);
+
+  const key = useMemo(() => quizStorageKey(userId), [userId]);
+  const saved = useMemo(() => loadQuizState(key), [key]);
+
   const [currentStep, setCurrentStep] = useState(saved.lastStep);
   const [answers, setAnswers] = useState<Partial<QuizAnswers>>(saved.answers);
   const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
@@ -109,13 +122,16 @@ export function OnboardingQuizPage() {
   // ✅ Prevent back navigation to profile page
   usePreventBack();
 
-  // Auto-save to localStorage
+  // Auto-save to localStorage (user-scoped)
   useEffect(() => {
-    localStorage.setItem('onboarding-quiz-answers', JSON.stringify({
-      answers,
-      lastStep: currentStep,
-    }));
-  }, [answers, currentStep]);
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        answers,
+        lastStep: currentStep,
+      })
+    );
+  }, [answers, currentStep, key]);
 
   const updateAnswer = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => {
     setAnswers(prev => ({ ...prev, [key]: value }));
@@ -213,7 +229,7 @@ export function OnboardingQuizPage() {
         throw err;
       }
     }
-    localStorage.removeItem('onboarding-quiz-answers');
+    localStorage.removeItem(key);
     nav('/onboarding/content');
   };
 

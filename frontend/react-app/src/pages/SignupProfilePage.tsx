@@ -21,6 +21,8 @@ export function SignupProfilePage() {
   const { refresh } = useAuth();
 
   const email = q.get('email') || '';
+  const nextParam = q.get('next') || '';
+  const safeNext = nextParam.startsWith('/') ? nextParam : '';
 
   // ✅ Prevent back navigation - profile is mandatory
   usePreventBack();
@@ -87,7 +89,8 @@ export function SignupProfilePage() {
       );
       // ✅ Refresh auth state to update profileCompleted status
       await refresh();
-      navigate('/onboarding/quiz');
+      // ✅ Go back to what user originally tried to open
+      navigate(safeNext || '/onboarding/quiz', { replace: true });
     } catch (err: any) {
       // Check if error has field-specific validation errors
       if (err.fieldErrors) {

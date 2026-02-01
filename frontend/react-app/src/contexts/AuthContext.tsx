@@ -53,6 +53,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       // ✅ Clear CSRF token cache on logout (session destroyed on backend)
       clearCSRFToken();
+
+      // ✅ Clear user-scoped localStorage that can leak across accounts
+      try {
+        // legacy keys
+        localStorage.removeItem('lastActivity');
+        localStorage.removeItem('onboarding-quiz-answers');
+
+        // best-effort: wipe autosave keys (legacy + future)
+        const keysToDelete: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i) || '';
+          if (k.startsWith('autosave_') || k.startsWith('autosave:')) keysToDelete.push(k);
+        }
+        keysToDelete.forEach((k) => localStorage.removeItem(k));
+      } catch {}
+
       setState({ status: 'unauthenticated', user: null });
     }
   };
@@ -82,6 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!import.meta.env.PROD) return;
     if (state.status !== 'authenticated') return;
 
+    const userId = state.user.id;
+    const LAST_ACTIVITY_KEY = `lastActivity:${userId}`;
+
     // Check session expiry (7 days default, 30 days if rememberMe)
     const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // Default 7 days
     const WARNING_TIME = 5 * 60 * 1000; // Warn 5 minutes before expiry
@@ -89,10 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let countdownInterval: NodeJS.Timeout | null = null;
 
     const checkSession = () => {
-      // Track last activity
-      const lastActivity = localStorage.getItem('lastActivity');
+      // Track last activity (user-scoped)
+      const lastActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
       if (!lastActivity) {
-        localStorage.setItem('lastActivity', Date.now().toString());
+        localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
         return;
       }
 
@@ -102,11 +121,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (timeUntilExpiry < WARNING_TIME && timeUntilExpiry > 0 && !modalElement) {
         // Auto-save user work before session expires
         try {
-          // Save any form data in localStorage
+          // Save any form data in localStorage (user-scoped)
           const formData = document.querySelectorAll('input, textarea, select');
           formData.forEach((el: any) => {
             if (el.value && el.id) {
-              localStorage.setItem(`autosave_${el.id}`, el.value);
+              localStorage.setItem(`autosave:${userId}:${el.id}`, el.value);
             }
           });
         } catch {
@@ -158,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Extend session button
         modalElement.querySelector('#extend-btn')?.addEventListener('click', () => {
-          localStorage.setItem('lastActivity', Date.now().toString());
+          localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
           if (countdownInterval) clearInterval(countdownInterval);
           if (modalElement) modalElement.remove();
           modalElement = null;
@@ -181,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Update last activity on user interaction
     const updateActivity = () => {
-      localStorage.setItem('lastActivity', Date.now().toString());
+      localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
     };
 
     // Listen for user activity
@@ -197,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('keydown', updateActivity);
       window.removeEventListener('scroll', updateActivity);
     };
-  }, [state.status, refresh]);
+  }, [state.status, state.user?.id, refresh]);
 
   const value = useMemo(() => ({ state, refresh, logout }), [state]);
 

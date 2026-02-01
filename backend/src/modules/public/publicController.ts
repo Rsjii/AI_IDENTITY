@@ -28,9 +28,8 @@ const chatSchema = z.object({
   voiceEnabled: z.boolean().optional(),
 });
 
-const historySchema = z.object({
+const historyAuthSchema = z.object({
   sessionId: z.string().min(1),
-  visitorId: z.string().min(1),
 });
 
 export async function getCreator(req: Request, res: Response) {
@@ -127,8 +126,11 @@ async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
   return r.rows[0]?.c || 0;
 }
 
-export async function publicChat(req: Request, res: Response) {
+export async function publicChat(req: any, res: Response) {
   const { slug, message, visitorId, sessionId, voiceEnabled } = chatSchema.parse(req.body);
+
+  const viewerUserId = req.user?.id;
+  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized', errorCode: 'UNAUTHORIZED' });
 
   const u = await userQueries.findBySlugOrHandle(slug);
   if (!u) return res.status(404).json({ error: 'Creator not found' });
@@ -181,8 +183,8 @@ export async function publicChat(req: Request, res: Response) {
   if (!sid) {
     const s = await chatSessionQueries.create({
       creatorId: u.id,
-      visitorId: visitorId || null,
-      userId: null,
+      visitorId: visitorId || null, // optional
+      userId: viewerUserId,          // ✅ now tracked
       platform: 'web',
     });
     sid = s.id;
@@ -389,17 +391,21 @@ export async function publicChat(req: Request, res: Response) {
   });
 }
 
-export async function publicHistory(req: Request, res: Response) {
-  const { sessionId, visitorId } = historySchema.parse({
+export async function publicHistory(req: any, res: Response) {
+  const { sessionId } = historyAuthSchema.parse({
     sessionId: req.query.sessionId,
-    visitorId: req.query.visitorId,
   });
+
+  const viewerUserId = req.user?.id;
+  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized', errorCode: 'UNAUTHORIZED' });
 
   const session = await chatSessionQueries.findById(sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  if (!session.visitorId || session.visitorId !== visitorId) {
+
+  // ✅ auth-based access control (no more anonymous visitor-only history)
+  if (session.userId && session.userId !== viewerUserId) {
     return res.status(403).json({ error: 'Session access denied' });
   }
 

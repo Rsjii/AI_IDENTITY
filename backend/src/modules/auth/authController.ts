@@ -15,6 +15,8 @@ import { identifyPostHogUser } from '../../services/posthogService';
 import { tokenizeId } from '../../utils/idTokenization';
 import { createOrUpdateAuthSession } from '../../services/authSessionService';
 import { generateRandomHandle } from '../../utils/idGenerator';
+import { verifyJWT } from '../../services/jwtService';
+import { revokeAuthSession } from '../../services/authSessionService';
 
 const cookieSameSite = isProd ? 'none' : 'lax';
 
@@ -1564,10 +1566,26 @@ export const me = async (req: Request, res: Response) => {
   });
 };
 
-export const logout = (req: Request, res: Response, next: NextFunction) => {
+export const logout = async (req: any, res: Response, next: NextFunction) => {
   try {
-    // Get userId before clearing session
-    const userId = req.session?.userId || null;
+    const token = req.cookies?.['jwtToken'];
+    let decoded: any = null;
+
+    if (token) {
+      try {
+        decoded = verifyJWT(token);
+      } catch {
+        decoded = null;
+      }
+    }
+
+    const userId = decoded?.userId || req.session?.userId || null;
+    const sessionId = decoded?.sessionId || null;
+
+    // ✅ Revoke current auth_session (so "active sessions" stays correct)
+    if (userId && sessionId) {
+      revokeAuthSession(sessionId, userId).catch(() => {});
+    }
 
     // Log logout event (if userId available)
     if (userId) {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { ThumbsUp, ThumbsDown, Send, Loader2, X } from 'lucide-react';
 import { PaymentPrompt } from '@/components/PaymentPrompt';
 import { FLAGS } from '@/lib/flags';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Msg = { 
   role: 'user' | 'assistant'; 
@@ -70,6 +71,9 @@ function shouldShowTimestamp(current: Date, previous?: Date): boolean {
 
 export function PublicChatPage() {
   const { slug = '' } = useParams();
+  const nav = useNavigate();
+  const { state } = useAuth();
+  const isAuthed = state.status === 'authenticated';
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
   const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
   const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
@@ -127,7 +131,9 @@ export function PublicChatPage() {
 
     if (!savedSessionId) return;
 
-    fetch(`/api/public/history?sessionId=${encodeURIComponent(savedSessionId)}&visitorId=${encodeURIComponent(visitorId)}`)
+    fetch(`/api/public/history?sessionId=${encodeURIComponent(savedSessionId)}&visitorId=${encodeURIComponent(visitorId)}`, {
+      credentials: 'include', // ✅ required now
+    })
       .then((r) => r.json())
       .then((d) => {
         if (!d?.success) return;
@@ -151,6 +157,11 @@ export function PublicChatPage() {
   }, [msgs, typing]);
 
   const send = async () => {
+    if (!isAuthed) {
+      nav(`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`, { replace: true });
+      return;
+    }
+
     const m = text.trim();
     if (!m) return;
     setText('');
@@ -167,6 +178,7 @@ export function PublicChatPage() {
       const r = await fetch('/api/public/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // ✅ required now
         body: JSON.stringify({ slug, message: m, visitorId, sessionId: sessionId || undefined, voiceEnabled }),
       });
       const d = await r.json();
@@ -358,6 +370,20 @@ export function PublicChatPage() {
           </div>
         </div>
       </div>
+
+      {!isAuthed && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3 text-sm">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+            <div className="text-yellow-900">Login required to chat.</div>
+            <Link
+              className="px-3 py-2 rounded bg-black text-white"
+              to={`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`}
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Chat Area */}
       <div 
@@ -584,14 +610,15 @@ export function PublicChatPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
+              placeholder={isAuthed ? 'Type your message...' : 'Login to start chatting...'}
               rows={1}
-              className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
+              disabled={!isAuthed || typing}
+              className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
             <button
               onClick={send}
-              disabled={!text.trim() || typing}
+              disabled={!isAuthed || !text.trim() || typing}
               className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center gap-2 font-medium min-h-[44px] min-w-[44px]"
             >
               {typing ? (
