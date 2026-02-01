@@ -11,10 +11,10 @@ export function OnboardingTrainingPage() {
   const nav = useNavigate();
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Processing documents...');
-  const [documentsProcessed, setDocumentsProcessed] = useState(0);
-  const [totalDocuments, setTotalDocuments] = useState(5);
+  const documentsProcessed = 0;
+  const totalDocuments = 5;
   const [emailNotification, setEmailNotification] = useState(true);
-  const [estimatedTime, setEstimatedTime] = useState(18); // hours
+  const estimatedTime = 18; // hours
 
   // ✅ Prevent back navigation to profile page
   useEffect(() => {
@@ -138,7 +138,7 @@ export function OnboardingTrainingPage() {
               <Checkbox
                 id="email-notification"
                 checked={emailNotification}
-                onCheckedChange={(checked) => setEmailNotification(checked as boolean)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmailNotification(e.target.checked)}
               />
               <Label htmlFor="email-notification" className="cursor-pointer">
                 Send me an email when training is complete
