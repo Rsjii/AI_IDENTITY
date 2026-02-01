@@ -29,45 +29,60 @@ export interface FeatureFlags {
 }
 
 /**
+ * Helper function to read env flags with explicit true/false support
+ * - Returns true if env var is explicitly 'true'
+ * - Returns false if env var is explicitly 'false'
+ * - Returns defaultValue if env var is undefined or empty
+ */
+function envFlag(name: string, defaultValue: boolean): boolean {
+  const v = process.env[name];
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return defaultValue;
+}
+
+/**
  * Get feature flags based on environment variables
  */
 export function getFeatureFlags(): FeatureFlags {
   return {
     // Core validation mode - when true, everything is approve-only
-    VALIDATION_MODE: process.env.VALIDATION_MODE === 'true' || isDev,
+    VALIDATION_MODE: envFlag('VALIDATION_MODE', isDev),
     
     // AI functionality
-    ENABLE_AI_GENERATION: process.env.ENABLE_AI_GENERATION !== 'false',
+    ENABLE_AI_GENERATION: envFlag('ENABLE_AI_GENERATION', true),
     
     // Public features
-    ENABLE_PUBLIC_PROFILES: process.env.ENABLE_PUBLIC_PROFILES !== 'false',
-    ENABLE_INVITES: process.env.ENABLE_INVITES !== 'false',
+    ENABLE_PUBLIC_PROFILES: envFlag('ENABLE_PUBLIC_PROFILES', true),
+    ENABLE_INVITES: envFlag('ENABLE_INVITES', true),
     
     // Analytics and tracking
-    ENABLE_ANALYTICS: process.env.ENABLE_ANALYTICS !== 'false',
+    ENABLE_ANALYTICS: envFlag('ENABLE_ANALYTICS', true),
     
     // Security features
-    ENABLE_RATE_LIMITING: process.env.ENABLE_RATE_LIMITING !== 'false',
-    ENABLE_CONTENT_FILTERING: process.env.ENABLE_CONTENT_FILTERING !== 'false',
+    ENABLE_RATE_LIMITING: envFlag('ENABLE_RATE_LIMITING', true),
+    ENABLE_CONTENT_FILTERING: envFlag('ENABLE_CONTENT_FILTERING', true),
     
     // Notifications
-    ENABLE_EMAIL_NOTIFICATIONS: process.env.ENABLE_EMAIL_NOTIFICATIONS !== 'false',
+    ENABLE_EMAIL_NOTIFICATIONS: envFlag('ENABLE_EMAIL_NOTIFICATIONS', true),
     
-    // Payments (disabled by default, enable with ENABLE_PAYMENTS=true)
-    ENABLE_PAYMENTS: process.env.ENABLE_PAYMENTS === 'true' || isDev,
+    // Payments (Phase 1: subscription only, disabled by default)
+    ENABLE_PAYMENTS: envFlag('ENABLE_PAYMENTS', false),
 
-    // Phase 2/3 feature modules (default ON in dev, opt-in in prod via env=true)
-    ENABLE_WIDGET: process.env.ENABLE_WIDGET === 'true' || isDev,
-    ENABLE_PAY_PER_CHAT: process.env.ENABLE_PAY_PER_CHAT === 'true' || isDev,
-    ENABLE_MARKETPLACE: process.env.ENABLE_MARKETPLACE === 'true' || isDev,
-    ENABLE_VOICE: process.env.ENABLE_VOICE === 'true' || isDev,
-    ENABLE_VIDEO: process.env.ENABLE_VIDEO === 'true' || isDev,
-    ENABLE_PHONE: process.env.ENABLE_PHONE === 'true' || isDev,
-    ENABLE_WHATSAPP: process.env.ENABLE_WHATSAPP === 'true' || isDev,
-    ENABLE_INSTAGRAM: process.env.ENABLE_INSTAGRAM === 'true' || isDev,
+    // Phase 1 features (ON by default for Phase 1)
+    ENABLE_WIDGET: envFlag('ENABLE_WIDGET', true),
+
+    // Phase 2/3 feature modules (OFF by default, opt-in via env=true)
+    ENABLE_PAY_PER_CHAT: envFlag('ENABLE_PAY_PER_CHAT', false),
+    ENABLE_MARKETPLACE: envFlag('ENABLE_MARKETPLACE', false),
+    ENABLE_VOICE: envFlag('ENABLE_VOICE', false),
+    ENABLE_VIDEO: envFlag('ENABLE_VIDEO', false),
+    ENABLE_PHONE: envFlag('ENABLE_PHONE', false),
+    ENABLE_WHATSAPP: envFlag('ENABLE_WHATSAPP', false),
+    ENABLE_INSTAGRAM: envFlag('ENABLE_INSTAGRAM', false),
     
     // Debug mode
-    DEBUG_MODE: isDev || process.env.DEBUG_MODE === 'true',
+    DEBUG_MODE: envFlag('DEBUG_MODE', isDev),
   };
 }
 

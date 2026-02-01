@@ -6,6 +6,7 @@ import { logger } from '../../config/logger';
 import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES } from '../../config/constants';
 import { generateVoiceAudio } from '../voice/voiceService';
+import { isFeatureEnabled } from '../../config/featureFlags';
 
 const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
 
@@ -197,9 +198,13 @@ export async function publicChat(req: Request, res: Response) {
   // ✅ Check for active premium session (24-hour window)
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
 
-  // Check payment requirement - only if creator has enabled pay-per-chat
+  // ✅ Feature flag check: pay-per-chat only if globally enabled
+  const payPerChatAllowed = isFeatureEnabled('ENABLE_PAY_PER_CHAT') && isFeatureEnabled('ENABLE_PAYMENTS');
+  const voiceAllowed = isFeatureEnabled('ENABLE_VOICE');
+
+  // Check payment requirement - only if creator has enabled pay-per-chat AND feature flag is ON
   const enablePayments = (u.priceConfig as any)?.enablePayments === true;
-  if (enablePayments && !hasPremiumSession) {
+  if (payPerChatAllowed && enablePayments && !hasPremiumSession) {
     // ✅ Use intelligent pricing detection
     const { shouldRequirePayment: intelligentPricing } = await import('../identity/intelligentPricing');
     
@@ -242,7 +247,7 @@ export async function publicChat(req: Request, res: Response) {
           visitorId,
         });
         let audioUrl: string | null = null;
-        if (voiceEnabled && result.reply) {
+        if (voiceAllowed && voiceEnabled && result.reply) {
           try {
             const voices = await voiceCloneQueries.findByUserId(u.id);
             const defaultVoice = voices.find((v: any) => v.status === 'ready');
@@ -357,7 +362,7 @@ export async function publicChat(req: Request, res: Response) {
     visitorId,
   });
   let audioUrl: string | null = null;
-  if (voiceEnabled && result.reply) {
+  if (voiceAllowed && voiceEnabled && result.reply) {
     try {
       const voices = await voiceCloneQueries.findByUserId(u.id);
       const defaultVoice = voices.find((v: any) => v.status === 'ready');

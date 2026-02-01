@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { ThumbsUp, ThumbsDown, Send, Loader2, X } from 'lucide-react';
 import { PaymentPrompt } from '@/components/PaymentPrompt';
+import { FLAGS } from '@/lib/flags';
 
 type Msg = { 
   role: 'user' | 'assistant'; 
@@ -177,8 +178,8 @@ export function PublicChatPage() {
         setCookie(sessionKey, newSessionId, THIRTY_DAYS_SECONDS);
       }
       
-      // Check if payment is required
-      if (d.requiresPayment) {
+      // Check if payment is required (only if pay-per-chat is enabled)
+      if (FLAGS.payPerChat && d.requiresPayment) {
         setTyping(false);
         // Show preview message
         const previewMsg: Msg = {
@@ -539,8 +540,8 @@ export function PublicChatPage() {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {showPaymentModal && paymentData && (
+      {/* Payment Modal - Only show if pay-per-chat is enabled */}
+      {FLAGS.payPerChat && showPaymentModal && paymentData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
           <div className="bg-bg-secondary w-full md:max-w-md md:rounded-lg rounded-t-2xl md:rounded-lg relative max-h-[92vh] md:max-h-[80vh] overflow-y-auto">
             <button
@@ -566,16 +567,18 @@ export function PublicChatPage() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
       >
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-end mb-2">
-            <label className="flex items-center gap-2 text-xs text-text-secondary">
-              <input
-                type="checkbox"
-                checked={voiceEnabled}
-                onChange={(e) => setVoiceEnabled(e.target.checked)}
-              />
-              Voice responses
-            </label>
-          </div>
+          {FLAGS.voice && (
+            <div className="flex items-center justify-end mb-2">
+              <label className="flex items-center gap-2 text-xs text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => setVoiceEnabled(e.target.checked)}
+                />
+                Voice responses
+              </label>
+            </div>
+          )}
           <div className="flex gap-2">
             <textarea
               value={text}

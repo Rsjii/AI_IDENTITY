@@ -14,6 +14,7 @@ import {
 import { generateVoiceAudio } from '../voice/voiceService';
 import { logger } from '../../config/logger';
 import { config } from '../../config/env';
+import { isFeatureEnabled } from '../../config/featureFlags';
 
 const chatSchema = z.object({
   creatorId: z.string().min(1), // tokenized preferred
@@ -113,10 +114,14 @@ export async function widgetChat(req: Request, res: Response) {
   const sessionMessages = await chatMessageQueries.countBySession(session.id);
   await chatMessageQueries.add({ sessionId: session.id, role: 'user', content: message });
 
+  // ✅ Feature flag check: pay-per-chat only if globally enabled
+  const payPerChatAllowed = isFeatureEnabled('ENABLE_PAY_PER_CHAT') && isFeatureEnabled('ENABLE_PAYMENTS');
+  const voiceAllowed = isFeatureEnabled('ENABLE_VOICE');
+
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(session.id);
   const enablePayments = (creator.priceConfig as any)?.enablePayments === true;
 
-  if (enablePayments && !hasPremiumSession) {
+  if (payPerChatAllowed && enablePayments && !hasPremiumSession) {
     const recentMessages = await chatMessageQueries.listForSession(session.id);
     const conversationContext = recentMessages
       .filter((m: any) => m.role === 'user')
@@ -166,8 +171,8 @@ export async function widgetChat(req: Request, res: Response) {
 
   let audioUrl: string | null = null;
 
-  // Generate voice if enabled and reply exists
-  if (voiceEnabled && result.reply) {
+  // Generate voice if enabled and reply exists (only if voice feature flag is ON)
+  if (voiceAllowed && voiceEnabled && result.reply) {
     try {
       // Get user's default voice
       const voices = await voiceCloneQueries.findByUserId(creatorUserId);

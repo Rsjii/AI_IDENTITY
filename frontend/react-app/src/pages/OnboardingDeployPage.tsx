@@ -9,6 +9,7 @@ import { Copy, Check, ExternalLink, QrCode, Code, MessageCircle, Instagram, Load
 import QRCode from 'qrcode';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 import { apiFetch } from '@/lib/api';
+import { FLAGS } from '@/lib/flags';
 
 export function OnboardingDeployPage() {
   const navigate = useNavigate();
@@ -331,43 +332,47 @@ export function OnboardingDeployPage() {
             </CardContent>
           </Card>
 
-          {/* Option C: WhatsApp */}
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                WhatsApp Business
-              </CardTitle>
-              <CardDescription>Auto-respond to WhatsApp messages</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Connect your WhatsApp Business account to let your AI respond to messages automatically.
-              </p>
-              <Button className="w-full" onClick={() => (window.location.href = '/integrations#whatsapp')}>
-                Setup WhatsApp
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Option C: WhatsApp - Only show if enabled */}
+          {FLAGS.whatsapp && (
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  WhatsApp Business
+                </CardTitle>
+                <CardDescription>Auto-respond to WhatsApp messages</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Connect your WhatsApp Business account to let your AI respond to messages automatically.
+                </p>
+                <Button className="w-full" onClick={() => (window.location.href = '/integrations#whatsapp')}>
+                  Setup WhatsApp
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Option D: Instagram */}
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Instagram className="h-5 w-5" />
-                Instagram DMs
-              </CardTitle>
-              <CardDescription>Auto-respond to Instagram DMs</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Connect your Instagram Business account to let your AI respond to DMs automatically.
-              </p>
-              <Button className="w-full" onClick={() => (window.location.href = '/integrations#instagram')}>
-                Setup Instagram
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Option D: Instagram - Only show if enabled */}
+          {FLAGS.instagram && (
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Instagram className="h-5 w-5" />
+                  Instagram DMs
+                </CardTitle>
+                <CardDescription>Auto-respond to Instagram DMs</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Connect your Instagram Business account to let your AI respond to DMs automatically.
+                </p>
+                <Button className="w-full" onClick={() => (window.location.href = '/integrations#instagram')}>
+                  Setup Instagram
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Next Steps */}

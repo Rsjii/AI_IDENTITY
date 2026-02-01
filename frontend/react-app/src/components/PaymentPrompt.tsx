@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
 import { Loader2, CheckCircle2, Sparkles } from 'lucide-react';
@@ -42,6 +43,7 @@ const CheckoutForm: React.FC<{
   });
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
+  const [payerEmail, setPayerEmail] = useState<string>('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ const CheckoutForm: React.FC<{
               tierLabel: selectedTier?.label || `$${(selectedAmount / 100).toFixed(2)}`,
               visitorId,
               sessionId,
+              payerEmail: payerEmail || undefined,
             }),
           }
         );
@@ -83,7 +86,7 @@ const CheckoutForm: React.FC<{
       }
     };
     fetchPaymentIntent();
-  }, [creatorId, selectedAmount, visitorId, sessionId, onClientSecretChange, paymentOptions.tiers]);
+  }, [creatorId, selectedAmount, visitorId, sessionId, payerEmail, onClientSecretChange, paymentOptions.tiers]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -175,6 +178,18 @@ const CheckoutForm: React.FC<{
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email-input" className="text-base font-semibold">Email (for receipt + full answer):</Label>
+        <Input
+          id="email-input"
+          type="email"
+          value={payerEmail}
+          onChange={(e) => setPayerEmail(e.target.value)}
+          placeholder="your@email.com"
+          className="h-12"
+          required
+        />
+      </div>
       <div className="space-y-2">
         <Label htmlFor="tier-select" className="text-base font-semibold">Choose your tier:</Label>
         <Select

@@ -45,6 +45,7 @@ import { PhoneSetupPage } from './pages/PhoneSetupPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { CreatorConversationsPage } from './pages/CreatorConversationsPage';
 import { CreatorConversationDetailPage } from './pages/CreatorConversationDetailPage';
+import { FLAGS } from './lib/flags';
 
 
 // Initialize CSRF token on app load
@@ -81,9 +82,15 @@ function App() {
               <Route path="/identity/setup" element={<IdentitySetupPage />} />
               <Route path="/identity/edit" element={<IdentityEditPage />} />
               <Route path="/mirror" element={<ProtectedRoute><MirrorPage /></ProtectedRoute>} />
-              <Route path="/voice/setup" element={<ProtectedRoute><VoiceSetupPage /></ProtectedRoute>} />
-              <Route path="/voice/manage" element={<ProtectedRoute><VoiceManagePage /></ProtectedRoute>} />
-              <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+              {FLAGS.voice && (
+                <>
+                  <Route path="/voice/setup" element={<ProtectedRoute><VoiceSetupPage /></ProtectedRoute>} />
+                  <Route path="/voice/manage" element={<ProtectedRoute><VoiceManagePage /></ProtectedRoute>} />
+                </>
+              )}
+              {FLAGS.integrationsPage && (
+                <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+              )}
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/users/:userId" element={<AdminUserPage />} />
               <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
@@ -106,12 +113,22 @@ function App() {
               <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
               <Route path="/chat/:slug" element={<PublicChatPage />} />
               <Route path="/@:handle" element={<CreatorPublicProfile />} />
-              <Route path="/marketplace" element={<MarketplacePage />} />
-              <Route path="/marketplace/:slug" element={<MarketplaceListingPage />} />
-              <Route path="/marketplace/manage" element={<ProtectedRoute><MarketplaceManagePage /></ProtectedRoute>} />
-              <Route path="/video/setup" element={<ProtectedRoute><VideoSetupPage /></ProtectedRoute>} />
-              <Route path="/video/manage" element={<ProtectedRoute><VideoManagePage /></ProtectedRoute>} />
-              <Route path="/phone/setup" element={<ProtectedRoute><PhoneSetupPage /></ProtectedRoute>} />
+              {FLAGS.marketplace && (
+                <>
+                  <Route path="/marketplace" element={<MarketplacePage />} />
+                  <Route path="/marketplace/:slug" element={<MarketplaceListingPage />} />
+                  <Route path="/marketplace/manage" element={<ProtectedRoute><MarketplaceManagePage /></ProtectedRoute>} />
+                </>
+              )}
+              {FLAGS.video && (
+                <>
+                  <Route path="/video/setup" element={<ProtectedRoute><VideoSetupPage /></ProtectedRoute>} />
+                  <Route path="/video/manage" element={<ProtectedRoute><VideoManagePage /></ProtectedRoute>} />
+                </>
+              )}
+              {FLAGS.phone && (
+                <Route path="/phone/setup" element={<ProtectedRoute><PhoneSetupPage /></ProtectedRoute>} />
+              )}
               <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
 
               <Route path="/conversations" element={<ProtectedRoute><CreatorConversationsPage /></ProtectedRoute>} />

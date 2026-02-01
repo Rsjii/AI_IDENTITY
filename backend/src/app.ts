@@ -73,9 +73,21 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
       imgSrc: ["'self'", "data:", "https:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      frameAncestors: ["'self'", "*"], // Allow embedding in iframes from any origin (for widget)
     },
   },
+  frameguard: {
+    action: 'deny', // Default deny, but we'll override for embed routes
+  },
 }));
+
+// Disable X-Frame-Options for embed routes (allow iframe embedding)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/embed') || req.path === '/embed.html') {
+    res.removeHeader('X-Frame-Options');
+  }
+  next();
+});
 
 app.use(compression());
 
@@ -490,12 +502,45 @@ const viewsPath = path.resolve(__dirname, '../../frontend/src/views');
 app.set('views', viewsPath);
 app.set('view cache', config.nodeEnv === 'production');
 
+// CORS middleware for static files (embed.js, embed.css, embed.html, etc.)
+app.use((req, res, next) => {
+  // Only for static embed files
+  if (req.path.startsWith('/embed') || 
+      req.path.endsWith('.js') || 
+      req.path.endsWith('.css') ||
+      req.path === '/embed.html' ||
+      req.path === '/embed-frame.js') {
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
+    // Remove X-Frame-Options to allow iframe embedding (CSP frame-ancestors handles this)
+    res.removeHeader('X-Frame-Options');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+  }
+  next();
+});
+
 // Static files
 const staticOptions = config.nodeEnv === 'production' 
   ? { maxAge: '1y', etag: true, lastModified: true }
   : { maxAge: 0, etag: false, lastModified: false };
 
 app.use(express.static(path.resolve(__dirname, '../../frontend/src/public'), staticOptions));
+
+// Serve test.html for widget testing (local + prod)
+app.get('/test-widget', (req, res) => {
+  const testHtmlPath = path.resolve(__dirname, '../../test.html');
+  if (fs.existsSync(testHtmlPath)) {
+    res.sendFile(testHtmlPath);
+  } else {
+    res.status(404).send('test.html not found');
+  }
+});
 
 // Uploads
 const uploadsPath = process.env.UPLOADS_DIR

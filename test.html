@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Selflyx Widget</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        h1 { color: #333; }
+        .info {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+    <!-- Inline embed.css content (temporary) -->
+    <style>
+        /* Add embed.css content here if needed */
+    </style>
+</head>
+<body>
+    <h1>🧪 Testing Selflyx Embed Widget</h1>
+    <div class="info">
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Make sure backend is running on port 3000</li>
+            <li>The widget should appear in the bottom-right corner</li>
+            <li>Click it to test the chat!</li>
+        </ol>
+    </div>
+    <h2>Your Website Content Here</h2>
+    <p>This is a sample website. The chat widget should appear below.</p>
+    
+    <!-- Inline embed.js script -->
+    <script>
+    (function () {
+      const API_BASE = 'http://localhost:3000';
+      const CREATOR_ID = 'v2.dXNlcjp1c2VyXzE3Njk5Mzg1MTMyMTlfbGZkdWZ3OHZj.F8ALId4tSp9Uee0gk95MIS0eS-W3JEem-nvurN3PUj4';
+      const CREATOR_SLUG = 'rsji';
+      const COLOR = '#2563eb';
+      const POSITION = 'bottom-right';
+      const TITLE = 'Selflyx';
+      const WELCOME_MESSAGE = 'Hey! Ask me anything!';
+
+      if (!API_BASE || !CREATOR_ID) {
+        console.error('[Selflyx Widget] Missing data-api-base or data-creator-id');
+        return;
+      }
+
+      const container = document.createElement('div');
+      container.id = 'selflyx-widget-container';
+      const posStyle = POSITION === 'bottom-left' ? 'left:20px;right:auto;' : 'right:20px;left:auto;';
+      container.style.cssText = `position:fixed;bottom:20px;${posStyle}z-index:999999;`;
+
+      const iframe = document.createElement('iframe');
+      iframe.title = 'Selflyx Widget';
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+      iframe.style.cssText = 'width:360px;height:520px;border:none;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.2);';
+
+      const srcParams = new URLSearchParams({
+        apiBase: API_BASE,
+        creatorId: CREATOR_ID,
+        color: COLOR,
+        title: TITLE,
+        avatarUrl: '',
+        voiceEnabled: 'false',
+        welcomeMessage: WELCOME_MESSAGE,
+        popularQuestions: '',
+        creatorSlug: CREATOR_SLUG,
+      });
+
+      iframe.src = `${API_BASE}/embed.html?${srcParams.toString()}`;
+      container.appendChild(iframe);
+      document.body.appendChild(container);
+    })();
+    </script>
+</body>
+</html>

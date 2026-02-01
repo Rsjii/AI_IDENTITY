@@ -4,6 +4,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { FLAGS } from '@/lib/flags';
 
 export function Navbar() {
   const nav = useNavigate();
@@ -40,12 +41,16 @@ export function Navbar() {
                   <Link to="/identity/edit" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Identity
                   </Link>
-                  <Link to="/voice/setup" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Voice
-                  </Link>
-                  <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Integrations
-                  </Link>
+                  {FLAGS.voice && (
+                    <Link to="/voice/setup" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      Voice
+                    </Link>
+                  )}
+                  {FLAGS.integrationsPage && (
+                    <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      Integrations
+                    </Link>
+                  )}
                   <Link to="/settings" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Settings
                   </Link>
@@ -105,8 +110,12 @@ export function Navbar() {
                 <div className="flex flex-col">
                   <MobileNavLink to="/mirror" onClick={() => nav('/mirror')}>Mirror</MobileNavLink>
                   <MobileNavLink to="/identity/edit" onClick={() => nav('/identity/edit')}>Identity</MobileNavLink>
-                  <MobileNavLink to="/voice/setup" onClick={() => nav('/voice/setup')}>Voice</MobileNavLink>
-                  <MobileNavLink to="/integrations" onClick={() => nav('/integrations')}>Integrations</MobileNavLink>
+                  {FLAGS.voice && (
+                    <MobileNavLink to="/voice/setup" onClick={() => nav('/voice/setup')}>Voice</MobileNavLink>
+                  )}
+                  {FLAGS.integrationsPage && (
+                    <MobileNavLink to="/integrations" onClick={() => nav('/integrations')}>Integrations</MobileNavLink>
+                  )}
                   <MobileNavLink to="/settings" onClick={() => nav('/settings')}>Settings</MobileNavLink>
                   {state.user?.isAdmin ? (
                     <MobileNavLink to="/admin" onClick={() => nav('/admin')}>Admin</MobileNavLink>

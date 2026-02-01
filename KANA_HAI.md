@@ -10,6 +10,7 @@
 #2. step 7 me text ke upaar aa raha meter
 #3. unauthenticted user agar koi bhi authenticated page ko access karne ka try kare, show him loign directly not that page, same for users jinhone onboarding / profile / upload incomplete hai, if they try to access any other authenitication requieed page, dont allo them , redirect to the current page where they left from ( profile / onboarding / upload / plan)
 #4. upload right side calculation
+#5. annoynmous banda chat kaise kar paa rah, matlab waha aur kuch link wagerah to hai hi nahi par login wagerah ye sab bhi to dikahana chahiye
 
 
 

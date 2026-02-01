@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { Copy, Eye, FileCode, MessageCircle } from 'lucide-react';
+import { FLAGS } from '@/lib/flags';
 
 export function IntegrationsPage() {
   const { state } = useAuth();
@@ -17,8 +19,9 @@ export function IntegrationsPage() {
   const [title, setTitle] = useState('Selflyx');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [snippet, setSnippet] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState('Hey! Ask me anything!');
+  const [popularQuestions, setPopularQuestions] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
   // Instagram state
   const [igStatus, setIgStatus] = useState<{ connected: boolean; username?: string }>({ connected: false });
@@ -62,6 +65,75 @@ export function IntegrationsPage() {
 
   const publicSlug = (user as any)?.publicSlug || user?.handle || '';
   const standaloneLink = publicSlug ? `${window.location.origin}/chat/${publicSlug}` : '';
+  const apiBase = window.location.origin;
+
+  // Generate embed code client-side
+  const embedCode = useMemo(() => {
+    if (!creatorId) return '';
+    
+    const questionsAttr = popularQuestions.trim()
+      ? `data-popular-questions="${popularQuestions.split(',').map(q => q.trim()).filter(Boolean).join(',')}"`
+      : '';
+    
+    return `<!-- Selflyx Chat Widget -->
+<script
+  src="${apiBase}/embed.js"
+  data-api-base="${apiBase}"
+  data-creator-id="${creatorId}"
+  data-creator-slug="${publicSlug}"
+  data-color="${color}"
+  data-position="${position}"
+  data-title="${title.replace(/"/g, '&quot;')}"
+  ${avatarUrl ? `data-avatar-url="${avatarUrl.replace(/"/g, '&quot;')}"` : ''}
+  ${voiceEnabled ? 'data-voice-enabled="true"' : ''}
+  data-welcome-message="${welcomeMessage.replace(/"/g, '&quot;')}"
+  ${questionsAttr}
+></script>
+<link rel="stylesheet" href="${apiBase}/embed.css" />`;
+  }, [creatorId, publicSlug, apiBase, color, position, title, avatarUrl, voiceEnabled, welcomeMessage, popularQuestions]);
+
+  const generateTestHtml = () => {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Selflyx Widget</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        h1 { color: #333; }
+        .info {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Testing Selflyx Embed Widget</h1>
+    <div class="info">
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Save this file as <code>test-widget.html</code></li>
+            <li>Open it in your browser</li>
+            <li>The widget should appear in the ${position} corner</li>
+            <li>Click it to test the chat!</li>
+        </ol>
+    </div>
+    <h2>Your Website Content Here</h2>
+    <p>This is a sample website. The chat widget should appear below.</p>
+    
+    ${embedCode}
+</body>
+</html>`;
+  };
 
   const savePricing = async () => {
     setPricingSaving(true);
@@ -87,60 +159,40 @@ export function IntegrationsPage() {
     }
   };
 
-  // Load widget code
+  // Load platform statuses (only if features are enabled)
   useEffect(() => {
-    if (!creatorId) return;
-    setLoading(true);
-    fetch(`/api/widget/code/${encodeURIComponent(creatorId)}`, { method: 'GET' })
-      .then((r) => r.text())
-      .then((code) => setSnippet(code))
-      .catch(() => setSnippet(''))
-      .finally(() => setLoading(false));
-  }, [creatorId]);
+    // Instagram status (only if enabled)
+    if (FLAGS.instagram) {
+      apiFetch('/api/instagram/status')
+        .then((data) => setIgStatus(data))
+        .catch(() => setIgStatus({ connected: false }));
+    }
 
-  // Load platform statuses
-  useEffect(() => {
-    // Instagram status
-    apiFetch('/api/instagram/status')
-      .then((data) => setIgStatus(data))
-      .catch(() => setIgStatus({ connected: false }));
+    // WhatsApp status (only if enabled)
+    if (FLAGS.whatsapp) {
+      apiFetch('/api/whatsapp/status')
+        .then((data) => {
+          setWaStatus(data);
+          if (data?.settings) {
+            setWaSettings((prev) => ({ ...prev, ...data.settings }));
+          }
+        })
+        .catch(() => setWaStatus({ connected: false }));
 
-    // WhatsApp status
-    apiFetch('/api/whatsapp/status')
-      .then((data) => {
-        setWaStatus(data);
-        if (data?.settings) {
-          setWaSettings((prev) => ({ ...prev, ...data.settings }));
-        }
-      })
-      .catch(() => setWaStatus({ connected: false }));
+      // WhatsApp stats
+      apiFetch('/api/whatsapp/stats')
+        .then((data) => setWaStats(data))
+        .catch(() => setWaStats(null));
+    }
 
-    // WhatsApp stats
-    apiFetch('/api/whatsapp/stats')
-      .then((data) => setWaStats(data))
-      .catch(() => setWaStats(null));
-
-    // Widget analytics
-    apiFetch('/api/widget/analytics')
-      .then((data) => setAnalytics(data))
-      .catch(() => setAnalytics(null));
+    // Widget analytics (only if widget enabled)
+    if (FLAGS.widget) {
+      apiFetch('/api/widget/analytics')
+        .then((data) => setAnalytics(data))
+        .catch(() => setAnalytics(null));
+    }
   }, []);
 
-  const customizedSnippet = useMemo(() => {
-    if (!snippet) return '';
-    const attrs = [
-      `data-color="${color}"`,
-      `data-position="${position}"`,
-      `data-title="${title.replace(/"/g, '&quot;')}"`,
-      avatarUrl ? `data-avatar-url="${avatarUrl.replace(/"/g, '&quot;')}"` : '',
-      voiceEnabled ? `data-voice-enabled="true"` : '',
-    ].filter(Boolean).join(' ');
-    return snippet.replace(/<script\s+([^>]+)\s*><\/script>/, `<script $1 ${attrs}></script>`);
-  }, [snippet, color, position, title, avatarUrl, voiceEnabled]);
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(customizedSnippet);
-  };
 
   // Instagram OAuth (simplified - in production, use proper OAuth popup)
   const connectInstagram = () => {
@@ -220,7 +272,8 @@ export function IntegrationsPage() {
           <p className="text-muted-foreground mt-1">Connect platforms + generate website widget embed code.</p>
         </div>
 
-        {/* Standalone Link + Pricing */}
+        {/* Standalone Link + Pricing (only if pay-per-chat enabled) */}
+        {FLAGS.payPerChat && (
         <Card className="glass">
           <CardHeader>
             <CardTitle>Standalone Link + Pricing</CardTitle>
@@ -280,6 +333,7 @@ export function IntegrationsPage() {
             </Button>
           </CardContent>
         </Card>
+        )}
 
         {/* Widget Analytics */}
         {analytics && (
@@ -306,6 +360,36 @@ export function IntegrationsPage() {
           </Card>
         )}
 
+        {/* How to Add Widget Guide */}
+        <Card className="glass bg-blue-50 dark:bg-blue-950 border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-lg">📖 How to Add Widget to Your Website</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div>
+              <strong>Step 1:</strong> Customize your widget (color, position, title, etc.)
+            </div>
+            <div>
+              <strong>Step 2:</strong> Click "Copy" to copy the embed code
+            </div>
+            <div>
+              <strong>Step 3:</strong> Paste the code into your website:
+              <ul className="list-disc list-inside mt-2 space-y-1 ml-4">
+                <li><strong>WordPress:</strong> Appearance → Theme Editor → Footer (before &lt;/body&gt;)</li>
+                <li><strong>Wix/Squarespace:</strong> Settings → Custom Code → Add to Footer</li>
+                <li><strong>HTML Website:</strong> Open your HTML file, paste before &lt;/body&gt; tag</li>
+                <li><strong>Shopify:</strong> Online Store → Themes → Actions → Edit Code → theme.liquid (before &lt;/body&gt;)</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Step 4:</strong> Save and refresh your website. Widget will appear!
+            </div>
+            <div className="pt-2 border-t">
+              <strong>💡 Tip:</strong> Use "Get Test HTML" to create a test file and see how it looks before adding to your real website.
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Website Widget */}
         <Card className="glass">
           <CardHeader>
@@ -313,65 +397,147 @@ export function IntegrationsPage() {
             <CardDescription>Customize and copy-paste the widget code into any website.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <div className="text-sm font-medium mb-1">Theme color</div>
-                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+            {!creatorId ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Please complete your profile to generate embed code.</p>
               </div>
-              <div>
-                <div className="text-sm font-medium mb-1">Position</div>
-                <select
-                  className="w-full border rounded-md px-3 py-2 bg-background"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value as any)}
-                >
-                  <option value="bottom-right">Bottom Right</option>
-                  <option value="bottom-left">Bottom Left</option>
-                </select>
-              </div>
-              <div>
-                <div className="text-sm font-medium mb-1">Title</div>
-                <input
-                  className="w-full border rounded-md px-3 py-2 bg-background"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <div className="text-sm font-medium mb-1">Avatar URL (optional)</div>
-                <input
-                  className="w-full border rounded-md px-3 py-2 bg-background"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://..."
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={voiceEnabled}
-                    onChange={(e) => setVoiceEnabled(e.target.checked)}
-                  />
-                  <span className="text-sm font-medium">Enable Voice Replies (requires voice clone setup)</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium mb-2">Embed code</div>
-              <textarea
-                className="w-full border rounded-md px-3 py-2 bg-background min-h-[140px] font-mono text-xs"
-                readOnly
-                value={loading ? 'Loading...' : (customizedSnippet || 'Failed to load snippet')}
-              />
-              <div className="flex gap-2 mt-2">
-                <Button onClick={copy} disabled={!customizedSnippet}>Copy</Button>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Theme Color</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="h-10 w-16 rounded border cursor-pointer"
+                      />
+                      <Input
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="flex-1"
+                        placeholder="#2563eb"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Position</label>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 bg-background h-10"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value as any)}
+                    >
+                      <option value="bottom-right">Bottom Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Widget Title</label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Chat with AI"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Avatar URL (optional)</label>
+                    <Input
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium mb-1 block">Welcome Message</label>
+                    <Input
+                      value={welcomeMessage}
+                      onChange={(e) => setWelcomeMessage(e.target.value)}
+                      placeholder="Hey! Ask me anything!"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This message appears when users first open the chat widget.
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium mb-1 block">Popular Questions (comma-separated)</label>
+                    <Input
+                      value={popularQuestions}
+                      onChange={(e) => setPopularQuestions(e.target.value)}
+                      placeholder="What do you do?, How can I help?, Tell me about yourself"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Add quick question buttons. Separate multiple questions with commas.
+                    </p>
+                  </div>
+                  {FLAGS.voice && (
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={voiceEnabled}
+                        onChange={(e) => setVoiceEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm font-medium">Enable Voice Replies (requires voice clone setup)</span>
+                    </label>
+                  </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="text-sm font-medium mb-2 block">Embed Code</label>
+                  <div className="relative">
+                    <textarea
+                      className="w-full border rounded-md px-3 py-2 bg-muted font-mono text-xs min-h-[160px] resize-none"
+                      readOnly
+                      value={embedCode || 'Generating code...'}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        navigator.clipboard.writeText(embedCode);
+                        showToast('Code copied to clipboard!', 'success');
+                      }}
+                      disabled={!embedCode}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowPreview(true)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Preview Widget
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      const testHtml = generateTestHtml();
+                      navigator.clipboard.writeText(testHtml);
+                      showToast('Test HTML copied! Paste it in a file and open in browser.', 'success');
+                    }}
+                  >
+                    <FileCode className="h-4 w-4 mr-2" />
+                    Get Test HTML
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Instagram */}
+        {/* Instagram (only if enabled) */}
+        {FLAGS.instagram && (
         <Card className="glass">
           <CardHeader>
             <CardTitle>Instagram DM</CardTitle>
@@ -403,8 +569,10 @@ export function IntegrationsPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* WhatsApp */}
+        {/* WhatsApp (only if enabled) */}
+        {FLAGS.whatsapp && (
         <Card className="glass">
           <CardHeader>
             <CardTitle>WhatsApp</CardTitle>
@@ -500,8 +668,10 @@ export function IntegrationsPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* Phone */}
+        {/* Phone (Phase 2/3 - hidden for Phase 1) */}
+        {false && (
         <Card className="glass">
           <CardHeader>
             <CardTitle>Phone</CardTitle>
@@ -516,6 +686,78 @@ export function IntegrationsPage() {
             </Button>
           </CardContent>
         </Card>
+        )}
+
+        {/* Preview Modal */}
+        {showPreview && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowPreview(false)}
+          >
+            <div
+              className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-4">Widget Preview</h3>
+              <div className="border rounded-lg h-96 relative bg-gray-100 dark:bg-gray-800">
+                <div
+                  className={`absolute bottom-4 ${position === 'bottom-left' ? 'left-4' : 'right-4'}`}
+                >
+                  {/* Mock widget button */}
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer"
+                    style={{ backgroundColor: color }}
+                  >
+                    <MessageCircle className="h-6 w-6" />
+                  </div>
+                </div>
+                {/* Mock chat panel */}
+                <div
+                  className={`absolute bottom-20 ${position === 'bottom-left' ? 'left-4' : 'right-4'} w-72 bg-white dark:bg-gray-900 rounded-lg shadow-xl`}
+                >
+                  <div
+                    className="p-3 border-b flex items-center gap-2"
+                    style={{ backgroundColor: color }}
+                  >
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <div className="w-8 h-8 bg-white/20 rounded-full" />
+                    )}
+                    <span className="text-white text-sm font-medium">{title}</span>
+                  </div>
+                  <div className="p-4 h-48 overflow-y-auto">
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2 text-sm mb-2">
+                      {welcomeMessage}
+                    </div>
+                    {popularQuestions && (
+                      <div className="flex flex-wrap gap-2">
+                        {popularQuestions.split(',').slice(0, 3).map((q, i) => (
+                          <button
+                            key={i}
+                            className="bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1 text-xs"
+                          >
+                            {q.trim()}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 border-t">
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-400">
+                      Type a message...
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

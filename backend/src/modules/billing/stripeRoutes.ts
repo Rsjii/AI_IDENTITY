@@ -6,7 +6,8 @@ import { createCheckoutSession, stripeWebhook } from './stripeController';
 import { upgradePlan, downgradePlan, cancelSubscription } from './subscriptionService';
 
 function normalizePlan(input: string): 'starter' | 'growth' | 'scale' | 'free' {
-  if (input === 'pro') return 'starter';
+  // Phase 1 naming: Basic ($49/5K) → starter, Pro ($99/25K) → growth, Scale ($199/unlimited) → scale
+  if (input === 'pro') return 'growth'; // Frontend sends 'pro' for the $99/25K tier
   if (input === 'starter' || input === 'growth' || input === 'scale' || input === 'free') return input;
   throw new Error('Invalid plan');
 }
