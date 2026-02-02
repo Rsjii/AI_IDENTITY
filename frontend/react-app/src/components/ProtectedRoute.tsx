@@ -60,15 +60,24 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (user && !onboardingComplete) {
     const required = getRequiredOnboardingPath(user);
+    const searchParams = new URLSearchParams(location.search);
+
+    // ✅ Allow /onboarding/deploy if user just paid (Stripe success redirect)
+    // The webhook may not have processed yet, so auth state is stale
+    const justPaid = searchParams.get('paid') === '1';
+    const isDeployPage = location.pathname === '/onboarding/deploy';
 
     // If they hit /onboarding (gate), push them to exact required step
     if (location.pathname === '/onboarding') {
       return <Navigate to={required} replace />;
     }
 
-    // Don’t allow skipping steps inside onboarding routes
+    // Don't allow skipping steps inside onboarding routes
+    // EXCEPT: Allow deploy page if ?paid=1 (Stripe redirect before webhook processed)
     if (location.pathname.startsWith('/onboarding') && location.pathname !== required) {
-      return <Navigate to={required} replace />;
+      if (!(isDeployPage && justPaid)) {
+        return <Navigate to={required} replace />;
+      }
     }
 
     // Don’t allow any other protected page until onboarding done

@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { apiFetch } from '@/lib/api';
 
 export function OnboardingDeployPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { state, refresh } = useAuth();
   const user: any = state.status === 'authenticated' ? state.user : null;
 
@@ -21,6 +22,18 @@ export function OnboardingDeployPage() {
   const apiBase = window.location.origin;
 
   const standaloneLink = useMemo(() => (slug ? `${apiBase}/chat/${slug}` : ''), [slug, apiBase]);
+
+  // ✅ Refresh auth when arriving from Stripe payment (webhook may still be processing)
+  useEffect(() => {
+    const paid = searchParams.get('paid');
+    if (paid === '1') {
+      // Refresh auth to get updated onboardingStep from server
+      refresh();
+      // Clean up URL
+      searchParams.delete('paid');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refresh]);
 
   // ✅ Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
