@@ -443,7 +443,7 @@ export async function checkMessageLimit(req: any, res: Response) {
   try {
     // Verify session belongs to viewer + fetch creator + pricing
     const sessionResult = await db.query(
-      `SELECT cs."creatorId", u."priceConfig"
+      `SELECT cs."creatorId", cs."freeResetAt", cs."createdAt", u."priceConfig"
        FROM chat_sessions cs
        LEFT JOIN "User" u ON u.id = cs."creatorId"
        WHERE cs.id = $1 AND COALESCE(cs."viewerUserId", cs."userId") = $2
@@ -456,21 +456,37 @@ export async function checkMessageLimit(req: any, res: Response) {
     }
 
     // Premium session (real unlock source)
-    const premium = await db.query(
-      `SELECT 1 FROM "premium_sessions" WHERE "sessionId"=$1 AND "expiresAt" > CURRENT_TIMESTAMP LIMIT 1`,
+    const premiumRow = await db.query(
+      `SELECT "expiresAt"
+       FROM "premium_sessions"
+       WHERE "sessionId"=$1 AND "expiresAt" > CURRENT_TIMESTAMP
+       ORDER BY "expiresAt" DESC
+       LIMIT 1`,
       [sessionId]
     );
-    const isUnlimited = premium.rowCount > 0;
-    if (isUnlimited) {
-      return res.json({ success: true, canSendMessage: true, isUnlimited: true, requiresPayment: false });
+
+    if (premiumRow.rowCount > 0) {
+      const expiresAt = premiumRow.rows[0].expiresAt;
+      const expiresAtIso = new Date(expiresAt).toISOString();
+      return res.json({
+        success: true,
+        canSendMessage: true,
+        isUnlimited: true,
+        requiresPayment: false,
+        premiumExpiresAt: expiresAtIso,
+        premiumRemainingMs: Math.max(0, new Date(expiresAtIso).getTime() - Date.now()),
+      });
     }
 
-    // Count messages in session
+    // Count messages after freeResetAt (or createdAt if freeResetAt is null)
+    const sessionRow = sessionResult.rows[0];
+    const since = sessionRow.freeResetAt || sessionRow.createdAt;
+
     const messageCountResult = await db.query(
       `SELECT COUNT(*)::int AS count
        FROM chat_messages
-       WHERE "sessionId" = $1 AND role = 'user'`,
-      [sessionId]
+       WHERE "sessionId" = $1 AND role = 'user' AND "createdAt" >= $2`,
+      [sessionId, since]
     );
 
     const messagesUsed = messageCountResult.rows[0]?.count || 0;

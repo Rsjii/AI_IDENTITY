@@ -41,6 +41,7 @@ const confirmPaymentSchema = z.object({
   sessionId: z.string().optional(),
   amountCents: z.number().int().min(100).optional(),
   tierLabel: z.string().optional(),
+  messageId: z.string().optional(), // NEW: teaser message ID to update
 });
 
 export async function createPaymentIntent(req: Request, res: Response) {
@@ -88,7 +89,7 @@ export async function confirmPayment(req: Request, res: Response) {
     if (!stripe) {
       return res.status(500).json({ error: 'STRIPE_SECRET_KEY not configured' });
     }
-    const { paymentIntentId, creatorId, sessionId, amountCents } = confirmPaymentSchema.parse(req.body);
+    const { paymentIntentId, creatorId, sessionId, amountCents, messageId } = confirmPaymentSchema.parse(req.body);
 
     // Verify payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -151,10 +152,12 @@ export async function confirmPayment(req: Request, res: Response) {
     });
 
     // ✅ Create premium session window (24 hours)
+    let premiumExpiresAt: string | null = null;
     if (metaSessionId || sessionId) {
       const resolvedSessionId = metaSessionId || sessionId || '';
       if (resolvedSessionId) {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        premiumExpiresAt = expiresAt.toISOString();
         await premiumSessionQueries.create({
           creatorId: metaCreatorId || creatorId,
           sessionId: resolvedSessionId,
@@ -204,9 +207,19 @@ export async function confirmPayment(req: Request, res: Response) {
             });
             fullReply = result.reply || '';
             
-            // Save the full reply if not already saved
+            // Update teaser message if messageId provided, otherwise add new message
             if (fullReply) {
-              await chatMessageQueries.add({ sessionId: resolvedSessionId, role: 'assistant', content: fullReply });
+              if (messageId) {
+                const msg = await chatMessageQueries.findById(messageId);
+                if (msg && msg.sessionId === resolvedSessionId && msg.role === 'assistant') {
+                  await chatMessageQueries.updateContent(messageId, fullReply, false);
+                } else {
+                  // fallback if messageId invalid
+                  await chatMessageQueries.add({ sessionId: resolvedSessionId, role: 'assistant', content: fullReply, truncated: false });
+                }
+              } else {
+                await chatMessageQueries.add({ sessionId: resolvedSessionId, role: 'assistant', content: fullReply, truncated: false });
+              }
             }
           }
         }
@@ -270,7 +283,7 @@ export async function confirmPayment(req: Request, res: Response) {
       }
     }
 
-    return res.json({ success: true, reply: fullReply });
+    return res.json({ success: true, reply: fullReply, premiumExpiresAt });
   } catch (error: any) {
     logger.error({ error }, 'Confirm payment error');
     return res.status(400).json({ error: error.message || 'Failed to confirm payment' });

@@ -407,8 +407,11 @@ CREATE TABLE IF NOT EXISTS "chat_sessions" (
   "isFavorite" BOOLEAN DEFAULT false,
   "isArchived" BOOLEAN DEFAULT false,
   "sessionTitle" VARCHAR(255),
-  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+  -- NEW: when guest session is claimed after login, free quota resets from this timestamp
+  "freeResetAt" TIMESTAMPTZ,
+
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -417,6 +420,10 @@ CREATE TABLE IF NOT EXISTS "chat_messages" (
   "sessionId" TEXT NOT NULL,
   "role" TEXT NOT NULL CHECK ("role" IN ('user','assistant')),
   "content" TEXT NOT NULL,
+
+  -- NEW: teaser messages = truncated=true (later we update same row to full answer)
+  "truncated" BOOLEAN NOT NULL DEFAULT false,
+
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -442,6 +449,10 @@ CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isFavorite"
 CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isArchived"
   ON "chat_sessions"("isArchived")
   WHERE "isArchived" = true;
+
+-- Ensure existing DBs get the new columns
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "freeResetAt" TIMESTAMPTZ;
+ALTER TABLE "chat_messages" ADD COLUMN IF NOT EXISTS "truncated" BOOLEAN NOT NULL DEFAULT false;
 
 -- Auto-update updatedAt on chat_sessions (same as migration)
 CREATE OR REPLACE FUNCTION update_chat_sessions_updated_at()
@@ -1662,22 +1673,52 @@ export const chatSessionQueries = {
 };
 
 export const chatMessageQueries = {
-  add: async (params: { sessionId: string; role: 'user' | 'assistant'; content: string }) => {
+  add: async (params: { sessionId: string; role: 'user' | 'assistant'; content: string; truncated?: boolean }) => {
     const id = `cm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const r = await db.query(
-      `INSERT INTO "chat_messages" (id,"sessionId","role","content") VALUES ($1,$2,$3,$4) RETURNING *`,
-      [id, params.sessionId, params.role, params.content]
+      `INSERT INTO "chat_messages" (id,"sessionId","role","content","truncated")
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING *`,
+      [id, params.sessionId, params.role, params.content, params.truncated ?? false]
     );
     return r.rows[0];
   },
+
+  updateContent: async (id: string, content: string, truncated: boolean) => {
+    const r = await db.query(
+      `UPDATE "chat_messages"
+       SET "content"=$2, "truncated"=$3
+       WHERE id=$1
+       RETURNING *`,
+      [id, content, truncated]
+    );
+    return r.rows[0] || null;
+  },
+
+  findById: async (id: string) => {
+    const r = await db.query(`SELECT * FROM "chat_messages" WHERE id=$1 LIMIT 1`, [id]);
+    return r.rows[0] || null;
+  },
+
   listForSession: async (sessionId: string) => {
     const r = await db.query(`SELECT * FROM "chat_messages" WHERE "sessionId"=$1 ORDER BY "createdAt" ASC`, [sessionId]);
     return r.rows;
   },
+
   countBySession: async (sessionId: string) => {
     const r = await db.query(
       `SELECT COUNT(*) as count FROM "chat_messages" WHERE "sessionId"=$1 AND "role"='user'`,
       [sessionId]
+    );
+    return parseInt(r.rows[0]?.count || '0', 10);
+  },
+
+  countBySessionSince: async (sessionId: string, sinceIso: string) => {
+    const r = await db.query(
+      `SELECT COUNT(*) as count
+       FROM "chat_messages"
+       WHERE "sessionId"=$1 AND "role"='user' AND "createdAt" >= $2`,
+      [sessionId, sinceIso]
     );
     return parseInt(r.rows[0]?.count || '0', 10);
   },

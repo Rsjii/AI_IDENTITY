@@ -28,9 +28,53 @@ const chatSchema = z.object({
   voiceEnabled: z.boolean().optional(),
 });
 
-const historyAuthSchema = z.object({
+const historySchema = z.object({
   sessionId: z.string().min(1),
+  visitorId: z.string().optional(),
 });
+
+const claimSessionSchema = z.object({
+  sessionId: z.string().min(1),
+  visitorId: z.string().min(1),
+});
+
+const publicLimitSchema = z.object({
+  sessionId: z.string().optional(),
+  visitorId: z.string().optional(),
+});
+
+function safeSlug(input: string): string {
+  return String(input || '').trim().replace(/^@/, '');
+}
+
+function shouldForcePaywall(priceConfig: any): boolean {
+  return priceConfig?.alwaysRequirePayment === true || priceConfig?.forcePaywall === true;
+}
+
+function shouldSmartTriggerPaywall(message: string, priceConfig: any): boolean {
+  if (!message) return false;
+  if (message.length > 500) return true; // doc trigger
+
+  const keywords: string[] = Array.isArray(priceConfig?.premiumKeywords)
+    ? priceConfig.premiumKeywords
+    : ['plan', 'diet', 'workout', 'meal', 'routine', 'strategy'];
+
+  const s = message.toLowerCase();
+  return keywords.some((k) => String(k).toLowerCase().trim() && s.includes(String(k).toLowerCase().trim()));
+}
+
+async function getActivePremiumExpiry(sessionId: string): Promise<Date | null> {
+  const r = await db.query(
+    `SELECT "expiresAt"
+     FROM "premium_sessions"
+     WHERE "sessionId"=$1 AND "expiresAt" > CURRENT_TIMESTAMP
+     ORDER BY "expiresAt" DESC
+     LIMIT 1`,
+    [sessionId]
+  );
+  const v = r.rows[0]?.expiresAt ? new Date(r.rows[0].expiresAt) : null;
+  return v && !Number.isNaN(v.getTime()) ? v : null;
+}
 
 export async function getCreator(req: Request, res: Response) {
   const slug = String(req.params.slug || '').trim().replace(/^@/, ''); // Remove @ prefix if present
@@ -126,287 +170,407 @@ async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
   return r.rows[0]?.c || 0;
 }
 
-export async function publicChat(req: any, res: Response) {
-  const { slug, message, visitorId, sessionId, voiceEnabled } = chatSchema.parse(req.body);
+/**
+ * ✅ Public: message-limit + premium countdown (works for guest + authed)
+ * GET /api/public/message-limit?sessionId=...&visitorId=...
+ */
+export async function publicMessageLimit(req: any, res: Response) {
+  const { sessionId, visitorId } = publicLimitSchema.parse({
+    sessionId: req.query.sessionId,
+    visitorId: req.query.visitorId,
+  });
 
-  const viewerUserId = req.user?.id;
-  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized', errorCode: 'UNAUTHORIZED' });
+  const FREE_MESSAGE_LIMIT = 3;
 
-  const u = await userQueries.findBySlugOrHandle(slug);
-  if (!u) return res.status(404).json({ error: 'Creator not found' });
-
-  // ✅ Check creator's plan limit (PHASE1 requirement)
-  const { tier, trialActive } = await getUserPlan(u.id);
-  const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
-  const limit = PLAN_LIMITS[effectiveTier];
-  const used = await countCreatorChatsThisMonth(u.id);
-
-  if (used >= limit) {
-    // ✅ Better upgrade prompt with helpful message
-    const planNames: Record<PlanTier, string> = {
-      free: 'Free',
-      starter: 'Starter',
-      growth: 'Growth',
-      scale: 'Scale',
-    };
-    
-    const nextTier: PlanTier | null = effectiveTier === 'free' ? 'starter' 
-      : effectiveTier === 'starter' ? 'growth'
-      : effectiveTier === 'growth' ? 'scale'
-      : null;
-    
-    return res.status(402).json({
-      error: 'Creator plan limit reached',
-      errorCode: 'CREATOR_PLAN_LIMIT',
-      tier: effectiveTier,
-      used,
-      limit,
-      upgradeUrl: '/pricing',
-      message: `You've reached your ${planNames[effectiveTier]} plan limit of ${limit.toLocaleString()} chats this month. ${nextTier ? `Upgrade to ${planNames[nextTier]} plan for more capacity.` : 'Contact support for higher limits.'}`,
-      nextTier,
+  if (!sessionId) {
+    return res.json({
+      success: true,
+      canSendMessage: true,
+      isUnlimited: false,
+      requiresPayment: false,
+      remainingFreeMessages: FREE_MESSAGE_LIMIT,
+      freeMessageLimit: FREE_MESSAGE_LIMIT,
+      messagesUsed: 0,
+      premiumExpiresAt: null,
+      premiumRemainingMs: null,
     });
   }
-  
-  // ✅ Warn when approaching limit (80% threshold)
-  if (used >= limit * 0.8) {
-    // Add warning header (non-blocking)
-    res.setHeader('X-Plan-Warning', JSON.stringify({
-      used,
-      limit,
-      percentage: Math.round((used / limit) * 100),
-      message: `You've used ${Math.round((used / limit) * 100)}% of your monthly limit. Consider upgrading soon.`,
-    }));
+
+  const session = await chatSessionQueries.findById(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  const viewerUserId = req.user?.id || null;
+
+  // Access control:
+  // - If session is claimed by a user => only that user can read limit
+  // - If session is guest (userId null) => require matching visitorId
+  if (session.userId) {
+    if (!viewerUserId || session.userId !== viewerUserId) {
+      return res.status(403).json({ error: 'Session access denied' });
+    }
+  } else {
+    if (!visitorId || session.visitorId !== visitorId) {
+      return res.status(403).json({ error: 'Session access denied' });
+    }
   }
 
-  // session: reuse if provided else create
-  let sid = sessionId || null;
+  const premiumExpiresAt = await getActivePremiumExpiry(sessionId);
+  if (premiumExpiresAt) {
+    return res.json({
+      success: true,
+      canSendMessage: true,
+      isUnlimited: true,
+      requiresPayment: false,
+      remainingFreeMessages: 0,
+      freeMessageLimit: FREE_MESSAGE_LIMIT,
+      messagesUsed: FREE_MESSAGE_LIMIT,
+      premiumExpiresAt: premiumExpiresAt.toISOString(),
+      premiumRemainingMs: Math.max(0, premiumExpiresAt.getTime() - Date.now()),
+    });
+  }
+
+  // Count messages after freeResetAt (if set) or all messages
+  const sinceIso =
+    session.freeResetAt && !Number.isNaN(new Date(session.freeResetAt).getTime())
+      ? new Date(session.freeResetAt).toISOString()
+      : null;
+
+  const messagesUsed = sinceIso
+    ? await chatMessageQueries.countBySessionSince(sessionId, sinceIso)
+    : await chatMessageQueries.countBySession(sessionId);
+
+  const remainingFreeMessages = Math.max(0, FREE_MESSAGE_LIMIT - messagesUsed);
+  const canSendMessage = messagesUsed < FREE_MESSAGE_LIMIT;
+
+  return res.json({
+    success: true,
+    canSendMessage,
+    isUnlimited: false,
+    requiresPayment: false, // NOTE: graduated paywall handled by /chat response
+    remainingFreeMessages,
+    freeMessageLimit: FREE_MESSAGE_LIMIT,
+    messagesUsed,
+    premiumExpiresAt: null,
+    premiumRemainingMs: null,
+  });
+}
+
+/**
+ * ✅ Claim a guest session after login (so it shows in /api/user/conversations)
+ * POST /api/public/claim-session { sessionId, visitorId }
+ */
+export async function claimSession(req: any, res: Response) {
+  const viewerUserId = req.user?.id;
+  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { sessionId, visitorId } = claimSessionSchema.parse(req.body);
+
+  const session = await chatSessionQueries.findById(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  if (session.userId) {
+    // already claimed
+    if (session.userId !== viewerUserId) return res.status(403).json({ error: 'Session access denied' });
+    return res.json({ success: true, claimed: true });
+  }
+
+  if (!session.visitorId || session.visitorId !== visitorId) {
+    return res.status(403).json({ error: 'Session access denied' });
+  }
+
+  await db.query(
+    `UPDATE "chat_sessions"
+     SET "userId"=$2, "viewerUserId"=$2, "freeResetAt"=NOW(), "updatedAt"=NOW()
+     WHERE id=$1`,
+    [sessionId, viewerUserId]
+  );
+
+  return res.json({ success: true, claimed: true });
+}
+
+/**
+ * ✅ Public chat: supports guest + logged in
+ * Graduated paywall:
+ * - messagesUsedBefore 0-2 => full answer
+ * - messagesUsedBefore == 3 => teaser (4th message)
+ * - messagesUsedBefore >= 4 => hard paywall
+ */
+export async function publicChat(req: any, res: Response) {
+  const { slug, message, visitorId, sessionId, voiceEnabled } = chatSchema.parse(req.body);
+  const cleanSlug = safeSlug(slug);
+
+  const viewerUserId = req.user?.id || null;
+
+  const creator = await userQueries.findBySlugOrHandle(cleanSlug);
+  if (!creator) return res.status(404).json({ error: 'Creator not found' });
+
+  // ✅ Check creator's plan limit (PHASE1 requirement) - only for logged-in creators
+  if (viewerUserId && viewerUserId === creator.id) {
+    const { tier, trialActive } = await getUserPlan(creator.id);
+    const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
+    const limit = PLAN_LIMITS[effectiveTier];
+    const used = await countCreatorChatsThisMonth(creator.id);
+
+    if (used >= limit) {
+      const planNames: Record<PlanTier, string> = {
+        free: 'Free',
+        starter: 'Starter',
+        growth: 'Growth',
+        scale: 'Scale',
+      };
+      
+      const nextTier: PlanTier | null = effectiveTier === 'free' ? 'starter' 
+        : effectiveTier === 'starter' ? 'growth'
+        : effectiveTier === 'growth' ? 'scale'
+        : null;
+      
+      return res.status(402).json({
+        error: 'Creator plan limit reached',
+        errorCode: 'CREATOR_PLAN_LIMIT',
+        tier: effectiveTier,
+        used,
+        limit,
+        upgradeUrl: '/pricing',
+        message: `You've reached your ${planNames[effectiveTier]} plan limit of ${limit.toLocaleString()} chats this month. ${nextTier ? `Upgrade to ${planNames[nextTier]} plan for more capacity.` : 'Contact support for higher limits.'}`,
+        nextTier,
+      });
+    }
+    
+    // ✅ Warn when approaching limit (80% threshold)
+    if (used >= limit * 0.8) {
+      res.setHeader('X-Plan-Warning', JSON.stringify({
+        used,
+        limit,
+        percentage: Math.round((used / limit) * 100),
+        message: `You've used ${Math.round((used / limit) * 100)}% of your monthly limit. Consider upgrading soon.`,
+      }));
+    }
+  }
+
+  // Resolve session with ownership validation
+  let sid: string | null = sessionId || null;
+
+  if (sid) {
+    const existing = await chatSessionQueries.findById(sid);
+    const validCreator = existing && existing.creatorId === creator.id;
+
+    if (!existing || !validCreator) {
+      sid = null;
+    } else if (existing.userId) {
+      // claimed session must match user
+      if (!viewerUserId || existing.userId !== viewerUserId) {
+        sid = null; // fallback: start new session (avoid leaking)
+      }
+    } else {
+      // guest session requires visitorId match
+      if (!visitorId || existing.visitorId !== visitorId) {
+        sid = null;
+      }
+    }
+  }
+
   if (!sid) {
     const s = await chatSessionQueries.create({
-      creatorId: u.id,
-      visitorId: visitorId || null, // optional
-      userId: viewerUserId,          // ✅ now tracked
+      creatorId: creator.id,
+      visitorId: visitorId || null,
+      userId: viewerUserId || null,
       platform: 'web',
     });
     sid = s.id;
   }
 
-  // Check if user exceeded free tier
+  // Get session row to check freeResetAt
+  const sessionRow = await chatSessionQueries.findById(sid);
+
+  // Count BEFORE adding this message (counts user messages only, after reset if present)
   const FREE_MESSAGE_LIMIT = 3;
-  const sessionMessages = await chatMessageQueries.countBySession(sid);
+  const sinceIso =
+    sessionRow?.freeResetAt && !Number.isNaN(new Date(sessionRow.freeResetAt).getTime())
+      ? new Date(sessionRow.freeResetAt).toISOString()
+      : null;
 
-  // Save user message
-  await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
+  const messagesUsedBefore = sinceIso
+    ? await chatMessageQueries.countBySessionSince(sid, sinceIso)
+    : await chatMessageQueries.countBySession(sid);
 
-  // ✅ Check for active premium session (24-hour window)
+  // Save user message (capture ID)
+  const userMsgRow = await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
+
+  // Premium check
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
 
-  // ✅ Feature flag check: pay-per-chat only if globally enabled
   const payPerChatAllowed = isFeatureEnabled('ENABLE_PAY_PER_CHAT') && isFeatureEnabled('ENABLE_PAYMENTS');
   const voiceAllowed = isFeatureEnabled('ENABLE_VOICE');
+  const enablePayments = (creator.priceConfig as any)?.enablePayments === true;
+  const priceConfig = creator.priceConfig as any;
+  const forced = shouldForcePaywall(priceConfig);
+  const smart = shouldSmartTriggerPaywall(message, priceConfig);
 
-  // Check payment requirement - only if creator has enabled pay-per-chat AND feature flag is ON
-  const enablePayments = (u.priceConfig as any)?.enablePayments === true;
-  if (payPerChatAllowed && enablePayments && !hasPremiumSession) {
-    // ✅ Use intelligent pricing detection
-    const { shouldRequirePayment: intelligentPricing } = await import('../identity/intelligentPricing');
-    
-    // Get conversation context (last few messages)
-    const recentMessages = await chatMessageQueries.listForSession(sid);
-    const conversationContext = recentMessages
-      .filter((m: any) => m.role === 'user')
-      .slice(-5)
-      .map((m: any) => m.content);
-    
-    // Check payment trigger rules (creator's custom rules take precedence)
-    const triggerRules = (u.priceConfig as any)?.paymentTriggerRules || {};
-    const intelligentDecision = intelligentPricing(message, conversationContext, u.priceConfig);
-    
-    // Combine intelligent pricing with creator rules
-    const shouldRequirePayment = 
-      sessionMessages >= FREE_MESSAGE_LIMIT || // Always after free limit
-      triggerRules.alwaysRequire === true || // Creator set always require
-      intelligentDecision.requiresPayment || // Intelligent detection
-      (triggerRules.keywords?.length > 0 && triggerRules.keywords.some((kw: string) => 
-        message.toLowerCase().includes(kw.toLowerCase())
-      )) || // Contains trigger keyword
-      (triggerRules.minLength > 0 && message.length >= triggerRules.minLength); // Exceeds length threshold
+  // If premium active OR payments not enabled => full reply
+  if (!(payPerChatAllowed && enablePayments) || hasPremiumSession) {
+    const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
+      platform: 'web',
+      sessionId: sid,
+      visitorId,
+    });
 
-    if (shouldRequirePayment) {
-      // ✅ Check if payment already made for this session
-      const paidResult = await db.query(
-        `SELECT 1 FROM "stripe_payments"
-         WHERE "sessionId"=$1 AND "status"='succeeded' AND "type"='pay_per_chat'
-         ORDER BY "createdAt" DESC
-         LIMIT 1`,
-        [sid]
-      );
-      
-      if (paidResult.rowCount > 0) {
-        // Payment already made, unlock full reply
-        const result = await generateMirrorReplyWithLogging(u.id, 'public_chat', message, {
-          platform: 'web',
-          sessionId: sid,
-          visitorId,
-        });
-        let audioUrl: string | null = null;
-        if (voiceAllowed && voiceEnabled && result.reply) {
-          try {
-            const voices = await voiceCloneQueries.findByUserId(u.id);
-            const defaultVoice = voices.find((v: any) => v.status === 'ready');
-            if (defaultVoice) {
-              audioUrl = await generateVoiceAudio(u.id, defaultVoice.id, result.reply);
-            }
-          } catch (err: any) {
-            logger.warn('[PublicChat] Voice generation failed:', err?.message || err);
-          }
-        }
-        if (result.reply) {
-          await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
-        }
-        return res.json({
-          success: true,
-          sessionId: sid,
-          reply: result.reply || '',
-          decision: result.decision,
-          mirrorRunId: result.mirrorRunId,
-          audioUrl,
-        });
-      }
-
-      // No payment, show paywall
-      const pricing = u.priceConfig || {};
-      const tiers = getPayPerChatTiers(pricing);
-      const preferred = Number((pricing as any)?.defaultTierCents || 0);
-      const defaultAmount = tiers.includes(preferred) ? preferred : tiers[0];
-      
-      // ✅ Log PAYMENT_REQUIRED event
-      const triggerReason = sessionMessages >= FREE_MESSAGE_LIMIT 
-        ? 'free_limit_exceeded'
-        : triggerRules.alwaysRequire 
-        ? 'always_require'
-        : triggerRules.keywords?.some((kw: string) => message.toLowerCase().includes(kw.toLowerCase()))
-        ? 'keyword_match'
-        : triggerRules.minLength > 0 && message.length >= triggerRules.minLength
-        ? 'min_length_exceeded'
-        : 'unknown';
-      
-      EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_REQUIRED, {
-        creatorId: u.id,
-        sessionId: sid,
-        visitorId: visitorId || null,
-        messageLength: message.length,
-        sessionMessages,
-        triggerReason,
-      }).catch((err) => {
-        logger.warn('Failed to log PAYMENT_REQUIRED event:', err);
-      });
-
-      // ✅ Generate teaser reply (limited tokens, AI-generated preview)
-      let previewReply = 'This answer requires payment to unlock the full response. Click below to proceed.';
-      
+    let audioUrl: string | null = null;
+    if (voiceAllowed && voiceEnabled && result.reply) {
       try {
-        // Generate a short teaser with limited tokens (no validation, single attempt)
-        const teaserResult = await generateMirrorReplyWithLogging(
-          u.id, 
-          'public_chat', 
-          message, 
-          {
-            platform: 'web',
-            sessionId: sid,
-            visitorId,
-            teaserOnly: true, // Flag for limited response
-            maxTokens: 100, // Short teaser only
-          }
-        );
-        
-        if (teaserResult.reply) {
-          // ✅ Truncate teaser to ~200 characters for preview (first sentence or first 200 chars)
-          const teaser = teaserResult.reply.trim();
-          const maxLength = 200;
-          if (teaser.length > maxLength) {
-            // Try to cut at sentence boundary
-            const sentenceEnd = teaser.substring(0, maxLength).lastIndexOf('.');
-            previewReply = sentenceEnd > maxLength * 0.5 
-              ? teaser.substring(0, sentenceEnd + 1)
-              : teaser.substring(0, maxLength) + '...';
-          } else {
-            previewReply = teaser;
-          }
-          // Don't save this teaser as a message - it's just for preview
-          // The full reply will be generated after payment
-        }
+        const voices = await voiceCloneQueries.findByUserId(creator.id);
+        const defaultVoice = voices.find((v: any) => v.status === 'ready');
+        if (defaultVoice) audioUrl = await generateVoiceAudio(creator.id, defaultVoice.id, result.reply);
       } catch (err: any) {
-        logger.warn('[Public Chat] Failed to generate teaser, using default message:', err);
-        // Use default previewReply
+        logger.warn('[PublicChat] Voice generation failed:', err?.message || err);
       }
-      
-      return res.json({
-        success: true,
-        requiresPayment: true,
-        sessionId: sid,
-        creatorId: u.id,
-        paymentOptions: {
-          tiers: tiers.map((amount) => ({
-            amount,
-            label: `$${(amount / 100).toFixed(2)}`,
-          })),
-          defaultAmount,
-        },
-        previewReply,
-      });
     }
+
+    if (result.reply) {
+      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+    }
+
+    return res.json({
+      success: true,
+      sessionId: sid,
+      reply: result.reply || '',
+      mirrorRunId: result.mirrorRunId,
+      audioUrl,
+    });
   }
 
-  // mirror + save messages via identityService opts
-  const result = await generateMirrorReplyWithLogging(u.id, 'public_chat', message, {
-    platform: 'web',
-    sessionId: sid,
-    visitorId,
-  });
-  let audioUrl: string | null = null;
-  if (voiceAllowed && voiceEnabled && result.reply) {
+  // ✅ Determine paywall stage
+  let paywallStage: 'none' | 'teaser' | 'hard' =
+    messagesUsedBefore === FREE_MESSAGE_LIMIT ? 'teaser' : messagesUsedBefore > FREE_MESSAGE_LIMIT ? 'hard' : 'none';
+
+  if (forced && paywallStage === 'none') {
+    paywallStage = messagesUsedBefore === 0 ? 'teaser' : 'hard';
+  }
+
+  if (smart && paywallStage === 'none') {
+    paywallStage = 'teaser';
+  }
+
+  if (paywallStage === 'none') {
+    // 1-3 free messages => full
+    const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
+      platform: 'web',
+      sessionId: sid,
+      visitorId,
+    });
+
+    if (result.reply) await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+
+    return res.json({
+      success: true,
+      sessionId: sid,
+      reply: result.reply || '',
+      mirrorRunId: result.mirrorRunId,
+    });
+  }
+
+  // pricing tiers (use helper)
+  const tiers = getPayPerChatTiers(priceConfig);
+  const preferred = Number(priceConfig?.defaultTierCents || 0);
+  const defaultAmount = tiers.includes(preferred) ? preferred : tiers[0];
+
+  // teaser stage -> generate teaser, STORE it as truncated, return teaserMessageId
+  if (paywallStage === 'teaser') {
+    let previewReply = '';
     try {
-      const voices = await voiceCloneQueries.findByUserId(u.id);
-      const defaultVoice = voices.find((v: any) => v.status === 'ready');
-      if (defaultVoice) {
-        audioUrl = await generateVoiceAudio(u.id, defaultVoice.id, result.reply);
-      }
+      const teaserResult = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
+        platform: 'web',
+        sessionId: sid,
+        visitorId,
+        teaserOnly: true,
+        maxTokens: 220, // longer so UI can blur "the rest"
+      });
+
+      previewReply = (teaserResult.reply || '').trim();
+      if (previewReply.length > 900) previewReply = previewReply.slice(0, 900).trim() + '...';
     } catch (err: any) {
-      logger.warn('[PublicChat] Voice generation failed:', err?.message || err);
+      logger.warn('[PublicChat] teaser generation failed:', err?.message || err);
+      previewReply = "Here's a preview of what you'll get. Unlock to see the full detailed answer.";
     }
+
+    const teaserRow = await chatMessageQueries.add({
+      sessionId: sid,
+      role: 'assistant',
+      content: previewReply,
+      truncated: true,
+    });
+
+    EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_REQUIRED, {
+      creatorId: creator.id,
+      sessionId: sid,
+      visitorId: visitorId || null,
+      paywallStage: 'teaser',
+      messagesUsedBefore,
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      sessionId: sid,
+      requiresPayment: true,
+      paywallStage: 'teaser',
+      creatorId: creator.id,
+      userMessageId: userMsgRow.id,
+      teaserMessageId: teaserRow.id,
+      previewReply,
+      paymentOptions: {
+        tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
+        defaultAmount,
+      },
+    });
   }
 
-  // Save assistant reply
-  if (result.reply) {
-    await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
-  }
+  // hard stage -> no preview, just require payment
+  EventLogger.logSystemEvent(EVENT_TYPES.PAYMENT_REQUIRED, {
+    creatorId: creator.id,
+    sessionId: sid,
+    visitorId: visitorId || null,
+    paywallStage: 'hard',
+    messagesUsedBefore,
+  }).catch(() => {});
 
   return res.json({
     success: true,
     sessionId: sid,
-    reply: result.reply || '',
-    decision: result.decision,
-    mirrorRunId: result.mirrorRunId,
-    audioUrl,
+    requiresPayment: true,
+    paywallStage: 'hard',
+    creatorId: creator.id,
+    userMessageId: userMsgRow.id,
+    teaserMessageId: null,
+    previewReply: '',
+    paymentOptions: {
+      tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
+      defaultAmount,
+    },
   });
 }
 
+/**
+ * ✅ Public history: guest + authed
+ * GET /api/public/history?sessionId=...&visitorId=...
+ */
 export async function publicHistory(req: any, res: Response) {
-  const { sessionId } = historyAuthSchema.parse({
+  const { sessionId, visitorId } = historySchema.parse({
     sessionId: req.query.sessionId,
+    visitorId: req.query.visitorId,
   });
 
-  const viewerUserId = req.user?.id;
-  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized', errorCode: 'UNAUTHORIZED' });
-
   const session = await chatSessionQueries.findById(sessionId);
-  if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
+  if (!session) return res.status(404).json({ error: 'Session not found' });
 
-  // ✅ auth-based access control (no more anonymous visitor-only history)
-  if (session.userId && session.userId !== viewerUserId) {
-    return res.status(403).json({ error: 'Session access denied' });
+  const viewerUserId = req.user?.id || null;
+
+  if (session.userId) {
+    if (!viewerUserId || session.userId !== viewerUserId) {
+      return res.status(403).json({ error: 'Session access denied' });
+    }
+  } else {
+    if (!visitorId || session.visitorId !== visitorId) {
+      return res.status(403).json({ error: 'Session access denied' });
+    }
   }
 
   const messages = await chatMessageQueries.listForSession(sessionId);
@@ -423,6 +587,7 @@ export async function publicHistory(req: any, res: Response) {
       id: m.id,
       role: m.role,
       content: m.content,
+      truncated: !!m.truncated, // NEW
       createdAt: m.createdAt,
     })),
   });

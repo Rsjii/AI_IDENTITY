@@ -6,9 +6,17 @@ interface LayoutProps {
   children: ReactNode;
   showNavbar?: boolean;
   showFooter?: boolean;
+  useContainer?: boolean;
+  mainClassName?: string;
 }
 
-export function Layout({ children, showNavbar = true, showFooter = true }: LayoutProps) {
+export function Layout({
+  children,
+  showNavbar = true,
+  showFooter = true,
+  useContainer = true,
+  mainClassName = '',
+}: LayoutProps) {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col">
       {/* Premium background gradient */}
@@ -16,7 +24,7 @@ export function Layout({ children, showNavbar = true, showFooter = true }: Layou
       
       {showNavbar && <Navbar />}
 
-      <main className="container mx-auto px-4 py-10 flex-1">
+      <main className={`${useContainer ? 'container mx-auto px-4 py-10' : ''} flex-1 ${mainClassName}`}>
         {children}
       </main>
 

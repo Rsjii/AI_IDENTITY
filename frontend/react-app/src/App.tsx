@@ -33,6 +33,7 @@ import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
 import { OnboardingDeployPage } from './pages/OnboardingDeployPage';
 import { OnboardingTrainingPage } from './pages/OnboardingTrainingPage';
 import { PublicChatPage } from './pages/PublicChatPage';
+import { Layout } from './components/Layout';
 import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { CreatorPublicProfile } from './pages/CreatorPublicProfile';
@@ -112,7 +113,14 @@ function App() {
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
               <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
-              <Route path="/chat/:slug" element={<PublicChatPage />} />
+              <Route
+                path="/chat/:slug"
+                element={
+                  <Layout showFooter={false} useContainer={false} mainClassName="p-0">
+                    <PublicChatPage />
+                  </Layout>
+                }
+              />
               <Route path="/@:handle" element={<CreatorPublicProfile />} />
               {FLAGS.marketplace && (
                 <>

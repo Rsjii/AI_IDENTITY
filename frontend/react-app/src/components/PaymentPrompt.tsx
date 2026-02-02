@@ -19,7 +19,10 @@ interface PaymentPromptProps {
     tiers: { amount: number; label: string }[];
     defaultAmount?: number;
   };
-  onSuccess: (reply?: string) => void;
+  previewText?: string;
+  messageIdToUnlock?: string;
+  creatorName?: string;
+  onSuccess: (reply?: string, premiumExpiresAt?: string) => void;
   onCancel: () => void;
 }
 
@@ -91,7 +94,8 @@ export function PaymentPrompt(props: PaymentPromptProps) {
       <CardHeader>
         <CardTitle>Unlock Premium Content</CardTitle>
         <CardDescription>
-          Choose a tier to unlock a detailed response. You'll receive the full answer via email after payment.
+          Unlock the full answer and get <strong>24-hour unlimited access</strong> to this session.
+          You'll also receive the full answer via email after payment.
           <div className="mt-2 text-xs text-muted-foreground">
             Platform fee: 25% | Creator earnings: 75%
           </div>
@@ -101,6 +105,14 @@ export function PaymentPrompt(props: PaymentPromptProps) {
         {/* Step 1: Collect email and tier BEFORE creating Elements */}
         {!clientSecret ? (
           <div className="space-y-4">
+            {props.previewText ? (
+              <div className="mb-4 p-3 rounded-lg border border-border-default bg-bg-tertiary/40">
+                <div className="text-xs font-semibold mb-1">Preview</div>
+                <div className="text-sm max-h-28 overflow-hidden" style={{ maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)' }}>
+                  {props.previewText}
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="email-input" className="text-base font-semibold">Email (for receipt + full answer):</Label>
               <Input
@@ -176,6 +188,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
               onBack={() => setClientSecret(null)}
               sessionId={props.sessionId}
               creatorId={props.creatorId}
+              messageIdToUnlock={props.messageIdToUnlock}
             />
           </Elements>
         )}
@@ -189,12 +202,13 @@ const CheckoutFormWithPayment: React.FC<{
   selectedAmount: number;
   payerEmail: string;
   clientSecret: string;
-  onSuccess: (reply?: string) => void;
+  onSuccess: (reply?: string, premiumExpiresAt?: string) => void;
   onCancel: () => void;
   onBack: () => void;
   sessionId: string;
   creatorId: string;
-}> = ({ selectedAmount, payerEmail, clientSecret, onSuccess, onCancel, onBack, sessionId, creatorId }) => {
+  messageIdToUnlock?: string;
+}> = ({ selectedAmount, payerEmail, clientSecret, onSuccess, onCancel, onBack, sessionId, creatorId, messageIdToUnlock }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -226,13 +240,14 @@ const CheckoutFormWithPayment: React.FC<{
         setLoading(false);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
         try {
-          const result = await apiFetch<{ success: boolean; reply?: string }>('/api/payments/pay-per-chat/confirm', {
+          const result = await apiFetch<{ success: boolean; reply?: string; premiumExpiresAt?: string }>('/api/payments/pay-per-chat/confirm', {
             method: 'POST',
             body: JSON.stringify({
               paymentIntentId: paymentIntent.id,
               sessionId,
               creatorId,
               amountCents: selectedAmount,
+              messageId: messageIdToUnlock || undefined, // NEW
             }),
           });
           setPaymentSuccess(true);
@@ -246,7 +261,7 @@ const CheckoutFormWithPayment: React.FC<{
           });
 
           setTimeout(() => {
-            onSuccess(result.reply);
+            onSuccess(result.reply, result.premiumExpiresAt);
           }, 2000);
         } catch (err: any) {
           setMessage(err.message || 'Payment succeeded but confirmation failed.');
