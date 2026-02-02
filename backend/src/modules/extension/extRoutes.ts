@@ -29,7 +29,7 @@ router.post('/mirror', async (req: ExtensionAuthedRequest, res) => {
     return res.json({
       success: true,
       decision: result.decision?.action || '',
-      decisionReason: result.decisionReason || result.decision?.reason || '',
+      decisionReason: result.decisionReason || (result.decision && 'reason' in result.decision ? result.decision.reason : '') || '',
       reply: result.reply,
       rulesApplied: result.rulesApplied,
       mirrorRunId: result.mirrorRunId,

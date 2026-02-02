@@ -1211,7 +1211,7 @@ export const mirrorRunQueries = {
     tokensOut?: number,
     costCents?: number,
     meta?: {
-      platform?: 'web' | 'gmail' | 'linkedin' | 'api';
+      platform?: 'web' | 'gmail' | 'linkedin' | 'api' | 'instagram' | 'phone';
       decisionAction?: 'reply' | 'ignore' | 'defer' | 'clarify';
       decisionReason?: string;
       validatorStatus?: 'pass' | 'fail' | 'skipped';

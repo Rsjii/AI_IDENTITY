@@ -64,8 +64,8 @@ export const createIdentity = async (req: AuthenticatedRequest, res: Response, n
 
     const { identityJson } = createIdentitySchema.parse(req.body);
 
-    // Create identity using service
-    const { identity, version } = await createIdentityService(req.user.id, identityJson);
+    // Create identity using service (ensure required fields)
+    const { identity, version } = await createIdentityService(req.user.id, identityJson as any);
 
     // ✅ ADD: advance onboarding step
     try {
@@ -166,7 +166,7 @@ export const updateIdentityVersion = async (req: AuthenticatedRequest, res: Resp
     const { identityJson } = updateIdentitySchema.parse(req.body);
 
     // Update using service (now creates new version instead of mutating)
-    const result = await updateIdentityVersionService(versionId, req.user.id, identityJson);
+    const result = await updateIdentityVersionService(versionId, req.user.id, identityJson as any);
 
     res.json({
       success: true,
@@ -218,7 +218,7 @@ export const createIdentityVersion = async (req: AuthenticatedRequest, res: Resp
     }
 
     const { identityJson } = createVersionSchema.parse(req.body);
-    const result = await createNewIdentityVersion(req.user.id, identityJson);
+    const result = await createNewIdentityVersion(req.user.id, identityJson as any);
 
     return res.json({
       success: true,
@@ -345,7 +345,7 @@ export const mirror = async (req: AuthenticatedRequest, res: Response, next: Nex
     res.json({
       success: true,
       decision: result.decision?.action || '',
-      decisionReason: result.decisionReason || result.decision?.reason || '',
+      decisionReason: result.decisionReason || (result.decision && 'reason' in result.decision ? result.decision.reason : '') || '',
       reply: result.reply,
       rulesApplied: result.rulesApplied,
       mirrorRunId: result.mirrorRunId,

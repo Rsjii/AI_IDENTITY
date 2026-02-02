@@ -49,7 +49,7 @@ export async function requireExtensionBearer(req: ExtensionAuthedRequest, res: R
     }
 
     // attach user + token
-    req.user = { id: userId, userId };
+    req.user = { id: userId, userId, email: '' }; // email not available for extension auth
     req.extensionToken = {
       id: matched.id,
       userId,

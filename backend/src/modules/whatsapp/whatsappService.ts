@@ -42,7 +42,7 @@ export async function sendWhatsAppMessage(
     throw new Error(`Send message failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { sid: string };
   return { messageSid: data.sid };
 }
 
@@ -83,7 +83,7 @@ export async function sendWhatsAppVoiceMessage(
     throw new Error(`Send voice message failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { sid: string };
   return { messageSid: data.sid };
 }
 

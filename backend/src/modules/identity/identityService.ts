@@ -556,7 +556,7 @@ export async function generateMirrorReplyWithLogging(
   userId: string,
   context: string,
   incomingMessage: string,
-  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api'; sessionId?: string; visitorId?: string; maxTokens?: number; teaserOnly?: boolean }
+  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api' | 'instagram' | 'phone'; sessionId?: string; visitorId?: string; maxTokens?: number; teaserOnly?: boolean }
 ) {
   const platform = opts?.platform || 'web';
 
@@ -661,8 +661,8 @@ export async function generateMirrorReplyWithLogging(
       costCents,
       {
         platform,
-        decisionAction: decision.action,
-        decisionReason: decision.reason,
+        decisionAction: decision.action === 'escalate' ? 'defer' : decision.action, // map escalate to defer for DB
+        decisionReason: decision.reason || '',
         validatorStatus: 'skipped',
         validatorViolations: [],
         latencyMs: Date.now() - startTime,

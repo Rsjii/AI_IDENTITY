@@ -6,7 +6,7 @@ export function getStripe(): Stripe {
   if (!stripe) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY missing');
-    stripe = new Stripe(key, { apiVersion: '2023-10-16' });
+    stripe = new Stripe(key, { apiVersion: '2024-06-20' });
   }
   return stripe;
 }
@@ -52,7 +52,7 @@ export async function createWhatsAppPaymentLink(params: {
           },
         },
         quantity: 1,
-      },
+      } as any, // Stripe TypeScript types don't include price_data for LineItem, but it's valid in API
     ],
     after_completion: {
       type: 'redirect',

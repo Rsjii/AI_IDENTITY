@@ -43,7 +43,7 @@ export async function createOrder(params: {
     notes: params.notes || {},
   });
 
-  return { id: order.id, amount: order.amount, currency: order.currency };
+  return { id: order.id, amount: typeof order.amount === 'number' ? order.amount : Number(order.amount), currency: order.currency };
 }
 
 export function verifyPaymentSignature(params: {

@@ -223,7 +223,7 @@ async function processIncomingMessage(event: any) {
       }
     );
 
-    if (result.decision === 'reply' && result.reply) {
+    if (result.decision?.action === 'reply' && result.reply) {
       // Send reply back via Instagram
       await sendInstagramMessage(senderId, result.reply, accessToken);
       logger.info(`[Instagram] Sent reply to ${senderId}`);

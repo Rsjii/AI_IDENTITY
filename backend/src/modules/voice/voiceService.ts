@@ -34,7 +34,7 @@ async function createElevenLabsVoice(audioBuffer: Buffer, fileName: string, labe
     throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { voice_id: string };
   return data.voice_id; // ElevenLabs returns the voice_id
 }
 

@@ -28,7 +28,7 @@ export async function exchangeForLongLivedToken(shortLivedToken: string): Promis
     throw new Error(`Token exchange failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { access_token: string };
   return data.access_token;
 }
 
@@ -53,7 +53,7 @@ export async function getInstagramProfile(accessToken: string): Promise<{
     throw new Error(`Profile fetch failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { id: string; username: string; name?: string; profile_picture_url?: string };
   return {
     id: data.id,
     username: data.username,
@@ -90,7 +90,7 @@ export async function sendInstagramMessage(
     throw new Error(`Send message failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { message_id: string };
   return { messageId: data.message_id };
 }
 

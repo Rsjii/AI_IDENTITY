@@ -34,7 +34,7 @@ export async function mirrorVoice(req: any, res: Response) {
     return res.json({
       success: true,
       decision: result.decision?.action || '',
-      decisionReason: result.decisionReason || result.decision?.reason || '',
+      decisionReason: result.decisionReason || (result.decision && 'reason' in result.decision ? result.decision.reason : '') || '',
       reply: result.reply,
       mirrorRunId: result.mirrorRunId,
       audioUrl,

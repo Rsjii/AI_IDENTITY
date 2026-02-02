@@ -105,7 +105,7 @@ function extractChannelId(channelUrl: string, apiKey: string): Promise<string> {
       const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(username)}&key=${apiKey}`;
       try {
         const searchRes = await fetch(searchUrl);
-        const searchData = await searchRes.json();
+        const searchData = await searchRes.json() as { items?: Array<{ id: { channelId: string } }> };
         if (searchData.items && searchData.items.length > 0) {
           channelId = searchData.items[0].id.channelId;
           resolve(channelId);
@@ -133,7 +133,7 @@ async function fetchAllYouTubeVideos(channelId: string, apiKey: string): Promise
   do {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=50&order=date&key=${apiKey}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
     const res = await fetch(url);
-    const data = await res.json();
+    const data = await res.json() as { error?: { message: string }; items?: any[]; nextPageToken?: string };
 
     if (data.error) {
       throw new Error(`YouTube API error: ${data.error.message}`);
