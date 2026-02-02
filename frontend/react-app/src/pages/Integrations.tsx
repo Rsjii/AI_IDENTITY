@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
-import { Copy, Eye, FileCode, MessageCircle, QrCode, Check, ExternalLink, Download } from 'lucide-react';
+import { Copy, Eye, FileCode, MessageCircle, Check, ExternalLink, Download } from 'lucide-react';
 import { FLAGS } from '@/lib/flags';
 import QRCode from 'qrcode';
 

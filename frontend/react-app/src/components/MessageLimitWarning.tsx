@@ -20,7 +20,6 @@ export function MessageLimitWarning({
   ],
   variant = 'inline',
 }: MessageLimitWarningProps) {
-  const messagesUsed = totalFreeMessages - remainingMessages;
   const isLastMessage = remainingMessages === 1;
   const isOutOfMessages = remainingMessages === 0;
 

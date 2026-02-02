@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { ThumbsUp, ThumbsDown, Send, Loader2, X, Copy, Check, RotateCcw, Lock, Star, MessageCircle, Zap, Menu } from 'lucide-react';
 import { PaymentPrompt } from '@/components/PaymentPrompt';
@@ -72,7 +72,6 @@ function shouldShowTimestamp(current: Date, previous?: Date): boolean {
 
 export function PublicChatPage() {
   const { slug = '' } = useParams();
-  const nav = useNavigate();
   const { state } = useAuth();
   const isAuthed = state.status === 'authenticated';
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
@@ -197,10 +196,6 @@ export function PublicChatPage() {
 
     checkMessageLimit();
   }, [sessionId, isAuthed, msgs.length]);
-
-  const handleLogin = () => {
-    nav(`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`);
-  };
 
   const openPaymentModalFromLimit = () => {
     if (!creator?.id || !sessionId) return;

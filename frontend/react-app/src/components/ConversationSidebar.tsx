@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Star, Lock, MessageCircle, X, Filter, Clock, DollarSign } from 'lucide-react';
+import { Search, Star, Lock, MessageCircle, X, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
@@ -44,7 +44,6 @@ export function ConversationSidebar({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
-  const [showFilters, setShowFilters] = useState(false);
 
   const loadConversations = async () => {
     setLoading(true);
@@ -129,7 +128,7 @@ export function ConversationSidebar({
     return 'bg-blue-100 text-blue-700';
   };
 
-  const getTierIcon = (tier: string, isPaid: boolean) => {
+  const getTierIcon = (_tier: string, isPaid: boolean) => {
     if (!isPaid) return <Lock className="h-3 w-3" />;
     return <DollarSign className="h-3 w-3" />;
   };
