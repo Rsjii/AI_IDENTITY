@@ -116,7 +116,7 @@ function App() {
               <Route
                 path="/chat/:slug"
                 element={
-                  <Layout showFooter={false} useContainer={false} mainClassName="p-0">
+                  <Layout showNavbar={false} showFooter={false} useContainer={false} mainClassName="p-0">
                     <PublicChatPage />
                   </Layout>
                 }

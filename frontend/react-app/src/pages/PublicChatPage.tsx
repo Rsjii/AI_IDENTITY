@@ -15,6 +15,8 @@ import {
   Zap,
   Menu,
   Info,
+  LogOut,
+  Settings,
 } from 'lucide-react';
 
 import { PaymentPrompt } from '@/components/PaymentPrompt';
@@ -113,8 +115,17 @@ function formatDuration(ms: number): string {
 
 export function PublicChatPage() {
   const { slug = '' } = useParams();
-  const { state } = useAuth();
+  const { state, logout } = useAuth();
   const isAuthed = state.status === 'authenticated';
+
+  const onLogout = async () => {
+    try {
+      await logout();
+      showToast('Logged out', 'success');
+    } catch {
+      showToast('Logout failed', 'error');
+    }
+  };
 
   const visitorId = useMemo(() => getOrCreateVisitorId(), []);
   const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
@@ -476,7 +487,7 @@ export function PublicChatPage() {
     <div className="theme-light min-h-screen bg-bg-primary flex">
       {/* LEFT: Conversations (authed only) */}
       {!isMobile && (
-        <div className="w-80 flex-shrink-0 border-r border-border-default bg-bg-secondary">
+        <div className="w-[280px] flex-shrink-0 border-r border-border-default bg-bg-secondary">
           {isAuthed ? (
             <ConversationSidebar currentSessionId={sessionId} />
           ) : (
@@ -521,34 +532,39 @@ export function PublicChatPage() {
 
       {/* CENTER: chat */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header with breadcrumb + actions */}
+        {/* Header with Logo + Creator + Actions */}
         <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
           <div className="max-w-5xl mx-auto flex items-center gap-3">
+            {/* Logo (left) */}
+            <Link to="/" className="font-bold text-text-primary tracking-tight mr-2">
+              Selflyx<span className="text-accent-primary">.</span>
+            </Link>
+
+            {/* Mobile hamburger */}
             {isMobile && (
               <button onClick={() => setShowSidebar(true)} className="p-2 hover:bg-bg-elevated rounded-lg">
                 <Menu className="h-5 w-5 text-text-primary" />
               </button>
             )}
 
+            {/* Creator identity */}
             <div className="flex items-center gap-3 min-w-0">
               {creator?.avatarUrl && (
-                <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-10 h-10 rounded-full" />
+                <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-9 h-9 rounded-full" />
               )}
               <div className="min-w-0">
                 <div className="text-xs text-text-tertiary">
-                  <Link to="/" className="hover:underline">
-                    Home
-                  </Link>{' '}
-                  /{' '}
-                  <Link to="/marketplace" className="hover:underline">
-                    Marketplace
-                  </Link>{' '}
-                  / <span className="text-text-secondary">{creator?.displayName || slug}</span>
+                  <Link to="/marketplace" className="hover:underline">Marketplace</Link>
+                  {' / '}
+                  <span className="text-text-secondary">{creator?.displayName || slug}</span>
                 </div>
-                <div className="font-semibold text-text-primary truncate">{creator?.displayName || slug}</div>
+                <div className="font-semibold text-text-primary truncate">
+                  Chat with {creator?.displayName || slug}'s AI
+                </div>
               </div>
             </div>
 
+            {/* Right actions */}
             <div className="ml-auto flex items-center gap-2">
               {!isAuthed ? (
                 <Link
@@ -558,12 +574,22 @@ export function PublicChatPage() {
                   Login to Save
                 </Link>
               ) : (
-                <Link
-                  to="/conversations"
-                  className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
-                >
-                  My Chats
-                </Link>
+                <>
+                  <Link
+                    to="/settings"
+                    className="p-2 hover:bg-bg-elevated rounded-lg"
+                    title="Settings"
+                  >
+                    <Settings className="h-5 w-5 text-text-primary" />
+                  </Link>
+                  <button
+                    onClick={onLogout}
+                    className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated inline-flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </>
               )}
 
               {isMobile && (
@@ -682,12 +708,20 @@ export function PublicChatPage() {
                         {m.isTeaser && (
                           <>
                             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg-secondary to-transparent pointer-events-none" />
-                            <div className="absolute inset-x-0 bottom-3 flex justify-center">
+                            <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2 px-3">
+                              {!isAuthed && (
+                                <Link
+                                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                                  className="px-4 py-2 bg-bg-tertiary border border-border-default rounded-lg font-medium"
+                                >
+                                  Login (recommended)
+                                </Link>
+                              )}
                               <button
                                 onClick={() => setShowPaymentModal(true)}
                                 className="px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium shadow"
                               >
-                                Unlock full answer (includes 24h access)
+                                Unlock full answer
                               </button>
                             </div>
                           </>
@@ -848,19 +882,98 @@ export function PublicChatPage() {
 
             <div className="mt-4 border-t border-border-default pt-4">
               <div className="text-sm font-semibold text-text-primary mb-2">Pricing</div>
-              <div className="text-sm text-text-secondary">
-                <div>🆓 First 3 questions free</div>
-                <div className="mt-2">✨ Any payment unlocks <strong>24h unlimited</strong></div>
+
+              <div className="text-sm text-text-secondary space-y-1">
+                <div>🆓 First {freeLimit} questions free</div>
+                <div className="text-xs text-text-tertiary">
+                  ✨ Any payment unlocks <strong>24h unlimited</strong> access for this session
+                </div>
+
+                {Array.isArray(creator?.priceConfig?.payPerChatTiers) && creator.priceConfig.payPerChatTiers.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {creator.priceConfig.payPerChatTiers
+                      .slice(0, 4)
+                      .map((cents: number) => (
+                        <div key={cents} className="flex items-center justify-between">
+                          <span className="text-text-secondary">• Tier</span>
+                          <span className="font-semibold text-text-primary">${(cents / 100).toFixed(0)}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
-              {!isAuthed && (
-                <Link
-                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                  className="mt-4 inline-flex items-center justify-center w-full px-4 py-2 bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
-                >
-                  Login to save chats
-                </Link>
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
+              >
+                View pricing / Upgrade
+              </button>
+            </div>
+
+            {/* Session status box */}
+            <div className="mt-4 border-t border-border-default pt-4">
+              <div className="text-sm font-semibold text-text-primary mb-2">Your session</div>
+
+              {premiumRemainingMs !== null && premiumRemainingMs > 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+                  <div className="font-semibold">⚡ Premium active</div>
+                  <div className="text-xs mt-1">
+                    Time left: <strong>{formatDuration(premiumRemainingMs)}</strong>
+                  </div>
+                  {premiumExpiresAt && (
+                    <div className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+                      Expires: {new Date(premiumExpiresAt).toLocaleString()}
+                    </div>
+                  )}
+                  <button onClick={() => setShowPaymentModal(true)} className="mt-2 text-xs underline">
+                    Extend access
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border-default bg-bg-tertiary p-3 text-sm text-text-secondary">
+                  Free remaining: <strong>{remainingFree}/{freeLimit}</strong>
+                </div>
               )}
+            </div>
+
+            {/* Social links + trust badges */}
+            <div className="mt-4 border-t border-border-default pt-4">
+              <div className="text-sm font-semibold text-text-primary mb-2">Links</div>
+              <div className="text-sm text-text-secondary space-y-1">
+                {creator?.socialLinks?.twitter ? (
+                  <a className="hover:underline block" href={creator.socialLinks.twitter} target="_blank" rel="noreferrer">
+                    Twitter
+                  </a>
+                ) : null}
+                {creator?.socialLinks?.instagram ? (
+                  <a className="hover:underline block" href={creator.socialLinks.instagram} target="_blank" rel="noreferrer">
+                    Instagram
+                  </a>
+                ) : null}
+                {creator?.socialLinks?.youtube ? (
+                  <a className="hover:underline block" href={creator.socialLinks.youtube} target="_blank" rel="noreferrer">
+                    YouTube
+                  </a>
+                ) : null}
+                {creator?.socialLinks?.website ? (
+                  <a className="hover:underline block" href={creator.socialLinks.website} target="_blank" rel="noreferrer">
+                    Website
+                  </a>
+                ) : null}
+                {!creator?.socialLinks?.twitter &&
+                  !creator?.socialLinks?.instagram &&
+                  !creator?.socialLinks?.youtube &&
+                  !creator?.socialLinks?.website && (
+                    <div className="text-xs text-text-tertiary">No links provided.</div>
+                  )}
+              </div>
+
+              <div className="mt-3 text-xs text-text-tertiary space-y-1">
+                <div>🔒 Encrypted messages</div>
+                <div>✅ Secure payments (Stripe)</div>
+                <div>📩 Receipt + full answer via email</div>
+              </div>
             </div>
           </div>
 

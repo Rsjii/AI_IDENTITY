@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Star, Lock, MessageCircle, X, DollarSign } from 'lucide-react';
+import { Search, Star, Lock, MessageCircle, X, DollarSign, Archive, Download, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
@@ -32,6 +32,20 @@ interface ConversationSidebarProps {
 }
 
 type FilterType = 'all' | 'paid' | 'free' | 'favorites';
+type GroupKey = 'Today' | 'Yesterday' | 'Last 7 days' | 'Older';
+
+function getGroupKey(iso: string): GroupKey {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfThatDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.floor((startOfToday - startOfThatDay) / 86400000);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays <= 6) return 'Last 7 days';
+  return 'Older';
+}
 
 export function ConversationSidebar({
   currentSessionId,
@@ -44,6 +58,7 @@ export function ConversationSidebar({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const loadConversations = async () => {
     setLoading(true);
@@ -78,6 +93,19 @@ export function ConversationSidebar({
     loadConversations();
   }, [filter, search]);
 
+  // Ctrl/Cmd+K keyboard shortcut to focus search
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isK = e.key.toLowerCase() === 'k';
+      const isCmdK = (e.metaKey || e.ctrlKey) && isK;
+      if (!isCmdK) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const handleConversationClick = (conversation: Conversation) => {
     if (onConversationSelect) {
       onConversationSelect(conversation.sessionId, conversation.creatorHandle || conversation.creatorId);
@@ -102,6 +130,61 @@ export function ConversationSidebar({
       }
     } catch {
       showToast('Failed to update favorite', 'error');
+    }
+  };
+
+  const toggleArchive = async (sessionId: string, next: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await apiFetch(`/api/user/conversations/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isArchived: next }),
+      });
+      if (res?.success) {
+        setConversations((prev) =>
+          prev.map((c) => (c.sessionId === sessionId ? { ...c, isArchived: next } : c))
+        );
+        showToast(next ? 'Archived' : 'Unarchived', 'success');
+      }
+    } catch {
+      showToast('Failed to update archive', 'error');
+    }
+  };
+
+  const exportConversation = async (sessionId: string, format: 'txt' | 'json', e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const r = await fetch(`/api/user/conversations/${encodeURIComponent(sessionId)}/export?format=${format}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!r.ok) throw new Error('Export failed');
+      const blob = await r.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `conversation-${sessionId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('Exported', 'success');
+    } catch {
+      showToast('Export failed', 'error');
+    }
+  };
+
+  const deleteConversation = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this conversation? This cannot be undone.')) return;
+    try {
+      const res = await apiFetch(`/api/user/conversations/${sessionId}`, { method: 'DELETE' });
+      if (res?.success) {
+        setConversations((prev) => prev.filter((c) => c.sessionId !== sessionId));
+        showToast('Conversation deleted', 'success');
+      }
+    } catch {
+      showToast('Failed to delete conversation', 'error');
     }
   };
 
@@ -153,8 +236,9 @@ export function ConversationSidebar({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
           <Input
+            ref={searchRef}
             type="text"
-            placeholder="Search conversations..."
+            placeholder="Search conversations... (Ctrl/Cmd+K)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-3 h-10"
@@ -216,88 +300,143 @@ export function ConversationSidebar({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border-default">
-            {conversations.map((conv) => (
-              <button
-                key={conv.sessionId}
-                onClick={() => handleConversationClick(conv)}
-                className={`w-full text-left p-4 hover:bg-bg-elevated transition-colors ${
-                  currentSessionId === conv.sessionId ? 'bg-bg-elevated border-l-4 border-accent-primary' : ''
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Creator Avatar */}
-                  <div className="flex-shrink-0">
-                    {conv.creatorAvatar ? (
-                      <img
-                        src={conv.creatorAvatar}
-                        alt={conv.creatorName}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-accent-primary">
-                          {conv.creatorName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+          (() => {
+            const grouped = conversations.reduce<Record<GroupKey, Conversation[]>>(
+              (acc, c) => {
+                const key = getGroupKey(c.lastMessageAt);
+                acc[key].push(c);
+                return acc;
+              },
+              { Today: [], Yesterday: [], 'Last 7 days': [], Older: [] }
+            );
 
-                  {/* Conversation Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <h3 className="font-medium text-text-primary text-sm truncate">
-                          {conv.creatorName}
-                        </h3>
+            return (
+              <div className="divide-y divide-border-default">
+                {(Object.keys(grouped) as GroupKey[]).map((groupKey) => {
+                  const list = grouped[groupKey];
+                  if (list.length === 0) return null;
+                  return (
+                    <div key={groupKey}>
+                      <div className="px-4 py-2 text-xs font-semibold text-text-tertiary bg-bg-primary/40">
+                        {groupKey}
+                      </div>
+
+                      {list.map((conv) => (
                         <button
-                          type="button"
-                          onClick={(e) => toggleFavorite(conv.sessionId, !conv.isFavorite, e)}
-                          className="p-0.5 rounded hover:bg-bg-tertiary flex-shrink-0"
-                          title={conv.isFavorite ? 'Unfavorite' : 'Favorite'}
+                          key={conv.sessionId}
+                          onClick={() => handleConversationClick(conv)}
+                          className={`group w-full text-left p-4 hover:bg-bg-elevated transition-colors ${
+                            currentSessionId === conv.sessionId ? 'bg-bg-elevated border-l-4 border-accent-primary' : ''
+                          }`}
                         >
-                          <Star className={`h-3 w-3 ${conv.isFavorite ? 'text-yellow-500 fill-yellow-500' : 'text-text-tertiary'}`} />
+                          <div className="flex items-start gap-3">
+                            {/* Creator Avatar */}
+                            <div className="flex-shrink-0">
+                              {conv.creatorAvatar ? (
+                                <img
+                                  src={conv.creatorAvatar}
+                                  alt={conv.creatorName}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
+                                  <span className="text-sm font-semibold text-accent-primary">
+                                    {conv.creatorName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Conversation Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <h3 className="font-medium text-text-primary text-sm truncate">
+                                    {conv.creatorName}
+                                  </h3>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => toggleFavorite(conv.sessionId, !conv.isFavorite, e)}
+                                    className="p-0.5 rounded hover:bg-bg-tertiary flex-shrink-0"
+                                    title={conv.isFavorite ? 'Unfavorite' : 'Favorite'}
+                                  >
+                                    <Star className={`h-3 w-3 ${conv.isFavorite ? 'text-yellow-500 fill-yellow-500' : 'text-text-tertiary'}`} />
+                                  </button>
+                                </div>
+                                <span className="text-xs text-text-tertiary flex-shrink-0">
+                                  {formatTimeAgo(conv.lastMessageAt)}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-text-secondary line-clamp-2 mb-2">
+                                {conv.lastMessage}
+                              </p>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-text-tertiary flex items-center gap-1">
+                                    <MessageCircle className="h-3 w-3" />
+                                    {conv.messageCount}
+                                  </span>
+                                  {conv.isPaid && (
+                                    <span
+                                      className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${getTierBadgeClass(
+                                        conv.paymentTier,
+                                        conv.isPaid
+                                      )}`}
+                                    >
+                                      {getTierIcon(conv.paymentTier, conv.isPaid)}
+                                      {conv.isPaid ? `$${(conv.paymentAmount / 100).toFixed(0)}` : 'Free'}
+                                    </span>
+                                  )}
+                                </div>
+                                {!conv.isPaid && (
+                                  <span className="text-xs text-text-tertiary flex items-center gap-1">
+                                    <Lock className="h-3 w-3" />
+                                    Free
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={(e) => toggleArchive(conv.sessionId, !conv.isArchived, e)}
+                                className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated"
+                                title={conv.isArchived ? 'Unarchive' : 'Archive'}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => exportConversation(conv.sessionId, 'txt', e)}
+                                className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated"
+                                title="Export TXT"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => deleteConversation(conv.sessionId, e)}
+                                className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
                         </button>
-                      </div>
-                      <span className="text-xs text-text-tertiary flex-shrink-0">
-                        {formatTimeAgo(conv.lastMessageAt)}
-                      </span>
+                      ))}
                     </div>
-
-                    <p className="text-xs text-text-secondary line-clamp-2 mb-2">
-                      {conv.lastMessage}
-                    </p>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-tertiary flex items-center gap-1">
-                          <MessageCircle className="h-3 w-3" />
-                          {conv.messageCount}
-                        </span>
-                        {conv.isPaid && (
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${getTierBadgeClass(
-                              conv.paymentTier,
-                              conv.isPaid
-                            )}`}
-                          >
-                            {getTierIcon(conv.paymentTier, conv.isPaid)}
-                            {conv.isPaid ? `$${(conv.paymentAmount / 100).toFixed(0)}` : 'Free'}
-                          </span>
-                        )}
-                      </div>
-                      {!conv.isPaid && (
-                        <span className="text-xs text-text-tertiary flex items-center gap-1">
-                          <Lock className="h-3 w-3" />
-                          Free
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })()
         )}
       </div>
 
