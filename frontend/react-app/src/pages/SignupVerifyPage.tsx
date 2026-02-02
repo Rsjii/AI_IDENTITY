@@ -22,6 +22,14 @@ export function SignupVerifyPage() {
   const { refresh } = useAuth();
 
   const initialEmail = q.get('email') || '';
+  const nextParam = q.get('next') || '';
+  const safeNext = useMemo(() => {
+    // only allow internal paths; also avoid looping back into auth/verify
+    if (!nextParam.startsWith('/')) return '';
+    if (nextParam.startsWith('/auth')) return '';
+    if (nextParam.startsWith('/signup/verify')) return '';
+    return nextParam;
+  }, [nextParam]);
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -69,6 +77,14 @@ export function SignupVerifyPage() {
         { method: 'POST', body: JSON.stringify({ email, code }) }
       );
       await refresh(); // ✅ Refresh auth state after JWT cookie is set
+
+      // ✅ If user originally came from a protected page, go there after verification.
+      // ProtectedRoute will still enforce profile/onboarding steps if needed.
+      if (safeNext) {
+        navigate(safeNext, { replace: true });
+        return;
+      }
+
       if (result.redirect) navigate(result.redirect, { replace: true });
       else navigate('/onboarding', { replace: true });      
     } catch (err: any) {

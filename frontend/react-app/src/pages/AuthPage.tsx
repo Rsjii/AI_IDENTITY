@@ -149,15 +149,20 @@ export function AuthPage() {
         }),
       });
 
-      // ✅ preserve next for signup too
-      if (safeNext) {
-        navigate(safeNext, { replace: true });
-        return;
-      }
-
+      // ✅ Signup MUST go to OTP verify first.
+      // Instead of navigating to safeNext immediately, carry it forward to /signup/verify via querystring.
       if (result.redirect) {
         const redirectPath = result.redirect.startsWith('/') ? result.redirect : '/' + result.redirect;
-        navigate(redirectPath, { replace: true });
+
+        // attach ?next=... only if it's a safe internal path
+        let finalRedirect = redirectPath;
+        if (safeNext) {
+          const u = new URL(redirectPath, window.location.origin);
+          u.searchParams.set('next', safeNext);
+          finalRedirect = u.pathname + u.search + u.hash;
+        }
+
+        navigate(finalRedirect, { replace: true });
       } else {
         setError('Signup successful but no redirect provided.');
       }
