@@ -13,7 +13,7 @@ Below is a **copy‑paste friendly MD** style guide with **diagrams + exact env 
   - **Paste / URL** → DB (and outbound internet fetch)
   - **File upload** → **S3/R2 is REQUIRED** (otherwise upload 500)
   - **YouTube video URL transcript** → no OAuth, transcript availability matters
-  - **YouTube/Twitter/Instagram OAuth import** → respective platform apps + env keys
+  - **YouTube/Twitter/Instagram/LinkedIn OAuth import** → respective platform apps + env keys
 - **Training (embeddings/RAG)** → OpenAI/Groq keys (depending what you use) + DB
 - **Email “training ready” + OTP emails (prod)** → Resend key (in your code it’s `SMTP_PASS`)
 - **Payments** → Stripe keys + webhook setup (prod)
@@ -27,7 +27,7 @@ flowchart TD
   BE --> LLM[Groq/OpenAI APIs]
   BE --> EMB[Embeddings + RAG]
   BE --> EMAIL[Resend Email API]
-  BE --> OAUTH[Google/Twitter/Meta OAuth]
+  BE --> OAUTH[Google/Twitter/Meta/LinkedIn OAuth]
   OAUTH --> BE
 ```
 
@@ -223,12 +223,20 @@ YOUTUBE_OAUTH_CALLBACK_URL=http://localhost:3000/api/content/social/youtube/call
 ---
 
 ### 5.3 Twitter/X (OAuth 2.0 + PKCE) — setup
+#### ⚠️ Important: API Credits Required
+**Twitter API requires paid credits/subscription** to fetch tweets. Free tier has very limited access. If you see `402 Payment Required` error, you need to:
+- Upgrade to Twitter API Basic ($100/month) or higher
+- Add credits to your Twitter Developer account
+- Without credits, tweets fetch will fail with 402 error
+
 #### What you need (X Developer Portal)
 1. Go to [X Developer Portal](https://developer.x.com/)
 2. Create Project/App
 3. Enable OAuth 2.0
 4. Add callback URL:
    - `http://localhost:3000/api/content/social/twitter/callback`
+   - For production: `https://yourdomain.com/api/content/social/twitter/callback`
+5. **Enable API access and purchase credits** (required for fetching tweets)
 
 Env:
 ```env
@@ -239,8 +247,10 @@ TWITTER_CALLBACK_URL=http://localhost:3000/api/content/social/twitter/callback
 
 #### How it reads data
 - Token → `GET /2/users/me` to get user id
-- Then `GET /2/users/:id/tweets?...`
+- Then `GET /2/users/:id/tweets?...` (requires API credits)
+- Fetches last 100 tweets (excluding retweets/replies)
 - Builds text dump → stores as knowledge source
+- **Note:** If API credits are depleted, connection will succeed but tweets will be empty (0 bytes)
 
 ---
 
@@ -277,6 +287,63 @@ INSTAGRAM_CALLBACK_URL=http://localhost:3000/api/content/social/instagram/callba
 - Fetch media:
   - `/{igUserId}/media?...`
 - Build text → store chunks
+
+---
+
+### 5.5 LinkedIn (OAuth 2.0) — setup
+#### What you need (LinkedIn Developer Portal)
+1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/)
+2. Create a new **App** (or use existing)
+3. In **Auth** tab, add **Redirect URLs**:
+   - Local: `http://localhost:3000/api/content/social/linkedin/callback`
+   - Production: `https://yourdomain.com/api/content/social/linkedin/callback`
+4. Request **Products** (if not already added):
+   - **Sign In with LinkedIn using OpenID Connect**
+   - **Marketing Developer Platform** (for posts API access)
+5. Note your **Client ID** and **Client Secret**
+
+#### Required Scopes (Permissions)
+Your app needs these OAuth scopes:
+- `openid` - Basic authentication
+- `profile` - User profile information
+- `email` - User email address
+- `w_member_social` - Read user's posts (requires approval)
+- `r_liteprofile` - Basic profile (deprecated, use `profile` instead)
+
+**Note:** `w_member_social` scope requires **LinkedIn Partner Program approval** for production use. For testing, you can use basic scopes but won't be able to fetch posts.
+
+Env:
+```env
+LINKEDIN_CLIENT_ID=...
+LINKEDIN_CLIENT_SECRET=...
+LINKEDIN_CALLBACK_URL=http://localhost:3000/api/content/social/linkedin/callback
+```
+
+#### How it reads data
+- Exchange code → access token
+- Fetch user profile: `GET /v2/userinfo` (OpenID Connect)
+- Fetch user's posts: `GET /v2/ugcPosts?q=authors&authors=List({personUrn})`
+  - **Note:** Posts API requires Partner Program approval
+- Alternative (if posts API not available):
+  - Use Extension-based import (current implementation)
+  - Or fetch via LinkedIn Activity API (limited)
+- Build text dump → stores as knowledge source
+
+#### LinkedIn API Limitations
+- **Free tier:** Very limited API access
+- **Posts API:** Requires Partner Program approval (strict process)
+- **Rate limits:** Strict rate limiting on all endpoints
+- **Alternative:** Extension-based import (browser extension scrapes posts)
+
+#### Production Setup Steps
+1. **Apply for LinkedIn Partner Program** (if you need posts API):
+   - Go to [LinkedIn Partner Program](https://www.linkedin.com/help/linkedin/answer/a1338220)
+   - Submit application with use case
+   - Wait for approval (can take weeks)
+2. **Verify your app** (for production):
+   - Complete app verification process
+   - Add privacy policy and terms of service URLs
+3. **Update redirect URLs** for production domain
 
 ---
 
@@ -357,6 +424,10 @@ META_APP_ID=...
 META_APP_SECRET=...
 INSTAGRAM_CALLBACK_URL=http://localhost:3000/api/content/social/instagram/callback
 
+LINKEDIN_CLIENT_ID=...
+LINKEDIN_CLIENT_SECRET=...
+LINKEDIN_CALLBACK_URL=http://localhost:3000/api/content/social/linkedin/callback
+
 # Stripe (you already did)
 STRIPE_SECRET_KEY=...
 STRIPE_WEBHOOK_SECRET=...
@@ -374,3 +445,18 @@ vZgFy-AFuhFddztmDy47xFFljTcnfAImIaoGMKSP
 Use jurisdiction-specific endpoints for S3 clients:
 DefaultEuropean Union (EU)
 https://0ee444084e868589c5da757a15530822.r2.cloudflarestorage.com
+
+
+
+
+
+
+
+
+
+  
+
+
+Consumer Key: LVEPuoe9q8aLkJ4Mb7U3zE34q
+Secret Key: dHRqXwTiXgWOzSyi3rSTvBrxXMKwH7EsSWIiAytgkUaIOJpnfL
+Bearer Token: AAAAAAAAAAAAAAAAAAAAAI9e7QEAAAAAZLRlgWeX6nmirNL75UJeg1RqSE0%3D3DbZgltCXvvUPseRHYtjru6nmYPSl21pU4cgxeczszRN9WzwIG

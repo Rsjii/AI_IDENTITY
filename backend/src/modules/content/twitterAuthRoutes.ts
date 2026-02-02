@@ -8,6 +8,9 @@ import { randomBytes, createHash } from 'crypto';
 
 const router = Router();
 
+// Helper function to get frontend URL for redirects
+const getFrontendUrl = () => process.env.FRONTEND_URL || 'http://localhost:5173';
+
 function base64Url(buf: Buffer) {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
@@ -82,7 +85,7 @@ router.get(
     const code = String(req.query.code || '');
     const state = String(req.query.state || '');
 
-    if (!code || !state) return res.redirect('/onboarding/content?error=twitter_oauth_failed');
+    if (!code || !state) return res.redirect(`${getFrontendUrl()}/onboarding/content?error=twitter_oauth_failed`);
 
     const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID;
     const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
@@ -104,11 +107,11 @@ router.get(
         .find((r: any) => (r.config?.state || '') === state);
 
       if (!match?.userId || !match?.config?.codeVerifier) {
-        return res.redirect('/onboarding/content?error=invalid_state');
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?error=invalid_state`);
       }
 
       if (match.config.expiresAt && Date.now() > Number(match.config.expiresAt)) {
-        return res.redirect('/onboarding/content?error=state_expired');
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?error=state_expired`);
       }
 
       const userId = match.userId;
@@ -165,13 +168,122 @@ router.get(
       );
 
       // Import tweets
+      logger.info({ twitterUserId, handle: twitterHandle }, '[Twitter OAuth] Fetching tweets from API');
+      
       const tweetsResponse = await fetch(
         `https://api.twitter.com/2/users/${twitterUserId}/tweets?max_results=100&tweet.fields=created_at,text,public_metrics&exclude=retweets,replies`,
         { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
       );
 
+      // ✅ ADD: Check response status
+      if (!tweetsResponse.ok) {
+        const errorData: any = await tweetsResponse.json().catch(() => ({}));
+        logger.warn({ 
+          status: tweetsResponse.status, 
+          statusText: tweetsResponse.statusText,
+          error: errorData,
+          twitterUserId,
+          handle: twitterHandle
+        }, '[Twitter OAuth] Failed to fetch tweets - API error');
+        
+        // Continue with empty tweets - still save the connection
+        const tweets: any[] = [];
+        
+        // Save source with error message
+        const existingSources = await knowledgeSourceQueries.listByUserId(userId);
+        const existingSource = existingSources.find((s: any) => s.type === 'twitter');
+        
+        let source: any;
+        const errorMessage = errorData?.error?.message || errorData?.title || errorData?.detail || 'Unknown error';
+        const fallbackText = `Twitter: @${twitterHandle}\n\nNo tweets available. This may be due to:\n- Rate limit reached (${tweetsResponse.status})\n- API permissions issue\n- Account has no tweets\n\nError: ${errorMessage}`;
+        
+        if (existingSource) {
+          await knowledgeSourceQueries.update(existingSource.id, {
+            rawText: fallbackText,
+            lastFetchedAt: new Date(),
+            fetchMetadata: { 
+              tweetsCount: 0, 
+              handle: twitterHandle,
+              error: `API returned ${tweetsResponse.status}: ${errorMessage}`,
+              apiStatus: tweetsResponse.status
+            },
+          });
+          source = existingSource;
+        } else {
+          source = await knowledgeSourceQueries.create({
+            userId,
+            type: 'twitter',
+            title: `X/Twitter: @${twitterHandle}`,
+            originalUrl: `https://twitter.com/${twitterHandle}`,
+            rawText: fallbackText,
+            fetchMetadata: {
+              tweetsCount: 0,
+              handle: twitterHandle,
+              error: `API returned ${tweetsResponse.status}: ${errorMessage}`,
+              apiStatus: tweetsResponse.status
+            },
+          });
+        }
+        
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?success=twitter_connected&warning=no_tweets`);
+      }
+
       const tweetsData: any = await tweetsResponse.json();
       const tweets = tweetsData.data || [];
+
+      // ✅ ADD: Log what we got
+      logger.info({ 
+        tweetsCount: tweets.length,
+        twitterUserId,
+        handle: twitterHandle,
+        responseStatus: tweetsResponse.status,
+        hasData: !!tweetsData.data,
+        errorInResponse: tweetsData.error || null
+      }, '[Twitter OAuth] Tweets API response received');
+
+      // ✅ ADD: Check if tweets are empty
+      if (tweets.length === 0) {
+        logger.warn({ 
+          twitterUserId, 
+          handle: twitterHandle,
+          responseData: tweetsData
+        }, '[Twitter OAuth] No tweets found for user');
+        
+        // Still save the connection with informative message
+        const existingSources = await knowledgeSourceQueries.listByUserId(userId);
+        const existingSource = existingSources.find((s: any) => s.type === 'twitter');
+        
+        let source: any;
+        const emptyTweetsText = `Twitter: @${twitterHandle}\n\nNo tweets found. This account may have:\n- No tweets yet\n- All tweets are retweets/replies (excluded by filter)\n- Private account\n- Account suspended or restricted`;
+        
+        if (existingSource) {
+          await knowledgeSourceQueries.update(existingSource.id, {
+            rawText: emptyTweetsText,
+            lastFetchedAt: new Date(),
+            fetchMetadata: { 
+              tweetsCount: 0, 
+              handle: twitterHandle,
+              reason: 'No tweets found - all may be retweets/replies or account has no tweets'
+            },
+          });
+          source = existingSource;
+        } else {
+          source = await knowledgeSourceQueries.create({
+            userId,
+            type: 'twitter',
+            title: `X/Twitter: @${twitterHandle}`,
+            originalUrl: `https://twitter.com/${twitterHandle}`,
+            rawText: emptyTweetsText,
+            fetchMetadata: {
+              tweetsCount: 0,
+              handle: twitterHandle,
+              reason: 'No tweets found'
+            },
+          });
+        }
+        
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?success=twitter_connected&warning=no_tweets`);
+      }
 
       // Chunk helper
       function chunkText(text: string, maxTokens: number = 300): string[] {
@@ -194,9 +306,24 @@ router.get(
         return chunks;
       }
 
+      // ✅ Log successful fetch
+      logger.info({ 
+        tweetsCount: tweets.length,
+        handle: twitterHandle 
+      }, '[Twitter OAuth] Successfully fetched tweets, processing...');
+
       const content = tweets
         .map((t: any) => `Tweet: ${t.text}\nDate: ${t.created_at}\nLikes: ${t.public_metrics?.like_count || 0}\n`)
         .join('\n---\n\n');
+
+      // ✅ Log content stats
+      const contentLength = content.length;
+      const estimatedWords = content.split(/\s+/).filter(Boolean).length;
+      logger.info({ 
+        contentLength,
+        estimatedWords,
+        tweetsCount: tweets.length 
+      }, '[Twitter OAuth] Content generated from tweets');
 
       const existingSources = await knowledgeSourceQueries.listByUserId(userId);
       const existingSource = existingSources.find((s: any) => s.type === 'twitter');
@@ -206,7 +333,12 @@ router.get(
         await knowledgeSourceQueries.update(existingSource.id, {
           rawText: content,
           lastFetchedAt: new Date(),
-          fetchMetadata: { tweetsCount: tweets.length, handle: twitterHandle },
+          fetchMetadata: { 
+            tweetsCount: tweets.length, 
+            handle: twitterHandle,
+            contentLength,
+            estimatedWords
+          },
         });
         source = existingSource;
       } else {
@@ -216,16 +348,30 @@ router.get(
           title: `X/Twitter: @${twitterHandle}`,
           originalUrl: `https://twitter.com/${twitterHandle}`,
           rawText: content,
+          fetchMetadata: {
+            tweetsCount: tweets.length,
+            handle: twitterHandle,
+            contentLength,
+            estimatedWords
+          },
         });
       }
 
       const chunks = tweets.flatMap((t: any) => chunkText(t.text, 300));
-      if (chunks.length) await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+      if (chunks.length) {
+        await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
+        logger.info({ 
+          chunksCount: chunks.length,
+          handle: twitterHandle 
+        }, '[Twitter OAuth] Chunks created and saved');
+      } else {
+        logger.warn({ handle: twitterHandle }, '[Twitter OAuth] No chunks created from tweets');
+      }
 
-      return res.redirect('/onboarding/content?success=twitter_imported');
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?success=twitter_imported`);
     } catch (error: any) {
       logger.error({ err: error }, 'Twitter OAuth callback error');
-      return res.redirect(`/onboarding/content?error=${encodeURIComponent(error.message || 'twitter_failed')}`);
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?error=${encodeURIComponent(error.message || 'twitter_failed')}`);
     }
   })
 );

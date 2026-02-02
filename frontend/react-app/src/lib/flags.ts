@@ -20,5 +20,8 @@ export const FLAGS = {
   
   // ✅ Phase-1: Integrations page is required for WEBSITE embed generator
   integrationsPage: import.meta.env.VITE_ENABLE_WIDGET === 'true',
+  
+  // ✅ Social media import - enabled in local/dev, disabled in production by default
+  socialMediaImport: import.meta.env.VITE_ENABLE_SOCIAL_MEDIA_IMPORT === 'true' || import.meta.env.MODE === 'development',
 };
 

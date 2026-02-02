@@ -15,6 +15,7 @@ import {
   Check, ExternalLink
 } from 'lucide-react';
 import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { FLAGS } from '@/lib/flags';
 
 interface ContentItem {
   id: string;
@@ -52,6 +53,13 @@ export function OnboardingContentPage() {
   const { refresh: refreshAuth } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('files');
+
+  // ✅ If social tab is disabled and user is on social tab, switch to files
+  useEffect(() => {
+    if (!FLAGS.socialMediaImport && activeTab === 'social') {
+      setActiveTab('files');
+    }
+  }, [activeTab]);
   const [pasteText, setPasteText] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -374,12 +382,14 @@ export function OnboardingContentPage() {
         setLoading(false);
       }
     } else if (platform === 'linkedin') {
-      showToast(
-        'LinkedIn import uses Extension (official API is restricted). Go to Account → create Extension Token → install extension → paste token → click Import.',
-        'info',
-        6000
-      );
-      nav('/account');
+      try {
+        setLoading(true);
+        window.location.href = '/api/content/social/linkedin/authorize';
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to connect LinkedIn.', 'error');
+        setLoading(false);
+      }
     } else {
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} import will be added in the next phase.`, 'info');
     }
@@ -424,7 +434,7 @@ export function OnboardingContentPage() {
                 { id: 'files' as TabType, label: 'Files', icon: File },
                 { id: 'text' as TabType, label: 'Text', icon: FileText },
                 { id: 'url' as TabType, label: 'URL', icon: LinkIcon },
-                { id: 'social' as TabType, label: 'Social', icon: Twitter },
+                ...(FLAGS.socialMediaImport ? [{ id: 'social' as TabType, label: 'Social', icon: Twitter }] : []),
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -665,7 +675,7 @@ export function OnboardingContentPage() {
                 </div>
               )}
 
-              {activeTab === 'social' && (
+              {FLAGS.socialMediaImport && activeTab === 'social' && (
                 <div className="space-y-6">
                   <div className="rounded-lg bg-gradient-to-r from-accent-primary/10 to-purple-500/10 border border-accent-primary/20 p-4">
                     <h4 className="font-medium mb-1 flex items-center gap-2">

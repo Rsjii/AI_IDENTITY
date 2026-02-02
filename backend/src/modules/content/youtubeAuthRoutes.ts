@@ -7,6 +7,9 @@ import { logger } from '../../config/logger';
 
 const router = Router();
 
+// Helper function to get frontend URL for redirects
+const getFrontendUrl = () => process.env.FRONTEND_URL || 'http://localhost:5173';
+
 function chunkText(text: string, chunkSize = 1200): string[] {
   const clean = (text || '').trim();
   if (!clean) return [];
@@ -61,12 +64,12 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const code = String(req.query.code || '');
     const state = String(req.query.state || '');
-    if (!code || !state) return res.redirect('/onboarding/content?error=youtube_oauth_failed');
+    if (!code || !state) return res.redirect(`${getFrontendUrl()}/onboarding/content?error=youtube_oauth_failed`);
 
     const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
     const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return res.redirect('/onboarding/content?error=google_not_configured');
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?error=google_not_configured`);
     }
 
     const callbackUrl =
@@ -86,9 +89,9 @@ router.get(
         .map((r: any) => ({ userId: r.userId, config: r.config }))
         .find((r: any) => (r.config?.state || '') === state);
 
-      if (!match?.userId) return res.redirect('/onboarding/content?error=invalid_state');
+      if (!match?.userId) return res.redirect(`${getFrontendUrl()}/onboarding/content?error=invalid_state`);
       if (match.config?.expiresAt && Date.now() > Number(match.config.expiresAt)) {
-        return res.redirect('/onboarding/content?error=state_expired');
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?error=state_expired`);
       }
 
       const userId = match.userId;
@@ -180,10 +183,10 @@ router.get(
       const chunks = chunkText(rawText);
       await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-      return res.redirect('/onboarding/content?success=youtube_imported');
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?success=youtube_imported`);
     } catch (e: any) {
       logger.error({ err: e }, '[YouTube OAuth] callback failed');
-      return res.redirect(`/onboarding/content?error=${encodeURIComponent(e.message || 'youtube_failed')}`);
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?error=${encodeURIComponent(e.message || 'youtube_failed')}`);
     }
   })
 );

@@ -7,6 +7,9 @@ import { logger } from '../../config/logger';
 
 const router = Router();
 
+// Helper function to get frontend URL for redirects
+const getFrontendUrl = () => process.env.FRONTEND_URL || 'http://localhost:5173';
+
 function chunkText(text: string, chunkSize = 1200): string[] {
   const clean = (text || '').trim();
   if (!clean) return [];
@@ -62,12 +65,12 @@ router.get(
     const code = String(req.query.code || '');
     const state = String(req.query.state || '');
 
-    if (!code || !state) return res.redirect('/onboarding/content?error=instagram_oauth_failed');
+    if (!code || !state) return res.redirect(`${getFrontendUrl()}/onboarding/content?error=instagram_oauth_failed`);
 
     const META_APP_ID = process.env.META_APP_ID;
     const META_APP_SECRET = process.env.META_APP_SECRET;
     if (!META_APP_ID || !META_APP_SECRET) {
-      return res.redirect('/onboarding/content?error=meta_not_configured');
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?error=meta_not_configured`);
     }
 
     const callbackUrl =
@@ -87,10 +90,10 @@ router.get(
         .map((r: any) => ({ userId: r.userId, config: r.config }))
         .find((r: any) => (r.config?.state || '') === state);
 
-      if (!match?.userId) return res.redirect('/onboarding/content?error=invalid_state');
+      if (!match?.userId) return res.redirect(`${getFrontendUrl()}/onboarding/content?error=invalid_state`);
 
       if (match.config?.expiresAt && Date.now() > Number(match.config.expiresAt)) {
-        return res.redirect('/onboarding/content?error=state_expired');
+        return res.redirect(`${getFrontendUrl()}/onboarding/content?error=state_expired`);
       }
 
       const userId = match.userId;
@@ -220,10 +223,10 @@ router.get(
       const chunks = chunkText(rawText);
       await knowledgeChunkQueries.replaceForSource(userId, source.id, chunks);
 
-      return res.redirect('/onboarding/content?success=instagram_imported');
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?success=instagram_imported`);
     } catch (e: any) {
       logger.error({ err: e }, '[Instagram OAuth] callback failed');
-      return res.redirect(`/onboarding/content?error=${encodeURIComponent(e.message || 'instagram_failed')}`);
+      return res.redirect(`${getFrontendUrl()}/onboarding/content?error=${encodeURIComponent(e.message || 'instagram_failed')}`);
     }
   })
 );

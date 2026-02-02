@@ -19,6 +19,8 @@ import {
 import twitterAuthRoutes from './twitterAuthRoutes';
 import youtubeAuthRoutes from './youtubeAuthRoutes';
 import instagramAuthRoutes from './instagramAuthRoutes';
+import linkedinAuthRoutes from './linkedinAuthRoutes';
+
 
 const router = Router();
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -30,6 +32,7 @@ const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 router.use('/social/twitter', twitterAuthRoutes);
 router.use('/social/youtube', youtubeAuthRoutes);
 router.use('/social/instagram', instagramAuthRoutes);
+router.use('/social/linkedin', linkedinAuthRoutes);
 
 /**
  * Everything below requires login
