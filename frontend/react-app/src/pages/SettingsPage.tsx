@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, UserCog } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
+import { SpendingDashboard } from '@/components/SpendingDashboard';
 import { showToast } from '@/lib/toast';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1449,6 +1450,9 @@ export function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* User Spending Dashboard */}
+            <SpendingDashboard />
 
             <Card className="glass">
               <CardHeader>

@@ -132,9 +132,15 @@ export async function confirmPayment(req: Request, res: Response) {
     const platformFee = Math.floor(amount * PLATFORM_FEE_PERCENT);
     const creatorEarnings = amount - platformFee;
 
+    // Get payer identity (important for spending stats)
+    const payerUserId = (req as any).user?.id || null;
+    const payerVisitorId = paymentIntent.metadata?.visitorId || null;
+
     // Record payment
     const payment = await stripePaymentQueries.create({
       creatorId: metaCreatorId || creatorId,
+      payerUserId,
+      payerVisitorId,
       sessionId: metaSessionId || sessionId || null,
       amount,
       status: 'succeeded',

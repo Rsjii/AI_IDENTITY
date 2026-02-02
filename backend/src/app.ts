@@ -45,6 +45,7 @@ import marketplaceReviewRoutes from './modules/marketplace/reviewRoutes';
 import marketplaceSubscriptionRoutes from './modules/marketplace/subscriptionRoutes';
 import videoRoutes from './modules/video/videoRoutes';
 import phoneRoutes from './modules/phone/phoneRoutes';
+import conversationsRoutes from './modules/conversations/conversationsRoutes';
 
 const cookieSameSite = isProd ? 'none' : 'lax';
 
@@ -606,6 +607,7 @@ app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
+app.use('/api/user/conversations', conversationsRoutes);
 if (isFeatureEnabled('ENABLE_MARKETPLACE') && isFeatureEnabled('ENABLE_PAYMENTS')) {
   app.use('/api/marketplace', marketplaceListingRoutes);
   app.use('/api/marketplace', marketplaceReviewRoutes);

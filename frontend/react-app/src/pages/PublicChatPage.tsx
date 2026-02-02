@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ThumbsUp, ThumbsDown, Send, Loader2, X, Copy, Check, RotateCcw, Lock, Star, MessageCircle, Zap } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Send, Loader2, X, Copy, Check, RotateCcw, Lock, Star, MessageCircle, Zap, Menu } from 'lucide-react';
 import { PaymentPrompt } from '@/components/PaymentPrompt';
+import { ConversationSidebar } from '@/components/ConversationSidebar';
+import { MessageLimitWarning } from '@/components/MessageLimitWarning';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
+import { apiFetch } from '@/lib/api';
 
 type Msg = {
   role: 'user' | 'assistant';
@@ -95,6 +98,26 @@ export function PublicChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Conversation sidebar state
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Message limit state
+  const [messageLimit, setMessageLimit] = useState<{
+    canSendMessage: boolean;
+    isUnlimited: boolean;
+    requiresPayment: boolean;
+    remainingFreeMessages: number;
+    freeMessageLimit: number;
+    messagesUsed: number;
+    suggestedTiers: Array<{ amount: number; label: string }>;
+    creatorId?: string;
+    paymentOptions?: {
+      tiers: Array<{ amount: number; label: string }>;
+      defaultAmount?: number;
+    };
+  } | null>(null);
+
   // Fetch creator info
   useEffect(() => {
     fetch(`/api/public/creator/${encodeURIComponent(slug)}`)
@@ -147,13 +170,71 @@ export function PublicChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, typing]);
 
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Check message limit when session changes
+  useEffect(() => {
+    const checkMessageLimit = async () => {
+      if (!sessionId || !isAuthed) return;
+
+      try {
+        const res = await apiFetch(`/api/user/conversations/${sessionId}/message-limit`);
+        if (res.success) {
+          setMessageLimit(res);
+        }
+      } catch (error) {
+        console.error('Failed to check message limit:', error);
+      }
+    };
+
+    checkMessageLimit();
+  }, [sessionId, isAuthed, msgs.length]);
+
   const handleLogin = () => {
     nav(`/auth?reason=unauthorized&next=${encodeURIComponent(`/chat/${slug}`)}`);
+  };
+
+  const openPaymentModalFromLimit = () => {
+    if (!creator?.id || !sessionId) return;
+
+    const tiers =
+      messageLimit?.paymentOptions?.tiers ||
+      messageLimit?.suggestedTiers ||
+      [];
+
+    const defaultAmount =
+      messageLimit?.paymentOptions?.defaultAmount ||
+      creator?.priceConfig?.defaultTierCents ||
+      tiers?.[0]?.amount;
+
+    setPaymentData({
+      creatorId: creator.id,
+      sessionId,
+      paymentOptions: {
+        tiers,
+        defaultAmount,
+      },
+    });
+    setShowPaymentModal(true);
   };
 
   const send = async () => {
     if (!isAuthed) {
       setShowLoginModal(true);
+      return;
+    }
+
+    // Check message limit before sending
+    if (messageLimit && messageLimit.requiresPayment && !messageLimit.canSendMessage) {
+      openPaymentModalFromLimit();
       return;
     }
 
@@ -574,10 +655,43 @@ export function PublicChatPage() {
 
   // LOGGED IN USER - Full Chat Experience
   return (
-    <div className="theme-light min-h-screen bg-bg-primary flex flex-col">
-      {/* Header */}
-      <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
+    <div className="theme-light min-h-screen bg-bg-primary flex">
+      {/* Sidebar - Desktop */}
+      {!isMobile && (
+        <div className="w-80 flex-shrink-0">
+          <ConversationSidebar currentSessionId={sessionId} />
+        </div>
+      )}
+
+      {/* Sidebar - Mobile Drawer */}
+      {isMobile && showSidebar && (
+        <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSidebar(false)}>
+          <div
+            className="w-80 h-full bg-bg-secondary"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ConversationSidebar
+              currentSessionId={sessionId}
+              onClose={() => setShowSidebar(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            {/* Hamburger menu for mobile */}
+            {isMobile && (
+              <button
+                onClick={() => setShowSidebar(true)}
+                className="p-2 hover:bg-bg-elevated rounded-lg transition-colors"
+              >
+                <Menu className="h-5 w-5 text-text-primary" />
+              </button>
+            )}
           {creator?.avatarUrl && (
             <img
               src={creator.avatarUrl}
@@ -792,6 +906,36 @@ export function PublicChatPage() {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Message Limit Warning */}
+        {messageLimit && !messageLimit.isUnlimited && messageLimit.requiresPayment && (
+          <div className="px-4 pb-4">
+            <div className="max-w-4xl mx-auto">
+              <MessageLimitWarning
+                remainingMessages={messageLimit.remainingFreeMessages}
+                totalFreeMessages={messageLimit.freeMessageLimit}
+                onUpgrade={openPaymentModalFromLimit}
+                suggestedTiers={messageLimit.suggestedTiers}
+                variant="modal"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Inline warning for approaching limit */}
+        {messageLimit && !messageLimit.isUnlimited && messageLimit.remainingFreeMessages > 0 && messageLimit.remainingFreeMessages <= 2 && (
+          <div className="px-4">
+            <div className="max-w-4xl mx-auto">
+              <MessageLimitWarning
+                remainingMessages={messageLimit.remainingFreeMessages}
+                totalFreeMessages={messageLimit.freeMessageLimit}
+                onUpgrade={openPaymentModalFromLimit}
+                suggestedTiers={messageLimit.suggestedTiers}
+                variant="inline"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment Modal */}
@@ -815,11 +959,11 @@ export function PublicChatPage() {
         </div>
       )}
 
-      {/* Input Area */}
-      <div
-        className="bg-bg-secondary border-t border-border-default px-4 py-4 sticky bottom-0"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
-      >
+        {/* Input Area */}
+        <div
+          className="bg-bg-secondary border-t border-border-default px-4 py-4 sticky bottom-0"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+        >
         <div className="max-w-4xl mx-auto">
           {FLAGS.voice && (
             <div className="flex items-center justify-end mb-2">
@@ -863,6 +1007,7 @@ export function PublicChatPage() {
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

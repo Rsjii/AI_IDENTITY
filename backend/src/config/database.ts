@@ -401,6 +401,14 @@ CREATE TABLE IF NOT EXISTS "chat_sessions" (
   "visitorId" TEXT,
   "userId" TEXT,
   "platform" TEXT NOT NULL DEFAULT 'web',
+
+  -- conversation management columns (from add_conversation_management_columns.sql)
+  "viewerUserId" TEXT,
+  "isFavorite" BOOLEAN DEFAULT false,
+  "isArchived" BOOLEAN DEFAULT false,
+  "sessionTitle" VARCHAR(255),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -422,6 +430,68 @@ ALTER TABLE "chat_sessions" ADD CONSTRAINT "chat_sessions_creatorId_fkey"
 ALTER TABLE "chat_messages" DROP CONSTRAINT IF EXISTS "chat_messages_sessionId_fkey";
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_sessionId_fkey"
   FOREIGN KEY ("sessionId") REFERENCES "chat_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Conversation management indexes
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_viewerUserId_updatedAt"
+  ON "chat_sessions"("viewerUserId", "updatedAt");
+
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isFavorite"
+  ON "chat_sessions"("isFavorite")
+  WHERE "isFavorite" = true;
+
+CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isArchived"
+  ON "chat_sessions"("isArchived")
+  WHERE "isArchived" = true;
+
+-- Auto-update updatedAt on chat_sessions (same as migration)
+CREATE OR REPLACE FUNCTION update_chat_sessions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS "trigger_update_chat_sessions_updated_at" ON "chat_sessions";
+CREATE TRIGGER "trigger_update_chat_sessions_updated_at"
+BEFORE UPDATE ON "chat_sessions"
+FOR EACH ROW
+EXECUTE FUNCTION update_chat_sessions_updated_at();
+
+-- OPTIONAL: migration parity table (not used by current runtime, but matches migration file)
+CREATE TABLE IF NOT EXISTS "pay_per_chat" (
+  "id" TEXT PRIMARY KEY,
+  "sessionId" TEXT NOT NULL,
+  "creatorId" TEXT NOT NULL,
+  "viewerUserId" TEXT NOT NULL,
+  "amountCents" INTEGER NOT NULL,
+  "tier" VARCHAR(50) NOT NULL DEFAULT 'basic',
+  "status" TEXT NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending', 'succeeded', 'failed', 'refunded')),
+  "stripePaymentIntentId" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_pay_per_chat_sessionId" ON "pay_per_chat"("sessionId");
+CREATE INDEX IF NOT EXISTS "idx_pay_per_chat_creatorId" ON "pay_per_chat"("creatorId");
+CREATE INDEX IF NOT EXISTS "idx_pay_per_chat_viewerUserId" ON "pay_per_chat"("viewerUserId");
+CREATE INDEX IF NOT EXISTS "idx_pay_per_chat_status" ON "pay_per_chat"("status");
+CREATE INDEX IF NOT EXISTS "idx_pay_per_chat_createdAt" ON "pay_per_chat"("createdAt");
+
+ALTER TABLE "pay_per_chat" DROP CONSTRAINT IF EXISTS "pay_per_chat_sessionId_fkey";
+ALTER TABLE "pay_per_chat"
+  ADD CONSTRAINT "pay_per_chat_sessionId_fkey"
+  FOREIGN KEY ("sessionId") REFERENCES "chat_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "pay_per_chat" DROP CONSTRAINT IF EXISTS "pay_per_chat_creatorId_fkey";
+ALTER TABLE "pay_per_chat"
+  ADD CONSTRAINT "pay_per_chat_creatorId_fkey"
+  FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "pay_per_chat" DROP CONSTRAINT IF EXISTS "pay_per_chat_viewerUserId_fkey";
+ALTER TABLE "pay_per_chat"
+  ADD CONSTRAINT "pay_per_chat_viewerUserId_fkey"
+  FOREIGN KEY ("viewerUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- ========== PREMIUM SESSIONS (Pay-Per-Chat Unlock Window) ==========
 CREATE TABLE IF NOT EXISTS "premium_sessions" (
@@ -1571,10 +1641,17 @@ export const chatSessionQueries = {
   create: async (params: { creatorId: string; visitorId?: string | null; userId?: string | null; platform?: string }) => {
     const id = `cs_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const r = await db.query(
-      `INSERT INTO "chat_sessions" (id,"creatorId","visitorId","userId","platform")
-       VALUES ($1,$2,$3,$4,$5)
+      `INSERT INTO "chat_sessions" (id,"creatorId","visitorId","userId","viewerUserId","platform")
+       VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING *`,
-      [id, params.creatorId, params.visitorId || null, params.userId || null, params.platform || 'web']
+      [
+        id,
+        params.creatorId,
+        params.visitorId || null,
+        params.userId || null,
+        params.userId || null, // viewerUserId defaults to same as userId
+        params.platform || 'web',
+      ]
     );
     return r.rows[0];
   },
