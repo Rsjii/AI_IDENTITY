@@ -33,9 +33,10 @@ export function OnboardingGatePage() {
             return;
           }
 
-          // If step exists, go to that step
+          // If step exists, go to that step (but skip deprecated steps)
           if (step) {
-            nav(`/onboarding/${step}`, { replace: true });
+            const safeStep = step === 'voice' || step === 'training' ? 'plan' : step;
+            nav(`/onboarding/${safeStep}`, { replace: true });
             return;
           }
         } catch {
@@ -59,7 +60,7 @@ export function OnboardingGatePage() {
           const content = await apiFetch<{ items: any[] }>('/api/content/list');
           const count = content?.items?.length || 0;
 
-          if (count < 3) nav('/onboarding/content', { replace: true });
+          if (count < 1) nav('/onboarding/content', { replace: true });
           else nav('/onboarding/plan', { replace: true });
         } catch {
           nav('/onboarding/content', { replace: true });

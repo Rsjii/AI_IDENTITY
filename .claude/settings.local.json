@@ -5,7 +5,10 @@
       "Bash(grep:*)",
       "Bash(wc:*)",
       "Bash(tree:*)",
-      "Bash(git -C \"c:\\\\Users\\\\rsji1\\\\OneDrive\\\\डेस्कटॉप\\\\AI_IDENTITY-1\" log --oneline)"
+      "Bash(git -C \"c:\\\\Users\\\\rsji1\\\\OneDrive\\\\डेस्कटॉप\\\\AI_IDENTITY-1\" log --oneline)",
+      "WebFetch(domain:botpress.com)",
+      "WebFetch(domain:www.letsgroto.com)",
+      "WebFetch(domain:www.chatbot.com)"
     ]
   }
 }

@@ -14,7 +14,7 @@ import {
   FileSpreadsheet, Star, Sparkles, TrendingUp,
   Check, ExternalLink
 } from 'lucide-react';
-import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { useOnboardingGuard } from '@/hooks/useOnboardingGuard';
 import { FLAGS } from '@/lib/flags';
 
 interface ContentItem {
@@ -93,7 +93,7 @@ export function OnboardingContentPage() {
   const estimatedMinutes = Math.max(2, Math.ceil(2 + totalSizeMB * 2));
   const estimatedHours = estimatedMinutes >= 60 ? (estimatedMinutes / 60).toFixed(1) : null;
 
-  const minimumItemsRequired = 3;
+  const minimumItemsRequired = 1;
   const hasMinimumItems = totalFiles >= minimumItemsRequired;
 
   // Quality score calculation
@@ -185,9 +185,6 @@ export function OnboardingContentPage() {
 
   // ✅ Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
-
-  // ✅ Prevent back navigation to profile page
-  usePreventBack();
 
   // ✅ FIX: Prevent double API calls in React StrictMode
   const didInit = useRef(false);
