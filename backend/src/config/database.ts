@@ -1557,7 +1557,7 @@ export const knowledgeSourceQueries = {
 
     return r.rows[0];
   },  
-  update: async (id: string, updates: { rawText?: string; lastFetchedAt?: Date; fetchMetadata?: any }) => {
+  update: async (id: string, updates: { rawText?: string; storageUrl?: string; lastFetchedAt?: Date; fetchMetadata?: any }) => {
     const updatesList: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -1565,6 +1565,10 @@ export const knowledgeSourceQueries = {
     if (updates.rawText !== undefined) {
       updatesList.push(`"rawText" = $${paramIndex++}`);
       values.push(updates.rawText);
+    }
+    if (updates.storageUrl !== undefined) {
+      updatesList.push(`"storageUrl" = $${paramIndex++}`);
+      values.push(updates.storageUrl);
     }
     if (updates.lastFetchedAt !== undefined) {
       updatesList.push(`"lastFetchedAt" = $${paramIndex++}`);
@@ -1595,13 +1599,20 @@ export const knowledgeSourceQueries = {
 export const knowledgeChunkQueries = {
   replaceForSource: async (userId: string, sourceId: string, chunks: string[]) => {
     await db.query(`DELETE FROM "knowledge_chunks" WHERE "userId"=$1 AND "sourceId"=$2`, [userId, sourceId]);
+    if (chunks.length === 0) return;
+    const placeholders: string[] = [];
+    const values: any[] = [];
+    let pi = 1;
     for (let i = 0; i < chunks.length; i++) {
       const id = `kc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}_${i}`;
-      await db.query(
-        `INSERT INTO "knowledge_chunks" (id,"userId","sourceId","chunkIndex","content") VALUES ($1,$2,$3,$4,$5)`,
-        [id, userId, sourceId, i, chunks[i]]
-      );
+      placeholders.push(`($${pi},$${pi + 1},$${pi + 2},$${pi + 3},$${pi + 4})`);
+      values.push(id, userId, sourceId, i, chunks[i]);
+      pi += 5;
     }
+    await db.query(
+      `INSERT INTO "knowledge_chunks" (id,"userId","sourceId","chunkIndex","content") VALUES ${placeholders.join(',')}`,
+      values
+    );
   },
 };
 

@@ -250,6 +250,50 @@ export async function createYoutubeSource(userId: string, url: string, title?: s
   return source;
 }
 
+// Background processor: called after source record is already created.
+// Does text extraction, S3 upload, chunking, and triggers training — all off the request path.
+export async function processFileContent(userId: string, sourceId: string, file: Express.Multer.File) {
+  try {
+    let extractedText = '';
+    const mimeType = file.mimetype || '';
+
+    try {
+      if (mimeType === 'application/pdf' && pdfParse) {
+        const data = await pdfParse(file.buffer);
+        extractedText = data.text || '';
+      } else if ((mimeType.includes('word') || mimeType.includes('document') || file.originalname.endsWith('.docx')) && mammoth) {
+        const result = await mammoth.extractRawText({ buffer: file.buffer });
+        extractedText = result.value || '';
+      } else if (mimeType.startsWith('text/')) {
+        extractedText = file.buffer.toString('utf-8');
+      } else if (mimeType.startsWith('audio/') && openaiClient) {
+        extractedText = await transcribeAudio(file.buffer, mimeType);
+      }
+    } catch (error: any) {
+      logger.warn({ error, mimeType, filename: file.originalname }, 'File parsing failed in background');
+    }
+
+    const upload = await uploadPublicBuffer({
+      keyPrefix: `knowledge/${userId}/files`,
+      contentType: file.mimetype || 'application/octet-stream',
+      body: file.buffer,
+      ext: (file.originalname.split('.').pop() || '').toLowerCase(),
+    });
+
+    await knowledgeSourceQueries.update(sourceId, {
+      storageUrl: upload.url,
+      rawText: extractedText || undefined,
+    });
+
+    const chunks = extractedText ? chunkText(extractedText) : [];
+    await knowledgeChunkQueries.replaceForSource(userId, sourceId, chunks);
+
+    await ensureTrainingJob(userId);
+  } catch (err: any) {
+    logger.error({ err, sourceId }, 'Background file processing failed');
+  }
+}
+
 export async function createFileSource(userId: string, file: Express.Multer.File, title?: string) {
   let extractedText = '';
   const mimeType = file.mimetype || '';

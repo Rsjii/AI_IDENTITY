@@ -440,17 +440,7 @@ export function ConversationSidebar({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-border-default">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => navigate('/marketplace')}
-        >
-          + New Conversation
-        </Button>
-      </div>
+      {/* Footer -- intentionally empty; new chats are started via the + button in the chat header */}
     </div>
   );
 }

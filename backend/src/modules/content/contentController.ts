@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { knowledgeSourceQueries } from '../../config/database';
-import { createPasteSource, createYoutubeSource, createFileSource, createUrlSource } from './contentService';
+import { createPasteSource, createYoutubeSource, createFileSource, createUrlSource, processFileContent } from './contentService';
 import { logger } from '../../config/logger';
 
 function getUserId(req: Request): string | null {
@@ -464,9 +464,8 @@ export async function upload(req: Request, res: Response) {
   if (!file) return res.status(400).json({ error: 'No file provided' });
 
   try {
-    // ✅ Enhanced file validation using sanitizer
     const { validateFileUpload } = await import('../../middleware/sanitizer');
-    
+
     const allowedMimeTypes = [
       'application/pdf',
       'application/msword',
@@ -479,47 +478,57 @@ export async function upload(req: Request, res: Response) {
       'audio/mp4',
     ];
     const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.mp3', '.wav', '.m4a'];
-    
+
     const validation = validateFileUpload(file, {
-      maxSize: 25 * 1024 * 1024, // 25MB (reduced from 50MB for security)
+      maxSize: 25 * 1024 * 1024,
       allowedMimeTypes,
       allowedExtensions,
     });
-    
+
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
     }
 
     const title = String((req as any).body?.title || '').trim() || undefined;
-    
-    // ✅ Upload to S3 with error handling
-    const source = await createFileSource(userId, file, title);
 
-    // ✅ ADD: advance step safely
+    // Create source record immediately so it shows up in the list right away
+    const source = await knowledgeSourceQueries.create({
+      userId,
+      type: 'file',
+      title: title || file.originalname,
+      fetchMetadata: {
+        mimeType: file.mimetype,
+        bytes: file.size,
+        originalName: file.originalname,
+      },
+    });
+
+    // Advance onboarding step
     try {
       const { userQueries } = await import('../../config/database');
       await userQueries.updateOnboardingStep(userId, 'content');
       const items = await knowledgeSourceQueries.listByUserId(userId);
       if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
     } catch {}
-    
-    return res.json({
+
+    // Respond immediately — user doesn't wait for extraction/S3/chunking
+    res.json({
       success: true,
       source,
-      message: 'File uploaded successfully. Processing embeddings...',
+      message: 'File uploaded successfully. Processing in background...',
     });
+
+    // Fire-and-forget: text extraction → S3 → chunking → training job
+    processFileContent(userId, source.id, file);
   } catch (error: any) {
     logger.error({ err: error }, 'Upload error');
-    
-    // ✅ User-friendly error messages
+
     if (error.message?.includes('S3') || error.message?.includes('upload')) {
       return res.status(500).json({ error: 'File upload failed. Please try again.' });
     }
-    
     if (error.message?.includes('parse') || error.message?.includes('extract')) {
       return res.status(500).json({ error: 'Failed to extract text from file.' });
     }
-    
     return res.status(500).json({ error: 'Upload failed. Please try again.' });
   }
 }

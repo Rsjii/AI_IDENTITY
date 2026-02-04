@@ -17,6 +17,8 @@ import {
   Info,
   LogOut,
   Settings,
+  Share2,
+  Plus,
 } from 'lucide-react';
 
 import { PaymentPrompt } from '@/components/PaymentPrompt';
@@ -113,6 +115,50 @@ function formatDuration(ms: number): string {
   return `${m}m`;
 }
 
+// Reusable share buttons block (Twitter, WhatsApp, Copy link)
+function ShareButtons({ slug, creatorName }: { slug: string; creatorName?: string }) {
+  const name = creatorName || slug;
+  const getUrl = () => `${window.location.origin}/chat/${slug}`;
+
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={() => {
+          window.open(
+            `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Chat with ${name}'s AI!`)}&url=${encodeURIComponent(getUrl())}`,
+            '_blank',
+            'noopener,noreferrer'
+          );
+        }}
+        className="flex-1 px-2 py-2 bg-bg-tertiary border border-border-default rounded-lg text-xs text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors text-center"
+      >
+        X (Twitter)
+      </button>
+      <button
+        onClick={() => {
+          window.open(
+            `https://wa.me/?text=${encodeURIComponent(`Chat with ${name}'s AI: ${getUrl()}`)}`,
+            '_blank',
+            'noopener,noreferrer'
+          );
+        }}
+        className="flex-1 px-2 py-2 bg-bg-tertiary border border-border-default rounded-lg text-xs text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors text-center"
+      >
+        WhatsApp
+      </button>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(getUrl());
+          showToast('Link copied!', 'success');
+        }}
+        className="px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-xs text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export function PublicChatPage() {
   const { slug = '' } = useParams();
   const { state, logout } = useAuth();
@@ -207,7 +253,7 @@ export function PublicChatPage() {
           role: m.role,
           content: m.content,
           timestamp: m.createdAt ? new Date(m.createdAt) : undefined,
-          isTeaser: !!m.truncated, // NEW
+          isTeaser: !!m.truncated,
         }));
         setMsgs(historyMsgs);
       })
@@ -334,7 +380,7 @@ export function PublicChatPage() {
             role: 'assistant',
             content: d.previewReply,
             timestamp: new Date(),
-            id: d.teaserMessageId || `msg_preview_${Date.now()}`, // IMPORTANT
+            id: d.teaserMessageId || `msg_preview_${Date.now()}`,
             isTeaser: true,
             paywallStage: 'teaser',
           };
@@ -478,29 +524,90 @@ export function PublicChatPage() {
     }
   };
 
+  // Clear current session and start fresh with the same creator
+  const startNewChat = () => {
+    setMsgs([]);
+    setSessionId('');
+    setText('');
+    localStorage.removeItem(sessionKey);
+    localStorage.removeItem(sessionTsKey);
+    document.cookie = `${sessionKey}=; Max-Age=0; Path=/; SameSite=Lax`;
+  };
+
   const premiumRemainingMs =
     premiumExpiresAt && !Number.isNaN(new Date(premiumExpiresAt).getTime())
       ? new Date(premiumExpiresAt).getTime() - Date.now()
       : null;
 
+  // Guest left-panel content (creator card + popular questions + login CTA)
+  const GuestLeftPanel = () => (
+    <div className="p-4 flex flex-col h-full overflow-y-auto">
+      {/* Creator mini-card */}
+      <div className="flex items-center gap-3 mb-3">
+        {creator?.avatarUrl ? (
+          <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-10 h-10 rounded-full object-cover" />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
+            <span className="text-sm font-semibold text-accent-primary">{(creator?.displayName || slug).slice(0, 1).toUpperCase()}</span>
+          </div>
+        )}
+        <div className="min-w-0">
+          <div className="font-semibold text-text-primary truncate">{creator?.displayName || slug}</div>
+          <div className="text-xs text-text-secondary">{creator?.expertise || 'AI Assistant'}</div>
+        </div>
+      </div>
+
+      {creator?.bio && <p className="text-sm text-text-secondary mb-4">{creator.bio}</p>}
+
+      {/* Popular questions */}
+      {creator?.popularQuestions?.length ? (
+        <div className="mb-4">
+          <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Popular questions</div>
+          <div className="flex flex-col gap-2">
+            {creator.popularQuestions.slice(0, 4).map((q, idx) => (
+              <button
+                key={idx}
+                onClick={() => setText(q)}
+                className="text-left px-3 py-2 bg-bg-tertiary hover:bg-bg-elevated border border-border-default rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Share section */}
+      <div className="mb-4">
+        <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Share this AI</div>
+        <ShareButtons slug={slug} creatorName={creator?.displayName} />
+      </div>
+
+      {/* Spacer pushes login CTA to bottom */}
+      <div className="flex-1" />
+
+      {/* Login CTA */}
+      <div className="border-t border-border-default pt-4">
+        <p className="text-xs text-text-tertiary mb-2">Login to save your conversations</p>
+        <Link
+          to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+          className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium text-sm"
+        >
+          Login / Sign up
+        </Link>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="theme-light min-h-screen bg-bg-primary flex">
-      {/* LEFT: Conversations (authed only) */}
+    <div className="theme-light h-screen overflow-hidden bg-bg-primary flex">
+      {/* LEFT: Conversations (authed) / Creator info (guest) -- desktop only */}
       {!isMobile && (
-        <div className="w-[280px] flex-shrink-0 border-r border-border-default bg-bg-secondary">
+        <div className="w-[280px] flex-shrink-0 border-r border-border-default bg-bg-secondary h-full overflow-hidden">
           {isAuthed ? (
             <ConversationSidebar currentSessionId={sessionId} />
           ) : (
-            <div className="p-4">
-              <div className="text-lg font-semibold text-text-primary mb-2">Menu</div>
-              <p className="text-sm text-text-secondary mb-4">Login to see your conversations and save history.</p>
-              <Link
-                to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
-              >
-                Login / Sign up
-              </Link>
-            </div>
+            <GuestLeftPanel />
           )}
         </div>
       )}
@@ -512,30 +619,61 @@ export function PublicChatPage() {
             {isAuthed ? (
               <ConversationSidebar currentSessionId={sessionId} onClose={() => setShowSidebar(false)} />
             ) : (
-              <div className="p-4">
-                <button onClick={() => setShowSidebar(false)} className="mb-4 text-text-secondary">
-                  <X className="h-5 w-5" />
-                </button>
-                <div className="text-lg font-semibold text-text-primary mb-2">Login</div>
-                <p className="text-sm text-text-secondary mb-4">Login to view conversation history.</p>
-                <Link
-                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                  className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
-                >
-                  Continue
-                </Link>
+              <div className="p-4 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="font-semibold text-text-primary">{creator?.displayName || slug}</div>
+                  <button onClick={() => setShowSidebar(false)} className="text-text-secondary">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {creator?.bio && <p className="text-sm text-text-secondary mb-3">{creator.bio}</p>}
+
+                {creator?.popularQuestions?.length ? (
+                  <div className="mb-4">
+                    <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Popular questions</div>
+                    <div className="flex flex-col gap-2">
+                      {creator.popularQuestions.slice(0, 4).map((q, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => { setText(q); setShowSidebar(false); }}
+                          className="text-left px-3 py-2 bg-bg-tertiary border border-border-default rounded-lg text-sm text-text-secondary"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Share this AI</div>
+                  <ShareButtons slug={slug} creatorName={creator?.displayName} />
+                </div>
+
+                <div className="flex-1" />
+
+                <div className="border-t border-border-default pt-4">
+                  <p className="text-xs text-text-tertiary mb-2">Login to save your conversations</p>
+                  <Link
+                    to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                    className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium text-sm"
+                  >
+                    Login / Sign up
+                  </Link>
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* CENTER: chat */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header with Logo + Creator + Actions */}
-        <div className="bg-bg-secondary border-b border-border-default px-4 py-3">
+      {/* CENTER: chat -- h-full + overflow-hidden so only the messages area scrolls */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Header */}
+        <div className="bg-bg-secondary border-b border-border-default px-4 py-3 flex-shrink-0">
           <div className="max-w-5xl mx-auto flex items-center gap-3">
-            {/* Logo (left) */}
+            {/* Logo */}
             <Link to="/" className="font-bold text-text-primary tracking-tight mr-2">
               Selflyx<span className="text-accent-primary">.</span>
             </Link>
@@ -547,29 +685,46 @@ export function PublicChatPage() {
               </button>
             )}
 
-            {/* Creator identity */}
+            {/* Creator identity -- no marketplace breadcrumb */}
             <div className="flex items-center gap-3 min-w-0">
               {creator?.avatarUrl && (
                 <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-9 h-9 rounded-full" />
               )}
               <div className="min-w-0">
-                <div className="text-xs text-text-tertiary">
-                  <Link to="/marketplace" className="hover:underline">Marketplace</Link>
-                  {' / '}
-                  <span className="text-text-secondary">{creator?.displayName || slug}</span>
-                </div>
+                <div className="text-xs text-text-secondary">{creator?.displayName || slug}</div>
                 <div className="font-semibold text-text-primary truncate">
                   Chat with {creator?.displayName || slug}'s AI
                 </div>
               </div>
             </div>
 
-            {/* Right actions */}
-            <div className="ml-auto flex items-center gap-2">
+            {/* Right actions: Share, New chat, auth buttons, mobile info */}
+            <div className="ml-auto flex items-center gap-1">
+              {/* Share (copy link) */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/chat/${slug}`);
+                  showToast('Link copied!', 'success');
+                }}
+                className="p-2 hover:bg-bg-elevated rounded-lg"
+                title="Share"
+              >
+                <Share2 className="h-5 w-5 text-text-primary" />
+              </button>
+
+              {/* New chat */}
+              <button
+                onClick={startNewChat}
+                className="p-2 hover:bg-bg-elevated rounded-lg"
+                title="New chat"
+              >
+                <Plus className="h-5 w-5 text-text-primary" />
+              </button>
+
               {!isAuthed ? (
                 <Link
                   to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                  className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
+                  className="ml-1 px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
                 >
                   Login to Save
                 </Link>
@@ -584,7 +739,7 @@ export function PublicChatPage() {
                   </Link>
                   <button
                     onClick={onLogout}
-                    className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated inline-flex items-center gap-2"
+                    className="ml-1 px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated inline-flex items-center gap-2"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
@@ -603,7 +758,7 @@ export function PublicChatPage() {
 
         {/* Premium banner */}
         {premiumRemainingMs !== null && premiumRemainingMs > 0 && (
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-amber-200 px-4 py-2">
+          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-amber-200 px-4 py-2 flex-shrink-0">
             <div className="max-w-5xl mx-auto text-sm text-amber-900 flex items-center justify-between">
               <span>
                 <strong>⚡ Premium active</strong> — {formatDuration(premiumRemainingMs)} left
@@ -618,10 +773,10 @@ export function PublicChatPage() {
           </div>
         )}
 
-        {/* Free counter banner (only when not premium) */}
+        {/* Free counter banner (only when not premium) -- no marketplace link */}
         {(!premiumRemainingMs || premiumRemainingMs <= 0) && (
-          <div className="bg-bg-primary border-b border-border-default px-4 py-2">
-            <div className="max-w-5xl mx-auto flex items-center justify-between text-sm">
+          <div className="bg-bg-primary border-b border-border-default px-4 py-2 flex-shrink-0">
+            <div className="max-w-5xl mx-auto text-sm">
               <span className="text-text-secondary">
                 {remainingFree > 0 ? (
                   <>
@@ -633,17 +788,14 @@ export function PublicChatPage() {
                   </>
                 )}
               </span>
-              <Link to="/marketplace" className="text-accent-primary hover:underline">
-                Browse creators
-              </Link>
             </div>
           </div>
         )}
 
-        {/* Messages */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+        {/* Messages -- flex-1 scrollable */}
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-5xl mx-auto space-y-4">
-            {/* Welcome */}
+            {/* Welcome screen */}
             {msgs.length === 0 && (
               <div className="text-center py-10">
                 <div className="text-2xl font-bold text-text-primary mb-2">
@@ -786,6 +938,26 @@ export function PublicChatPage() {
               );
             })}
 
+            {/* Suggested questions after last AI reply -- disappear when user types */}
+            {msgs.length > 0 &&
+              msgs[msgs.length - 1].role === 'assistant' &&
+              !msgs[msgs.length - 1].isTeaser &&
+              !typing &&
+              !text.trim() &&
+              creator?.popularQuestions?.length ? (
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                {creator.popularQuestions.slice(0, 3).map((q, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setText(q)}
+                    className="px-3 py-1.5 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/30 rounded-full text-sm text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
             {typing && (
               <div className="flex gap-3 justify-start">
                 <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0 mt-1 animate-pulse">
@@ -807,7 +979,7 @@ export function PublicChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Logged-in warning component (optional) */}
+          {/* Logged-in warning component */}
           {isAuthed && messageLimit && !messageLimit.isUnlimited && messageLimit.remainingFreeMessages <= 2 && messageLimit.remainingFreeMessages > 0 && (
             <div className="max-w-5xl mx-auto">
               <MessageLimitWarning
@@ -821,8 +993,8 @@ export function PublicChatPage() {
           )}
         </div>
 
-        {/* Input */}
-        <div className="bg-bg-secondary border-t border-border-default px-4 py-4 sticky bottom-0">
+        {/* Input -- no sticky, sits at bottom of flex column naturally */}
+        <div className="bg-bg-secondary border-t border-border-default px-4 py-4 flex-shrink-0">
           <div className="max-w-5xl mx-auto flex gap-2">
             <textarea
               value={text}
@@ -846,9 +1018,9 @@ export function PublicChatPage() {
         </div>
       </div>
 
-      {/* RIGHT: Creator context panel (desktop) */}
+      {/* RIGHT: Creator context panel (desktop only) -- h-full scrollable */}
       {!isMobile && (
-        <div className="w-[320px] flex-shrink-0 border-l border-border-default bg-bg-secondary p-4">
+        <div className="w-[320px] flex-shrink-0 border-l border-border-default bg-bg-secondary h-full overflow-y-auto p-4">
           <div className="rounded-xl border border-border-default bg-bg-primary p-4">
             <div className="flex items-start gap-3">
               {creator?.avatarUrl ? (
@@ -977,10 +1149,10 @@ export function PublicChatPage() {
             </div>
           </div>
 
+          {/* Share this AI -- replaces the old "Browse more creators" */}
           <div className="mt-4">
-            <Link to="/marketplace" className="inline-flex items-center justify-center w-full px-4 py-2 bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated">
-              Browse more creators
-            </Link>
+            <div className="text-sm font-semibold text-text-primary mb-2">Share this AI</div>
+            <ShareButtons slug={slug} creatorName={creator?.displayName} />
           </div>
         </div>
       )}
@@ -998,12 +1170,17 @@ export function PublicChatPage() {
             <div className="mt-3 text-sm text-text-secondary">
               <div><strong>{creator?.displayName || slug}</strong></div>
               <div className="mt-1">{creator?.expertise || 'AI Assistant'}</div>
-              <div className="mt-3">🆓 3 free questions • ✨ Pay once = 24h unlimited</div>
+              {creator?.bio && <div className="mt-2 text-xs text-text-tertiary">{creator.bio}</div>}
+              <div className="mt-3">🆓 {freeLimit} free questions • ✨ Pay once = 24h unlimited</div>
             </div>
             <div className="mt-4">
               <button onClick={() => setShowPaymentModal(true)} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
                 View pricing / Upgrade
               </button>
+            </div>
+            <div className="mt-3">
+              <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Share this AI</div>
+              <ShareButtons slug={slug} creatorName={creator?.displayName} />
             </div>
           </div>
         </div>
