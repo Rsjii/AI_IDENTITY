@@ -17,7 +17,13 @@ async function fetchCSRFToken(): Promise<string> {
     throw new Error('Failed to fetch CSRF token');
   }
 
-  const data = await response.json();
+  // ✅ If API misconfigured and returns HTML, do NOT throw (prevents app crash/noise)
+  const ct = response.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    return '';
+  }
+
+  const data = await response.json().catch(() => ({} as any));
   return data.csrfToken || '';
 }
 

@@ -40,8 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = async () => {
     try {
-      const res = await apiFetch<{ success: true; user: MeUser }>('/api/auth/me');
-      setState({ status: 'authenticated', user: res.user });
+      const res = await apiFetch<any>('/api/auth/me');
+      const user = res?.user;
+
+      if (res?.success === true && user && typeof user.id === 'string') {
+        setState({ status: 'authenticated', user });
+      } else {
+        setState({ status: 'unauthenticated', user: null });
+      }
     } catch {
       setState({ status: 'unauthenticated', user: null });
     }

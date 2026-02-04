@@ -5,10 +5,19 @@ import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
-// Initialize Sentry (error tracking)
-if (import.meta.env.VITE_SENTRY_DSN && import.meta.env.MODE === 'production') {
+// Initialize Sentry (error tracking) - DISABLED by default
+const sentryDsn = (import.meta.env.VITE_SENTRY_DSN || '').trim()
+const sentryEnabled =
+  import.meta.env.MODE === 'production' &&
+  import.meta.env.VITE_ENABLE_SENTRY === 'true' &&
+  sentryDsn &&
+  sentryDsn.startsWith('https://') &&
+  !sentryDsn.includes('your-sentry-dsn') &&
+  !sentryDsn.includes('project-id')
+
+if (sentryEnabled) {
   Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
+    dsn: sentryDsn,
     environment: import.meta.env.MODE,
     integrations: [
       Sentry.browserTracingIntegration(),
