@@ -23,7 +23,7 @@ Bhai, MVP ready hai to ab **LAUNCH & GET FIRST 30 CUSTOMERS** pe focus karo. Her
 3. CHAT INTERFACE (Clean AF)
    ├─ Mobile-responsive
    ├─ Fast loading (< 1 sec)
-   ├─ Message limit: "You have 3 free messages. Pay $5 for unlimited"
+   ├─ Message limit: "You have 10 free messages. Pay $5 for unlimited"
    ├─ Typing indicators
    └─ Message history saved
 
@@ -48,7 +48,7 @@ Bhai, MVP ready hai to ab **LAUNCH & GET FIRST 30 CUSTOMERS** pe focus karo. Her
 
 7. SUBSCRIPTION PLANS
    ├─ Starter: $49/mo → 5K chats, basic features
-   ├─ Growth: $149/mo → 25K chats, priority support
+   ├─ Pro: $99/mo → 25K chats, all features, priority support
    └─ Free trial: 7 days (50 chats max)
 ```
 

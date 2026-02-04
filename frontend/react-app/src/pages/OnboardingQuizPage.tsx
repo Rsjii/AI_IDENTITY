@@ -8,7 +8,7 @@ import {
   Briefcase, Code, Palette, TrendingUp, Heart, GraduationCap,
   DollarSign, Target, Sparkles
 } from 'lucide-react';
-import { useOnboardingGuard } from '@/hooks/useOnboardingGuard';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
 
@@ -114,11 +114,14 @@ export function OnboardingQuizPage() {
   const [isAnimating, setIsAnimating] = useState(false);
   const questionRef = useRef<HTMLDivElement>(null);
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 10;
   const progress = ((currentStep + 1) / TOTAL_STEPS) * 100;
 
   // ✅ Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
+
+  // ✅ Prevent back navigation to profile page
+  usePreventBack();
 
   // Auto-save to localStorage (user-scoped)
   useEffect(() => {
@@ -237,16 +240,19 @@ export function OnboardingQuizPage() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 0:
+      case 0: 
         return !!answers.expertise && (answers.expertise !== 'other' || (answers.expertiseOther?.trim().length || 0) > 0);
-      case 1:
-        return true; // style sliders
-      case 2:
-        return (answers.targetAudience?.length || 0) >= 1 && (answers.targetAudience?.length || 0) <= 3;
-      case 3:
-        return (answers.topics?.length || 0) >= 10 && (answers.topics?.length || 0) <= 200;
-      default:
-        return true;
+      case 1: return true; // Sliders always have values
+      case 2: return (answers.targetAudience?.length || 0) >= 1 && (answers.targetAudience?.length || 0) <= 3;
+      case 3: return (answers.topics?.length || 0) >= 10 && (answers.topics?.length || 0) <= 200;
+      case 4: return true; // Optional
+      case 5: return !!answers.language;
+      case 6: return answers.exampleQuestions?.every(q => q.length >= 10) || false;
+      case 7: return !!answers.responseLength;
+      case 8: return !!answers.emojiUsage;
+      case 9: return answers.personalityWords?.every(w => w.length >= 3 && w.length <= 15) && 
+                    new Set(answers.personalityWords).size === 3 || false;
+      default: return false;
     }
   };
 

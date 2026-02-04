@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { Copy, Check, ExternalLink, ArrowRight, Loader2 } from 'lucide-react';
-import { useOnboardingGuard } from '@/hooks/useOnboardingGuard';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 import { apiFetch } from '@/lib/api';
 
 export function OnboardingDeployPage() {
@@ -21,7 +21,7 @@ export function OnboardingDeployPage() {
   const slug = user?.publicSlug || user?.handle || '';
   const apiBase = window.location.origin;
 
-  const standaloneLink = useMemo(() => (slug ? `${apiBase}/@${slug}` : ''), [slug, apiBase]);
+  const standaloneLink = useMemo(() => (slug ? `${apiBase}/chat/${slug}` : ''), [slug, apiBase]);
 
   // ✅ Refresh auth when arriving from Stripe payment (webhook may still be processing)
   useEffect(() => {
@@ -37,6 +37,9 @@ export function OnboardingDeployPage() {
 
   // ✅ Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
+
+  // ✅ Prevent back navigation to profile page
+  usePreventBack();
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -87,8 +90,8 @@ export function OnboardingDeployPage() {
 
         {/* Progress indicator */}
         <div className="flex gap-2">
-          {['Quiz', 'Content', 'Plan', 'Deploy'].map((step) => (
-            <div key={step} className="h-2 flex-1 rounded bg-primary" />
+          {['Quiz', 'Content', 'Voice', 'Plan', 'Deploy'].map((step, i) => (
+            <div key={step} className={`h-2 flex-1 rounded ${i <= 4 ? 'bg-primary' : 'bg-muted'}`} />
           ))}
         </div>
 

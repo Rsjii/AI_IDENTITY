@@ -427,6 +427,16 @@ CREATE TABLE IF NOT EXISTS "chat_messages" (
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ensure existing DBs get the new columns (MUST run before indexes below)
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "viewerUserId" TEXT;
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "isFavorite" BOOLEAN DEFAULT false;
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "isArchived" BOOLEAN DEFAULT false;
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "sessionTitle" VARCHAR(255);
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "freeResetAt" TIMESTAMPTZ;
+ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE "chat_messages" ADD COLUMN IF NOT EXISTS "truncated" BOOLEAN NOT NULL DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS "idx_chat_sessions_creatorId_createdAt" ON "chat_sessions"("creatorId","createdAt");
 CREATE INDEX IF NOT EXISTS "idx_chat_messages_sessionId_createdAt" ON "chat_messages"("sessionId","createdAt");
 
@@ -449,10 +459,6 @@ CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isFavorite"
 CREATE INDEX IF NOT EXISTS "idx_chat_sessions_isArchived"
   ON "chat_sessions"("isArchived")
   WHERE "isArchived" = true;
-
--- Ensure existing DBs get the new columns
-ALTER TABLE "chat_sessions" ADD COLUMN IF NOT EXISTS "freeResetAt" TIMESTAMPTZ;
-ALTER TABLE "chat_messages" ADD COLUMN IF NOT EXISTS "truncated" BOOLEAN NOT NULL DEFAULT false;
 
 -- Auto-update updatedAt on chat_sessions (same as migration)
 CREATE OR REPLACE FUNCTION update_chat_sessions_updated_at()

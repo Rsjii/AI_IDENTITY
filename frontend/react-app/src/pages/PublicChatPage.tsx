@@ -22,6 +22,7 @@ import {
 import { PaymentPrompt } from '@/components/PaymentPrompt';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { MessageLimitWarning } from '@/components/MessageLimitWarning';
+import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
 import { apiFetch } from '@/lib/api';
@@ -282,29 +283,6 @@ export function PublicChatPage() {
     setShowPaymentModal(true);
   };
 
-  const resetSession = () => {
-    try {
-      localStorage.removeItem(sessionKey);
-      localStorage.removeItem(sessionTsKey);
-      setCookie(sessionKey, '', 0);
-    } catch {}
-    setSessionId('');
-    setMsgs([]);
-    setPaymentData(null);
-    setShowPaymentModal(false);
-    setMessageIdToUnlock(null);
-    setPreviewTextForModal('');
-    showToast('Started a new chat', 'success');
-  };
-
-  const requestUpgrade = () => {
-    if (!sessionId) {
-      showToast('Send one message to start the session, then you can upgrade.', 'info');
-      return;
-    }
-    setShowPaymentModal(true);
-  };
-
   const send = async () => {
     const m = text.trim();
     if (!m || typing) return;
@@ -343,7 +321,7 @@ export function PublicChatPage() {
         setCookie(sessionKey, newSessionId, THIRTY_DAYS_SECONDS);
       }
 
-      if (d.requiresPayment) {
+      if (FLAGS.payPerChat && d.requiresPayment) {
         setTyping(false);
 
         const stage = (d.paywallStage as 'teaser' | 'hard') || 'hard';
@@ -508,9 +486,22 @@ export function PublicChatPage() {
   return (
     <div className="theme-light min-h-screen bg-bg-primary flex">
       {/* LEFT: Conversations (authed only) */}
-      {!isMobile && isAuthed && (
+      {!isMobile && (
         <div className="w-[280px] flex-shrink-0 border-r border-border-default bg-bg-secondary">
-          <ConversationSidebar currentSessionId={sessionId} />
+          {isAuthed ? (
+            <ConversationSidebar currentSessionId={sessionId} />
+          ) : (
+            <div className="p-4">
+              <div className="text-lg font-semibold text-text-primary mb-2">Menu</div>
+              <p className="text-sm text-text-secondary mb-4">Login to see your conversations and save history.</p>
+              <Link
+                to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
+              >
+                Login / Sign up
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -563,6 +554,8 @@ export function PublicChatPage() {
               )}
               <div className="min-w-0">
                 <div className="text-xs text-text-tertiary">
+                  <Link to="/marketplace" className="hover:underline">Marketplace</Link>
+                  {' / '}
                   <span className="text-text-secondary">{creator?.displayName || slug}</span>
                 </div>
                 <div className="font-semibold text-text-primary truncate">
@@ -574,23 +567,12 @@ export function PublicChatPage() {
             {/* Right actions */}
             <div className="ml-auto flex items-center gap-2">
               {!isAuthed ? (
-                <>
-                  <button
-                    onClick={resetSession}
-                    className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated inline-flex items-center gap-2"
-                    title="Start a new chat"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    New chat
-                  </button>
-
-                  <Link
-                    to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                    className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
-                  >
-                    Login to Save
-                  </Link>
-                </>
+                <Link
+                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                  className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
+                >
+                  Login to Save
+                </Link>
               ) : (
                 <>
                   <Link
@@ -627,7 +609,7 @@ export function PublicChatPage() {
                 <strong>⚡ Premium active</strong> — {formatDuration(premiumRemainingMs)} left
               </span>
               <button
-                onClick={requestUpgrade}
+                onClick={() => setShowPaymentModal(true)}
                 className="text-sm underline hover:opacity-80"
               >
                 Extend
@@ -651,12 +633,9 @@ export function PublicChatPage() {
                   </>
                 )}
               </span>
-              <button
-                onClick={() => setShowInfoSheet(true)}
-                className="text-accent-primary hover:underline"
-              >
-                Creator info
-              </button>
+              <Link to="/marketplace" className="text-accent-primary hover:underline">
+                Browse creators
+              </Link>
             </div>
           </div>
         )}
@@ -739,7 +718,7 @@ export function PublicChatPage() {
                                 </Link>
                               )}
                               <button
-                                onClick={requestUpgrade}
+                                onClick={() => setShowPaymentModal(true)}
                                 className="px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium shadow"
                               >
                                 Unlock full answer
@@ -834,7 +813,7 @@ export function PublicChatPage() {
               <MessageLimitWarning
                 remainingMessages={messageLimit.remainingFreeMessages}
                 totalFreeMessages={messageLimit.freeMessageLimit}
-                onUpgrade={requestUpgrade}
+                onUpgrade={() => setShowPaymentModal(true)}
                 suggestedTiers={messageLimit.suggestedTiers}
                 variant="inline"
               />
@@ -925,7 +904,7 @@ export function PublicChatPage() {
               </div>
 
               <button
-                onClick={requestUpgrade}
+                onClick={() => setShowPaymentModal(true)}
                 className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
               >
                 View pricing / Upgrade
@@ -947,7 +926,7 @@ export function PublicChatPage() {
                       Expires: {new Date(premiumExpiresAt).toLocaleString()}
                     </div>
                   )}
-                  <button onClick={requestUpgrade} className="mt-2 text-xs underline">
+                  <button onClick={() => setShowPaymentModal(true)} className="mt-2 text-xs underline">
                     Extend access
                   </button>
                 </div>
@@ -998,6 +977,11 @@ export function PublicChatPage() {
             </div>
           </div>
 
+          <div className="mt-4">
+            <Link to="/marketplace" className="inline-flex items-center justify-center w-full px-4 py-2 bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated">
+              Browse more creators
+            </Link>
+          </div>
         </div>
       )}
 
@@ -1017,7 +1001,7 @@ export function PublicChatPage() {
               <div className="mt-3">🆓 3 free questions • ✨ Pay once = 24h unlimited</div>
             </div>
             <div className="mt-4">
-              <button onClick={requestUpgrade} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
+              <button onClick={() => setShowPaymentModal(true)} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
                 View pricing / Upgrade
               </button>
             </div>
@@ -1026,7 +1010,7 @@ export function PublicChatPage() {
       )}
 
       {/* Payment Modal */}
-      {showPaymentModal && (paymentData || (creator?.id && sessionId)) && (
+      {FLAGS.payPerChat && showPaymentModal && (paymentData || (creator?.id && sessionId)) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
           <div className="bg-bg-secondary w-full md:max-w-md md:rounded-lg rounded-t-2xl relative max-h-[92vh] overflow-y-auto">
             <button

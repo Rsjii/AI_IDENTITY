@@ -14,14 +14,12 @@ function getRequiredOnboardingPath(user: any): string {
   const map: Record<string, string> = {
     quiz: '/onboarding/quiz',
     content: '/onboarding/content',
-
-    // Phase-1: voice/training removed from mandatory flow
-    voice: '/onboarding/plan',
-    training: '/onboarding/plan',
-
+    voice: '/onboarding/voice',
     plan: '/onboarding/plan',
     deploy: '/onboarding/deploy',
     done: '/dashboard',
+    // Backward compatibility: some older code might use 'training'
+    training: '/onboarding/training',
   };
   return map[step] || '/onboarding/quiz';
 }
@@ -74,26 +72,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return <Navigate to={required} replace />;
     }
 
-    // Don't allow skipping *forward* inside onboarding routes.
-    // Allow going *back* (earlier steps) freely.
+    // Don't allow skipping steps inside onboarding routes
     // EXCEPT: Allow deploy page if ?paid=1 (Stripe redirect before webhook processed)
     if (location.pathname.startsWith('/onboarding') && location.pathname !== required) {
       if (!(isDeployPage && justPaid)) {
-        const order = ['/onboarding/quiz', '/onboarding/content', '/onboarding/plan', '/onboarding/deploy'];
-        const currentIdx = order.indexOf(location.pathname);
-        const requiredIdx = order.indexOf(required);
-
-        // If current is ahead of required => redirect back to required
-        if (currentIdx !== -1 && requiredIdx !== -1 && currentIdx > requiredIdx) {
-          return <Navigate to={required} replace />;
-        }
-
-        // If unknown path inside onboarding, be safe and redirect
-        if (currentIdx === -1 || requiredIdx === -1) {
-          return <Navigate to={required} replace />;
-        }
-
-        // If current is behind required => allow (Back button allowed)
+        return <Navigate to={required} replace />;
       }
     }
 

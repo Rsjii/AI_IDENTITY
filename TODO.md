@@ -19,7 +19,7 @@ Issue 6 — "Voice" step exists but should be SKIPPED. Phase 1 requirements expl
 CHAT FLOW ISSUES
 Issue 1 — Two entry points creating confusion. /@handle is CreatorPublicProfile.tsx — a full profile page. /chat/:slug is PublicChatPage.tsx — the actual chat. Deploy page gives /chat/${slug} as the link. But social sharing implies /@username. Guest has to click TWICE: profile page → "Chat" button → chat page. Waste of friction.
 
-Issue 2 — (CORRECTION) /api/user/conversations/:sessionId/message-limit actually EXISTS in backend. The earlier 404 assumption was wrong; keep using it for authed users, and /api/public/message-limit for guests.
+Issue 2 — Dead API call (likely 404). PublicChatPage.tsx:247 calls /api/user/conversations/${sessionId}/message-limit. This endpoint does NOT exist in backend routes. Backend has /api/public/message-limit and /api/creator/chats/:sessionId. This will 404 silently.
 
 Issue 3 — Paywall gated behind feature flag. PublicChatPage.tsx:324 — FLAGS.payPerChat && d.requiresPayment. If FLAGS.payPerChat is false, paywall NEVER shows. But free message limit still gets enforced. User gets stuck — can't send messages, no payment option appears.
 
@@ -482,15 +482,3 @@ Chatbot Design: Everything You Need to Build Better Bots
 Chatbot UI Examples for Designing a Great User Interface
 AI Chatbot UX: 2026's Top Design Best Practices
 15 Chatbot UI examples for designing an effective user interface
-
----
-
-## STATUS (Applied in code):
-✅ Min items gate: 3 → 1
-✅ Back button unblock (onboarding)
-✅ Remove Voice step from onboarding enforcement + deploy progress
-✅ /@handle → direct chat (redirect)
-✅ Paywall no longer gated by FLAGS.payPerChat
-✅ Guest left sidebar removed + "New chat" added
-✅ Upgrade modal helper added (prevents opening before sessionId exists)
-✅ "Browse more creators" link removed from right panel

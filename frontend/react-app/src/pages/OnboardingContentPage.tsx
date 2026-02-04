@@ -14,8 +14,7 @@ import {
   FileSpreadsheet, Star, Sparkles, TrendingUp,
   Check, ExternalLink
 } from 'lucide-react';
-import { useOnboardingGuard } from '@/hooks/useOnboardingGuard';
-import { FLAGS } from '@/lib/flags';
+import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
 
 interface ContentItem {
   id: string;
@@ -53,13 +52,6 @@ export function OnboardingContentPage() {
   const { refresh: refreshAuth } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('files');
-
-  // ✅ If social tab is disabled and user is on social tab, switch to files
-  useEffect(() => {
-    if (!FLAGS.socialMediaImport && activeTab === 'social') {
-      setActiveTab('files');
-    }
-  }, [activeTab]);
   const [pasteText, setPasteText] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -93,7 +85,7 @@ export function OnboardingContentPage() {
   const estimatedMinutes = Math.max(2, Math.ceil(2 + totalSizeMB * 2));
   const estimatedHours = estimatedMinutes >= 60 ? (estimatedMinutes / 60).toFixed(1) : null;
 
-  const minimumItemsRequired = 1;
+  const minimumItemsRequired = 3;
   const hasMinimumItems = totalFiles >= minimumItemsRequired;
 
   // Quality score calculation
@@ -185,6 +177,9 @@ export function OnboardingContentPage() {
 
   // ✅ Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
+
+  // ✅ Prevent back navigation to profile page
+  usePreventBack();
 
   // ✅ FIX: Prevent double API calls in React StrictMode
   const didInit = useRef(false);
@@ -431,7 +426,7 @@ export function OnboardingContentPage() {
                 { id: 'files' as TabType, label: 'Files', icon: File },
                 { id: 'text' as TabType, label: 'Text', icon: FileText },
                 { id: 'url' as TabType, label: 'URL', icon: LinkIcon },
-                ...(FLAGS.socialMediaImport ? [{ id: 'social' as TabType, label: 'Social', icon: Twitter }] : []),
+                { id: 'social' as TabType, label: 'Social', icon: Twitter },
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -672,7 +667,7 @@ export function OnboardingContentPage() {
                 </div>
               )}
 
-              {FLAGS.socialMediaImport && activeTab === 'social' && (
+              {activeTab === 'social' && (
                 <div className="space-y-6">
                   <div className="rounded-lg bg-gradient-to-r from-accent-primary/10 to-purple-500/10 border border-accent-primary/20 p-4">
                     <h4 className="font-medium mb-1 flex items-center gap-2">
