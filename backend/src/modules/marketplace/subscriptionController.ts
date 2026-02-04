@@ -76,9 +76,24 @@ export async function cancelSubscription(req: Request, res: Response) {
   const listingId = String(req.body?.listingId || '').trim();
   if (!listingId) return res.status(400).json({ error: 'listingId required' });
 
+  const subRes = await db.query(
+    `SELECT * FROM "marketplace_subscriptions" WHERE "listingId"=$1 AND "userId"=$2 LIMIT 1`,
+    [listingId, userId]
+  );
+  const sub = subRes.rows[0];
+  if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+  // If we have Stripe subscription id, cancel at period end in Stripe (source of truth)
+  if (sub.stripeSubscriptionId) {
+    const stripe = getStripe();
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+  }
+
   const r = await db.query(
     `UPDATE "marketplace_subscriptions"
-     SET "status"='canceled', "updatedAt"=CURRENT_TIMESTAMP
+     SET "cancelAtPeriodEnd"=true, "cancelledAt"=NOW(), "updatedAt"=CURRENT_TIMESTAMP
      WHERE "listingId"=$1 AND "userId"=$2
      RETURNING *`,
     [listingId, userId]

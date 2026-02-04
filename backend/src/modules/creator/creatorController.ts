@@ -193,6 +193,16 @@ export async function dashboard(req: Request, res: Response) {
     const planTier = userR.rows[0]?.planTier || 'free';
     const trialEndsAt = userR.rows[0]?.trialEndsAt || null;
 
+    // Active subscribers (marketplace subscriptions to this creator's listing)
+    const subsR = await db.query(
+      `SELECT COUNT(*)::int AS c
+       FROM "marketplace_subscriptions" ms
+       JOIN "marketplace_listings" ml ON ml.id = ms."listingId"
+       WHERE ml."creatorId"=$1 AND ms.status IN ('active','trialing')`,
+      [userId]
+    );
+    const activeSubscribers = subsR.rows[0]?.c || 0;
+
     return res.json({
       success: true,
       planTier,
@@ -207,6 +217,9 @@ export async function dashboard(req: Request, res: Response) {
         thisMonthCents: totalRevenue,
         payPerChatEarningsCents: payPerChatEarnings,
         subscriptionRevenueCents: subscriptionRevenue,
+      },
+      subscribers: {
+        active: activeSubscribers,
       },
       activeUsers: activeR.rows[0]?.c || 0,
       analytics: {
@@ -623,4 +636,71 @@ export async function chatDetails(req: Request, res: Response) {
   );
 
   return res.json({ success: true, sessionId, messages: m.rows });
+}
+
+export async function listSubscribers(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+  const offset = Math.max(0, Number(req.query.offset || 0));
+
+  const r = await db.query(
+    `
+    SELECT
+      ms.id,
+      ms.status,
+      ms."stripeSubscriptionId",
+      ms."cancelAtPeriodEnd",
+      ms."cancelledAt",
+      ms."currentPeriodStart",
+      ms."currentPeriodEnd",
+      ms."createdAt",
+      u.id AS "userId",
+      u.email,
+      u.handle,
+      u.name,
+      u."profileImage",
+      ml.id AS "listingId",
+      ml.slug AS "listingSlug",
+      ml."subscriptionPriceCents",
+      ml.currency
+    FROM "marketplace_subscriptions" ms
+    JOIN "marketplace_listings" ml ON ml.id = ms."listingId"
+    JOIN "User" u ON u.id = ms."userId"
+    WHERE ml."creatorId"=$1
+    ORDER BY ms."createdAt" DESC
+    LIMIT $2 OFFSET $3
+    `,
+    [userId, limit, offset]
+  );
+
+  return res.json({
+    success: true,
+    limit,
+    offset,
+    items: r.rows.map((x: any) => ({
+      id: x.id,
+      status: x.status,
+      stripeSubscriptionId: x.stripeSubscriptionId || null,
+      cancelAtPeriodEnd: !!x.cancelAtPeriodEnd,
+      cancelledAt: x.cancelledAt || null,
+      currentPeriodStart: x.currentPeriodStart || null,
+      currentPeriodEnd: x.currentPeriodEnd || null,
+      createdAt: x.createdAt,
+      listing: {
+        id: x.listingId,
+        slug: x.listingSlug,
+        subscriptionPriceCents: Number(x.subscriptionPriceCents || 0),
+        currency: x.currency || 'USD',
+      },
+      user: {
+        id: x.userId,
+        email: x.email,
+        handle: x.handle,
+        name: x.name,
+        profileImage: x.profileImage || null,
+      },
+    })),
+  });
 }

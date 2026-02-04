@@ -27,7 +27,7 @@ export function LandingPage() {
     (async () => {
       setFeaturedLoading(true);
       try {
-        const r = await fetch(`/api/marketplace/listings?page=1&pageSize=6&sort=popular`);
+        const r = await fetch(`/api/marketplace/listings?page=1&pageSize=6&featured=true&sort=popular`);
         const d = await r.json();
         if (!cancelled) setFeatured(d.items || []);
       } catch {

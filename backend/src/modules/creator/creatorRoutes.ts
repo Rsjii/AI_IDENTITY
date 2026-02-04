@@ -17,6 +17,7 @@ import {
   recentChats,
   listChats,
   chatDetails,
+  listSubscribers,
 } from './creatorController';
 
 const router = Router();
@@ -37,5 +38,6 @@ router.get('/stripe/status', asyncHandler(getStripeConnectStatus));
 router.get('/chats/recent', asyncHandler(recentChats));
 router.get('/chats', asyncHandler(listChats));
 router.get('/chats/:sessionId', asyncHandler(chatDetails));
+router.get('/subscribers', asyncHandler(listSubscribers));
 
 export default router;

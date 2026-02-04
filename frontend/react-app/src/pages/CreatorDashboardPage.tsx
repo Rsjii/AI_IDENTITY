@@ -37,7 +37,12 @@ interface DashboardData {
   };
   revenue: {
     thisMonthCents: number;
+    payPerChatEarningsCents?: number;
+    subscriptionRevenueCents?: number;
     totalCents?: number;
+  };
+  subscribers?: {
+    active: number;
   };
   activeUsers?: number;
   analytics?: {
@@ -233,6 +238,10 @@ const negativeToReviewLabel =
   negativeToReview === 1
     ? '1 negative rating needs review'
     : `${negativeToReview} negative ratings need review`;
+
+const payPerChatCents = data?.revenue?.payPerChatEarningsCents ?? 0;
+const subscriptionCents = data?.revenue?.subscriptionRevenueCents ?? 0;
+const activeSubs = data?.subscribers?.active ?? 0;
 
 const handleGenerateInsightsReport = () => {
   const d = new Date().toISOString().split('T')[0];
@@ -581,6 +590,20 @@ const handleGenerateInsightsReport = () => {
             {/* Revenue Tab */}
             {activeTab === 'revenue' && (
               <div className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="p-4 bg-bg-tertiary rounded-lg">
+                    <div className="text-sm text-text-secondary mb-1">Pay‑per‑chat earnings</div>
+                    <div className="text-2xl font-bold text-text-primary">{formatCurrency(payPerChatCents)}</div>
+                  </div>
+                  <div className="p-4 bg-bg-tertiary rounded-lg">
+                    <div className="text-sm text-text-secondary mb-1">Subscription revenue</div>
+                    <div className="text-2xl font-bold text-text-primary">{formatCurrency(subscriptionCents)}</div>
+                  </div>
+                  <div className="p-4 bg-bg-tertiary rounded-lg">
+                    <div className="text-sm text-text-secondary mb-1">Active subscribers</div>
+                    <div className="text-2xl font-bold text-text-primary">{activeSubs.toLocaleString()}</div>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-4">
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Total Earned</div>

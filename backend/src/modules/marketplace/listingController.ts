@@ -18,6 +18,7 @@ function slugify(input: string): string {
 
 const upsertListingSchema = z.object({
   isPublic: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
   category: z.string().max(50).optional(),
   subscriptionPriceCents: z.number().int().min(0).optional(),
   currency: z.string().max(5).optional(),
@@ -39,10 +40,14 @@ export async function getPublicListings(req: Request, res: Response) {
   const tag = typeof req.query.tag === 'string' ? req.query.tag : null;
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : null;
   const sort = typeof req.query.sort === 'string' ? req.query.sort : 'popular';
+  const featured = req.query.featured === 'true' || req.query.featured === '1';
 
   const params: any[] = [];
   let where = `"isPublic" = true`;
 
+  if (featured) {
+    where += ` AND "isFeatured" = true`;
+  }
   if (category) {
     params.push(category);
     where += ` AND "category" = $${params.length}`;
@@ -201,18 +206,20 @@ export async function upsertListing(req: Request, res: Response) {
       `UPDATE "marketplace_listings"
        SET
          "isPublic" = COALESCE($1, "isPublic"),
-         "category" = COALESCE($2, "category"),
-         "subscriptionPriceCents" = COALESCE($3, "subscriptionPriceCents"),
-         "currency" = COALESCE($4, "currency"),
-         "freeTrialQuestions" = COALESCE($5, "freeTrialQuestions"),
-         "description" = COALESCE($6, "description"),
-         "tags" = COALESCE($7, "tags"),
-         "slug" = COALESCE($8, "slug"),
+         "isFeatured" = COALESCE($2, "isFeatured"),
+         "category" = COALESCE($3, "category"),
+         "subscriptionPriceCents" = COALESCE($4, "subscriptionPriceCents"),
+         "currency" = COALESCE($5, "currency"),
+         "freeTrialQuestions" = COALESCE($6, "freeTrialQuestions"),
+         "description" = COALESCE($7, "description"),
+         "tags" = COALESCE($8, "tags"),
+         "slug" = COALESCE($9, "slug"),
          "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "creatorId"=$9
+       WHERE "creatorId"=$10
        RETURNING *`,
       [
         data.isPublic ?? null,
+        data.isFeatured ?? null,
         data.category ?? null,
         data.subscriptionPriceCents ?? null,
         data.currency ?? null,
@@ -235,14 +242,15 @@ export async function upsertListing(req: Request, res: Response) {
 
   const r = await db.query(
     `INSERT INTO "marketplace_listings"
-     ("id","creatorId","slug","isPublic","category","subscriptionPriceCents","currency","freeTrialQuestions","description","tags","createdAt","updatedAt")
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())
+     ("id","creatorId","slug","isPublic","isFeatured","category","subscriptionPriceCents","currency","freeTrialQuestions","description","tags","createdAt","updatedAt")
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())
      RETURNING *`,
     [
       id,
       userId,
       slug,
       data.isPublic ?? false,
+      data.isFeatured ?? false,
       data.category ?? null,
       data.subscriptionPriceCents ?? 0,
       data.currency ?? 'USD',

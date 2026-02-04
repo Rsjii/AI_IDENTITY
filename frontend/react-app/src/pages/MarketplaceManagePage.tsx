@@ -7,6 +7,7 @@ import { showToast } from '@/lib/toast';
 
 interface ListingForm {
   isPublic: boolean;
+  isFeatured: boolean;
   category: string;
   subscriptionPriceCents: number;
   currency: string;
@@ -18,6 +19,7 @@ interface ListingForm {
 export function MarketplaceManagePage() {
   const [form, setForm] = useState<ListingForm>({
     isPublic: false,
+    isFeatured: false,
     category: '',
     subscriptionPriceCents: 999,
     currency: 'USD',
@@ -33,6 +35,7 @@ export function MarketplaceManagePage() {
         if (data.item) {
           setForm({
             isPublic: data.item.isPublic ?? false,
+            isFeatured: data.item.isFeatured ?? false,
             category: data.item.category || '',
             subscriptionPriceCents: data.item.subscriptionPriceCents || 999,
             currency: data.item.currency || 'USD',
@@ -52,6 +55,7 @@ export function MarketplaceManagePage() {
         method: 'POST',
         body: JSON.stringify({
           isPublic: form.isPublic,
+          isFeatured: form.isFeatured,
           category: form.category,
           subscriptionPriceCents: form.subscriptionPriceCents,
           currency: form.currency,
@@ -84,6 +88,14 @@ export function MarketplaceManagePage() {
               onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
             />
             <span>Make listing public</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.isFeatured}
+              onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+            />
+            <span>Feature on homepage</span>
           </label>
 
           <Input

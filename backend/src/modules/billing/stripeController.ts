@@ -273,11 +273,20 @@ export async function stripeWebhook(req: Request, res: Response) {
         }
         
         if (metaType === 'marketplace_subscription' && listingId && userIdMeta) {
+          const cps = subscription?.current_period_start ? new Date(subscription.current_period_start * 1000) : null;
+          const cpe = subscription?.current_period_end ? new Date(subscription.current_period_end * 1000) : null;
+          const cancelAtPeriodEnd = !!subscription?.cancel_at_period_end;
+
           await db.query(
             `UPDATE "marketplace_subscriptions"
-             SET "status"=$1, "updatedAt"=now()
-             WHERE "stripeSubscriptionId"=$2`,
-            [status || 'active', subscription?.id]
+             SET
+               "status"=$1,
+               "currentPeriodStart"=$2,
+               "currentPeriodEnd"=$3,
+               "cancelAtPeriodEnd"=$4,
+               "updatedAt"=now()
+             WHERE "stripeSubscriptionId"=$5`,
+            [status || 'active', cps, cpe, cancelAtPeriodEnd, subscription?.id]
           );
         }
       } catch (err: any) {
@@ -367,7 +376,7 @@ export async function stripeWebhook(req: Request, res: Response) {
       if (metaType === 'marketplace_subscription') {
         await db.query(
           `UPDATE "marketplace_subscriptions"
-           SET "status"='canceled', "updatedAt"=now()
+           SET "status"='canceled', "cancelAtPeriodEnd"=false, "cancelledAt"=now(), "updatedAt"=now()
            WHERE "stripeSubscriptionId"=$1`,
           [subscription?.id]
         );

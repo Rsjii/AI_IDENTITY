@@ -723,6 +723,7 @@ CREATE TABLE IF NOT EXISTS "marketplace_listings" (
   "creatorId" TEXT NOT NULL,
   "slug" TEXT UNIQUE,
   "isPublic" BOOLEAN NOT NULL DEFAULT false,
+  "isFeatured" BOOLEAN NOT NULL DEFAULT false,
   "category" TEXT,
   "subscriptionPriceCents" INTEGER NOT NULL DEFAULT 0,
   "currency" TEXT NOT NULL DEFAULT 'USD',
@@ -737,6 +738,7 @@ CREATE TABLE IF NOT EXISTS "marketplace_listings" (
 
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_creatorId" ON "marketplace_listings"("creatorId");
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_isPublic" ON "marketplace_listings"("isPublic");
+CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_isFeatured" ON "marketplace_listings"("isFeatured");
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_category" ON "marketplace_listings"("category");
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_rating" ON "marketplace_listings"("rating");
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_price" ON "marketplace_listings"("subscriptionPriceCents");
@@ -771,6 +773,8 @@ CREATE TABLE IF NOT EXISTS "marketplace_subscriptions" (
   "userId" TEXT NOT NULL,
   "stripeSubscriptionId" TEXT,
   "status" TEXT NOT NULL DEFAULT 'active' CHECK ("status" IN ('active','trialing','past_due','canceled','incomplete','incomplete_expired','unpaid')),
+  "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
+  "cancelledAt" TIMESTAMPTZ,
   "currentPeriodStart" TIMESTAMPTZ,
   "currentPeriodEnd" TIMESTAMPTZ,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
