@@ -308,3 +308,4 @@ Last updated: 2026-02-04
 - Stripe subscription cancellation now follows “cancel at period end” semantics (when Stripe subscription ID exists) and webhook sync updates status and periods.
 
 
+
