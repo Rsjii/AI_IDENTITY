@@ -111,7 +111,11 @@ export function PaymentPrompt(props: PaymentPromptProps) {
       });
       window.location.href = res.url;
     } catch (e: any) {
-      setError(e.message || 'Failed to start subscription.');
+      if (e.message?.includes('not connected Stripe') || e.message?.includes('Creator has not connected')) {
+        setError('This creator has not set up payouts yet. Subscription is temporarily unavailable.');
+      } else {
+        setError(e.message || 'Failed to start subscription.');
+      }
     } finally {
       setSubLoading(false);
     }

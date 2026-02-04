@@ -379,6 +379,26 @@ app.use(async (req, res, next) => {
       return res.redirect('/auth');
     }
 
+    // ✅ userType-aware routing: visitors bypass onboarding entirely
+    if (!fullUser.userType) {
+      // Profile done but no userType chosen yet → send to fork screen
+      if (path !== '/choose-type' && !path.startsWith('/api/auth')) {
+        if (isApiRequest) {
+          return res.status(403).json({ error: 'User type not selected', errorCode: 'CHOOSE_TYPE_REQUIRED', redirect: '/choose-type' });
+        }
+        return res.redirect('/choose-type');
+      }
+    } else if (fullUser.userType === 'creator' && fullUser.onboardingStep && fullUser.onboardingStep !== 'done') {
+      // Creator who hasn't finished onboarding → force onboarding (unless already on onboarding routes)
+      if (!path.startsWith('/onboarding') && !path.startsWith('/api/identity') && !path.startsWith('/api/content') && !path.startsWith('/api/creator') && !path.startsWith('/api/payments') && !path.startsWith('/api/billing') && path !== '/choose-type') {
+        if (isApiRequest) {
+          return res.status(403).json({ error: 'Onboarding incomplete', errorCode: 'ONBOARDING_REQUIRED', redirect: '/onboarding' });
+        }
+        return res.redirect('/onboarding');
+      }
+    }
+    // userType === 'visitor' with profileCompleted → fall through, allow everything
+
     return next();
   } catch (err: any) {
     logger.error('ProfileCompletionGuard error:', {

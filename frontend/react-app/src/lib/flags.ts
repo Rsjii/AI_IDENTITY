@@ -18,6 +18,9 @@ export const FLAGS = {
   whatsapp: import.meta.env.VITE_ENABLE_WHATSAPP === 'true',
   instagram: import.meta.env.VITE_ENABLE_INSTAGRAM === 'true',
   
+  // ✅ Phase-1: Subscriptions + explore are core Phase 1 — always enabled
+  payments: true,
+
   // ✅ Phase-1: Integrations page is required for WEBSITE embed generator
   integrationsPage: import.meta.env.VITE_ENABLE_WIDGET === 'true',
   

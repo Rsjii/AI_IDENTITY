@@ -1427,7 +1427,7 @@ export function PublicChatPage() {
                 }
               }
               subscriptionOption={
-                FLAGS.marketplace &&
+                FLAGS.payments &&
                 creator?.listingId &&
                 (creator?.subscriptionPriceCents || 0) > 0
                   ? {

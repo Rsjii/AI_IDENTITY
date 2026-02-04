@@ -148,7 +148,7 @@ export async function createSubscriptionCheckout(req: Request, res: Response) {
         ? data.cancelUrl
         : `${frontendUrl}/marketplace/${listing.slug}?cancelled=1`,
     subscription_data: {
-      application_fee_percent: 30,
+      application_fee_percent: 25,
       transfer_data: { destination: listing.stripeConnectId },
       metadata: {
         listingId,

@@ -1537,3 +1537,26 @@ A: The backend periodically (daily) runs an LLM summarization on recent chat mes
 
 *This document is the master reference. When in doubt, refer here first.*
 *Last updated: Feb 4, 2026*
+
+---
+
+## 18. IMPLEMENTATION STATUS — Feb 4, 2026
+
+### ✅ All Priority 1–4 items: DONE
+Items [1]–[13] are fully implemented and verified in code. Stripe webhooks (Section 13.3) are confirmed handling `checkout.session.completed` (marketplace subscription creation), `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`.
+
+### ✅ Bugs fixed (Feb 4, 2026)
+- **Fee split aligned**: `application_fee_percent` in `subscriptionController.ts` changed from 30 → **25** to match the plan's 25/75 split. Frontend text ("Platform fee: 25%") was already correct.
+- **ProfileCompletionGuard**: Added full userType-aware logic in `app.ts`. Three paths enforced by middleware:
+  - `userType = null` → redirect to `/choose-type`
+  - `userType = 'creator'` + onboarding incomplete → redirect to `/onboarding`
+  - `userType = 'visitor'` + profileCompleted → allow everything (no onboarding)
+- **Subscription flag gate**: Added `FLAGS.payments = true` (always-on) in `flags.ts`. `PublicChatPage` subscription option now gated on `FLAGS.payments` instead of `FLAGS.marketplace`. Subscriptions + explore work regardless of marketplace flag.
+- **Stripe Connect error**: `PaymentPrompt` now shows a user-friendly message ("This creator has not set up payouts yet") when the backend returns the "Creator has not connected Stripe" 400 error, instead of a generic failure.
+- **Stripe webhooks**: Verified all required events are handled in `stripeController.ts`: `checkout.session.completed` (creates marketplace_subscriptions row), `customer.subscription.updated` (syncs status + period dates + cancelAtPeriodEnd), `customer.subscription.deleted` (marks cancelled), `invoice.payment_failed` (logged + available for future action).
+
+### 🔲 Remaining (Phase 2 / non-blocking)
+- `featuredOnExplore` column + toggle UI — backend currently uses `marketplace_listings.featured` field instead; works but differs from plan's User-table approach.
+- Visitor → Creator upgrade CTA — no "Create my own AI" button on `/explore` or `/my-profile` yet.
+- Creator analytics: Top Questions + Popular Topics — LLM summarization job not yet built.
+- Actual Stripe Connect payout transfers — `requestPayout` creates a DB record but `stripe.transfers.create()` is not yet wired (TODO stub in creatorController).
