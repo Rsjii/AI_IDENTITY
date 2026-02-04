@@ -7,6 +7,7 @@ import {
   publicHistory,
   claimSession,
   publicMessageLimit,
+  unlockBySubscription,
 } from './publicController';
 import { submitContactForm } from './contactController';
 import { contactFormRateLimit, contactFormDailyLimit, publicChatRateLimit } from '../../middleware/rateLimit';
@@ -24,6 +25,9 @@ router.post('/feedback', asyncHandler(publicFeedback));
 
 // ✅ After login, user can “claim” the guest session so it appears in /api/user/conversations
 router.post('/claim-session', requireJWTFromCookie, asyncHandler(claimSession));
+
+// ✅ After subscription checkout, unlock the latest teaser for this session
+router.post('/unlock-by-subscription', requireJWTFromCookie, asyncHandler(unlockBySubscription));
 
 router.post('/contact', contactFormRateLimit, contactFormDailyLimit, asyncHandler(submitContactForm));
 

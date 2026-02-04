@@ -89,8 +89,9 @@ export function SignupProfilePage() {
       );
       // ✅ Refresh auth state to update profileCompleted status
       await refresh();
-      // ✅ Go back to what user originally tried to open
-      navigate(safeNext || '/onboarding/quiz', { replace: true });
+      // ✅ Redirect to choose-type (fork screen)
+      const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+      navigate(`/choose-type${next}`, { replace: true });
     } catch (err: any) {
       // Check if error has field-specific validation errors
       if (err.fieldErrors) {

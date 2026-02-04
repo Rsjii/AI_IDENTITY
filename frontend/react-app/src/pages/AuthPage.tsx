@@ -41,9 +41,21 @@ export function AuthPage() {
   useEffect(() => {
     if (state.status !== 'authenticated') return;
   
+    const userType = (state.user as any)?.userType;
     const step = state.user?.onboardingStep;
-  
-    // ✅ If completed -> dashboard, else -> onboarding gate
+
+    if (!userType) {
+      navigate('/choose-type', { replace: true });
+      return;
+    }
+
+    if (userType === 'visitor') {
+      // visitor should not be forced into onboarding
+      navigate('/explore', { replace: true });
+      return;
+    }
+
+    // creator logic (existing)
     if (step === 'done') {
       navigate('/dashboard', { replace: true });
     } else {
@@ -113,6 +125,15 @@ export function AuthPage() {
       });
 
       await refresh(); // ✅ IMPORTANT: update auth state using /api/auth/me
+
+      // ✅ Check userType - if missing, go to choose-type first
+      const me = await apiFetch<any>('/api/auth/me');
+      const userType = me?.user?.userType;
+
+      if (safeNext && !userType) {
+        navigate(`/choose-type?next=${encodeURIComponent(safeNext)}`, { replace: true });
+        return;
+      }
 
       // ✅ If user came here from a protected page, go back there.
       // ProtectedRoute will still block them if profile/onboarding incomplete.

@@ -35,27 +35,49 @@ export function Navbar() {
             <div className="hidden md:flex items-center gap-4">
               {isAuthed ? (
                 <>
-                  <Link to="/mirror" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Mirror
+                  <Link to="/explore" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Explore
                   </Link>
-                  <Link to="/identity/edit" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    Identity
+                  <Link to="/my-chats" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    My Chats
                   </Link>
-                  {FLAGS.voice && (
-                    <Link to="/voice/setup" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                      Voice
+                  <Link to="/my-profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Profile
+                  </Link>
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <Link to="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      Dashboard
                     </Link>
-                  )}
-                  {FLAGS.integrationsPage && (
-                    <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                      Integrations
-                    </Link>
-                  )}
+                  ) : null}
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <>
+                      <Link to="/mirror" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        Mirror
+                      </Link>
+                      <Link to="/identity/edit" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        Identity
+                      </Link>
+                      {FLAGS.voice && (
+                        <Link to="/voice/setup" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                          Voice
+                        </Link>
+                      )}
+                      {FLAGS.integrationsPage && (
+                        <Link to="/integrations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                          Integrations
+                        </Link>
+                      )}
+                    </>
+                  ) : null}
                   <Link to="/settings" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Settings
                   </Link>
                 </>
-              ) : null}
+              ) : (
+                <Link to="/explore" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  Explore
+                </Link>
+              )}
 
               {isAuthed && state.user?.isAdmin ? (
                 <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -84,11 +106,11 @@ export function Navbar() {
             ) : isAuthed ? (
               <>
                 <Link
-                  to="/settings"
+                  to="/my-profile"
                   className="hidden sm:inline-flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
                   title={state.user?.email || ''}
                 >
-                  {state.user?.name || state.user?.handle || 'Settings'}
+                  {state.user?.name || state.user?.handle || 'Profile'}
                 </Link>
                 <Button size="sm" variant="outline" onClick={onLogout}>
                   Logout
@@ -108,14 +130,24 @@ export function Navbar() {
             <div className="rounded-xl border bg-background/80 backdrop-blur px-2 py-2">
               {isAuthed ? (
                 <div className="flex flex-col">
-                  <MobileNavLink to="/mirror" onClick={() => nav('/mirror')}>Mirror</MobileNavLink>
-                  <MobileNavLink to="/identity/edit" onClick={() => nav('/identity/edit')}>Identity</MobileNavLink>
-                  {FLAGS.voice && (
-                    <MobileNavLink to="/voice/setup" onClick={() => nav('/voice/setup')}>Voice</MobileNavLink>
-                  )}
-                  {FLAGS.integrationsPage && (
-                    <MobileNavLink to="/integrations" onClick={() => nav('/integrations')}>Integrations</MobileNavLink>
-                  )}
+                  <MobileNavLink to="/explore" onClick={() => nav('/explore')}>Explore</MobileNavLink>
+                  <MobileNavLink to="/my-chats" onClick={() => nav('/my-chats')}>My Chats</MobileNavLink>
+                  <MobileNavLink to="/my-profile" onClick={() => nav('/my-profile')}>Profile</MobileNavLink>
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <MobileNavLink to="/dashboard" onClick={() => nav('/dashboard')}>Dashboard</MobileNavLink>
+                  ) : null}
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <>
+                      <MobileNavLink to="/mirror" onClick={() => nav('/mirror')}>Mirror</MobileNavLink>
+                      <MobileNavLink to="/identity/edit" onClick={() => nav('/identity/edit')}>Identity</MobileNavLink>
+                      {FLAGS.voice && (
+                        <MobileNavLink to="/voice/setup" onClick={() => nav('/voice/setup')}>Voice</MobileNavLink>
+                      )}
+                      {FLAGS.integrationsPage && (
+                        <MobileNavLink to="/integrations" onClick={() => nav('/integrations')}>Integrations</MobileNavLink>
+                      )}
+                    </>
+                  ) : null}
                   <MobileNavLink to="/settings" onClick={() => nav('/settings')}>Settings</MobileNavLink>
                   {state.user?.isAdmin ? (
                     <MobileNavLink to="/admin" onClick={() => nav('/admin')}>Admin</MobileNavLink>
@@ -127,10 +159,13 @@ export function Navbar() {
                   </div>
                 </div>
               ) : (
-                <div className="px-2">
-                  <Button className="w-full h-11" onClick={() => nav('/auth')}>
-                    Sign in
-                  </Button>
+                <div className="flex flex-col">
+                  <MobileNavLink to="/explore" onClick={() => nav('/explore')}>Explore</MobileNavLink>
+                  <div className="px-2 pt-2">
+                    <Button className="w-full h-11" onClick={() => nav('/auth')}>
+                      Sign in
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

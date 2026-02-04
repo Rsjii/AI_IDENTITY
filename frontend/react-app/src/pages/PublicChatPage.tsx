@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
   ThumbsUp,
@@ -24,6 +24,8 @@ import {
 import { PaymentPrompt } from '@/components/PaymentPrompt';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { MessageLimitWarning } from '@/components/MessageLimitWarning';
+import { NotFoundCreator } from '@/components/NotFoundCreator';
+import { CreatorProfileModal } from '@/components/CreatorProfileModal';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
@@ -43,6 +45,9 @@ type Creator = {
   stats?: { totalChats: number; rating: number; totalRatings: number };
   priceConfig?: any;
   socialLinks?: any;
+  listingId?: string | null;
+  subscriptionPriceCents?: number;
+  currency?: string;
 };
 
 type Msg = {
@@ -161,8 +166,12 @@ function ShareButtons({ slug, creatorName }: { slug: string; creatorName?: strin
 
 export function PublicChatPage() {
   const { slug = '' } = useParams();
+  const [searchParams] = useSearchParams();
   const { state, logout } = useAuth();
   const isAuthed = state.status === 'authenticated';
+  
+  const sessionIdFromUrl = searchParams.get('sessionId') || '';
+  const subscribedFromUrl = searchParams.get('subscribed') === '1';
 
   const onLogout = async () => {
     try {
@@ -178,6 +187,9 @@ export function PublicChatPage() {
   const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
 
   const [creator, setCreator] = useState<Creator | null>(null);
+  const [creatorLoading, setCreatorLoading] = useState(true);
+  const [creatorNotFound, setCreatorNotFound] = useState(false);
+  const [creatorLoadError, setCreatorLoadError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [text, setText] = useState('');
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -210,17 +222,133 @@ export function PublicChatPage() {
   const [publicLimit, setPublicLimit] = useState<any>(null);
   const [messageIdToUnlock, setMessageIdToUnlock] = useState<string | null>(null);
   const [previewTextForModal, setPreviewTextForModal] = useState<string>('');
+  const [showCreatorModal, setShowCreatorModal] = useState(false);
+  const [showTransparencyNotice, setShowTransparencyNotice] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // Fetch creator
+  // Fetch creator with proper 404 handling
   useEffect(() => {
+    let cancelled = false;
+
+    setCreator(null);
+    setCreatorLoading(true);
+    setCreatorNotFound(false);
+    setCreatorLoadError(null);
+
     fetch(`/api/public/creator/${encodeURIComponent(slug)}`)
-      .then((r) => r.json())
-      .then((d) => setCreator(d.creator || null))
-      .catch(() => setCreator(null));
+      .then(async (r) => {
+        if (r.status === 404) {
+          if (!cancelled) setCreatorNotFound(true);
+          return null;
+        }
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d?.success) {
+          throw new Error(d?.error || 'Failed to load creator');
+        }
+        if (!cancelled) setCreator(d.creator || null);
+        return null;
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        setCreatorLoadError(e?.message || 'Failed to load creator');
+      })
+      .finally(() => {
+        if (!cancelled) setCreatorLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
-  // Restore sessionId from cookie/localStorage (guest + authed)
+  // Subscription status (logged-in only)
   useEffect(() => {
+    let cancelled = false;
+    setIsSubscribed(false);
+
+    (async () => {
+      if (!FLAGS.marketplace) return;
+      if (!isAuthed) return;
+      if (!creator?.listingId) return;
+
+      try {
+        const res = await apiFetch<{ item: any }>(
+          `/api/marketplace/subscriptions/status?listingId=${encodeURIComponent(creator.listingId)}`
+        );
+        const st = String(res?.item?.status || '');
+        if (!cancelled) setIsSubscribed(st === 'active' || st === 'trialing');
+      } catch {
+        if (!cancelled) setIsSubscribed(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed, creator?.listingId]);
+
+  // One-time transparency notice (Phase 1 disclosure)
+  useEffect(() => {
+    if (!creator) return;
+    const k = 'selflyx_transparency_notice_dismissed';
+    const dismissed = localStorage.getItem(k) === '1';
+    if (!dismissed) setShowTransparencyNotice(true);
+  }, [creator]);
+
+  // After returning from Stripe subscription checkout, unlock latest teaser (best-effort)
+  useEffect(() => {
+    if (!FLAGS.marketplace) return;
+    if (!subscribedFromUrl) return;
+    if (!isAuthed) return;
+    if (!sessionId) return;
+
+    apiFetch<{ success: boolean; unlocked?: boolean; teaserMessageId?: string; reply?: string }>(
+      '/api/public/unlock-by-subscription',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId,
+          teaserMessageId: messageIdToUnlock || undefined,
+        }),
+      }
+    )
+      .then((r) => {
+        if (!r?.success || !r.unlocked || !r.reply) return;
+
+        const tid = r.teaserMessageId || messageIdToUnlock;
+        if (tid) {
+          setMsgs((prev) =>
+            prev.map((m) =>
+              m.id === tid
+                ? { ...m, content: r.reply!, isTeaser: false, paywallStage: undefined }
+                : m
+            )
+          );
+          setMessageIdToUnlock(null);
+          setPreviewTextForModal('');
+        } else {
+          setMsgs((x) => [...x, { role: 'assistant', content: r.reply!, timestamp: new Date(), id: `msg_${Date.now()}` }]);
+        }
+        setIsSubscribed(true);
+        showToast('Subscribed — unlocked!', 'success');
+      })
+      .catch(() => {});
+  }, [subscribedFromUrl, isAuthed, sessionId, messageIdToUnlock]);
+
+  // If URL specifies a session, prefer it and persist it for this creator
+  useEffect(() => {
+    if (!sessionIdFromUrl) return;
+
+    setSessionId(sessionIdFromUrl);
+    localStorage.setItem(sessionKey, sessionIdFromUrl);
+    localStorage.setItem(sessionTsKey, String(Date.now()));
+    setCookie(sessionKey, sessionIdFromUrl, THIRTY_DAYS_SECONDS);
+  }, [sessionIdFromUrl, sessionKey, sessionTsKey]);
+
+  // Restore sessionId from cookie/localStorage (guest + authed) - only if not from URL
+  useEffect(() => {
+    if (sessionIdFromUrl) return; // URL session takes precedence
+
     const cookieSessionId = getCookie(sessionKey);
     const savedSessionId = cookieSessionId || localStorage.getItem(sessionKey);
     const savedTs = Number(localStorage.getItem(sessionTsKey) || '0');
@@ -235,7 +363,7 @@ export function PublicChatPage() {
       if (!cookieSessionId) setCookie(sessionKey, savedSessionId, THIRTY_DAYS_SECONDS);
       setSessionId(savedSessionId);
     }
-  }, [sessionKey, sessionTsKey]);
+  }, [sessionKey, sessionTsKey, sessionIdFromUrl]);
 
   // Load history (guest + authed)
   useEffect(() => {
@@ -591,6 +719,16 @@ export function PublicChatPage() {
         <p className="text-xs text-text-tertiary mb-2">Login to save your conversations</p>
         <Link
           to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+          onClick={() => {
+            try {
+              if (sessionId) {
+                const k = 'selflyx_pending_claim_session_ids';
+                const prev = JSON.parse(localStorage.getItem(k) || '[]');
+                const next = Array.from(new Set([...(prev || []), sessionId]));
+                localStorage.setItem(k, JSON.stringify(next));
+              }
+            } catch {}
+          }}
           className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium text-sm"
         >
           Login / Sign up
@@ -598,6 +736,29 @@ export function PublicChatPage() {
       </div>
     </div>
   );
+
+  // Early returns for loading/error states
+  if (creatorLoading) {
+    return (
+      <div className="theme-light h-screen bg-bg-primary flex items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-accent-primary" />
+      </div>
+    );
+  }
+
+  if (creatorNotFound) {
+    return <NotFoundCreator exploreHref="/explore" />;
+  }
+
+  if (creatorLoadError) {
+    return (
+      <NotFoundCreator
+        title="Could not load creator"
+        subtitle={creatorLoadError}
+        exploreHref="/explore"
+      />
+    );
+  }
 
   return (
     <div className="theme-light h-screen overflow-hidden bg-bg-primary flex">
@@ -657,6 +818,16 @@ export function PublicChatPage() {
                   <p className="text-xs text-text-tertiary mb-2">Login to save your conversations</p>
                   <Link
                     to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                    onClick={() => {
+                      try {
+                        if (sessionId) {
+                          const k = 'selflyx_pending_claim_session_ids';
+                          const prev = JSON.parse(localStorage.getItem(k) || '[]');
+                          const next = Array.from(new Set([...(prev || []), sessionId]));
+                          localStorage.setItem(k, JSON.stringify(next));
+                        }
+                      } catch {}
+                    }}
                     className="inline-flex items-center justify-center w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium text-sm"
                   >
                     Login / Sign up
@@ -690,12 +861,22 @@ export function PublicChatPage() {
               {creator?.avatarUrl && (
                 <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-9 h-9 rounded-full" />
               )}
-              <div className="min-w-0">
-                <div className="text-xs text-text-secondary">{creator?.displayName || slug}</div>
+              <button
+                type="button"
+                onClick={() => setShowCreatorModal(true)}
+                className="min-w-0 text-left hover:opacity-90"
+                title="View creator profile"
+              >
+                <div className="text-xs text-text-secondary flex items-center gap-2">
+                  <span>{creator?.displayName || slug}</span>
+                  {isSubscribed ? (
+                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300">⭐ Subscribed</span>
+                  ) : null}
+                </div>
                 <div className="font-semibold text-text-primary truncate">
                   Chat with {creator?.displayName || slug}'s AI
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Right actions: Share, New chat, auth buttons, mobile info */}
@@ -755,6 +936,26 @@ export function PublicChatPage() {
             </div>
           </div>
         </div>
+
+        {/* Transparency notice (one-time) */}
+        {showTransparencyNotice ? (
+          <div className="mx-auto max-w-5xl px-4 pt-3">
+            <div className="rounded-xl border border-border-default bg-bg-secondary p-3 flex items-start justify-between gap-3">
+              <div className="text-sm text-text-secondary">
+                <strong className="text-text-primary">Note:</strong> This conversation may be reviewed by the creator for quality improvement.
+              </div>
+              <button
+                className="px-3 py-2 rounded-lg bg-bg-tertiary text-sm hover:bg-bg-elevated"
+                onClick={() => {
+                  localStorage.setItem('selflyx_transparency_notice_dismissed', '1');
+                  setShowTransparencyNotice(false);
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Premium banner */}
         {premiumRemainingMs !== null && premiumRemainingMs > 0 && (
@@ -864,6 +1065,16 @@ export function PublicChatPage() {
                               {!isAuthed && (
                                 <Link
                                   to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
+                                  onClick={() => {
+                                    try {
+                                      if (sessionId) {
+                                        const k = 'selflyx_pending_claim_session_ids';
+                                        const prev = JSON.parse(localStorage.getItem(k) || '[]');
+                                        const next = Array.from(new Set([...(prev || []), sessionId]));
+                                        localStorage.setItem(k, JSON.stringify(next));
+                                      }
+                                    } catch {}
+                                  }}
                                   className="px-4 py-2 bg-bg-tertiary border border-border-default rounded-lg font-medium"
                                 >
                                   Login (recommended)
@@ -1186,6 +1397,11 @@ export function PublicChatPage() {
         </div>
       )}
 
+      {/* Creator Profile Modal */}
+      {creator && showCreatorModal && (
+        <CreatorProfileModal creator={creator as any} onClose={() => setShowCreatorModal(false)} />
+      )}
+
       {/* Payment Modal */}
       {FLAGS.payPerChat && showPaymentModal && (paymentData || (creator?.id && sessionId)) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
@@ -1210,6 +1426,20 @@ export function PublicChatPage() {
                   defaultAmount: creator?.priceConfig?.defaultTierCents || 500,
                 }
               }
+              subscriptionOption={
+                FLAGS.marketplace &&
+                creator?.listingId &&
+                (creator?.subscriptionPriceCents || 0) > 0
+                  ? {
+                      listingId: creator.listingId,
+                      priceCents: creator.subscriptionPriceCents || 0,
+                      currency: creator.currency || 'USD',
+                    }
+                  : undefined
+              }
+              returnTo={`/chat/${encodeURIComponent(slug)}${
+                (paymentData?.sessionId || sessionId) ? `?sessionId=${encodeURIComponent(paymentData?.sessionId || sessionId)}` : ''
+              }`}
               previewText={previewTextForModal}
               messageIdToUnlock={messageIdToUnlock || undefined}
               creatorName={creator?.displayName}

@@ -13,6 +13,9 @@ type ChatListItem = {
   lastMessageAt: string;
   messageCount: number;
   platform?: string | null;
+  paymentAmount?: number | null;
+  isPaid?: boolean;
+  isSubscribed?: boolean;
 };
 
 export function CreatorConversationsPage() {
@@ -72,7 +75,22 @@ export function CreatorConversationsPage() {
                     onClick={() => nav(`/conversations/${encodeURIComponent(c.sessionId)}`)}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="text-sm font-semibold text-text-primary">{c.label}</div>
+                      <div className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                        <span>{c.label}</span>
+                        {c.isSubscribed ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300">
+                            ⭐ Subscribed
+                          </span>
+                        ) : c.isPaid ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">
+                            💳 Paid {c.paymentAmount ? `$${(Number(c.paymentAmount) / 100).toFixed(2)}` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-bg-secondary border border-border-default text-text-tertiary">
+                            🆓 Free
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-text-tertiary">
                         {new Date(c.lastMessageAt).toLocaleString()}
                       </div>

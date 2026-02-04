@@ -544,6 +544,9 @@ export async function listChats(req: Request, res: Response) {
       cs."visitorId",
       cs."userId" as "viewerUserId",
       COALESCE(u."handle", CONCAT('Visitor ', COALESCE(cs."visitorId",'unknown'))) as "label",
+      sp.amount AS "paymentAmount",
+      CASE WHEN sp.amount IS NOT NULL THEN true ELSE false END AS "isPaid",
+      CASE WHEN msub.id IS NOT NULL THEN true ELSE false END AS "isSubscribed",
       COALESCE((
         SELECT cm."content"
         FROM "chat_messages" cm
@@ -565,6 +568,24 @@ export async function listChats(req: Request, res: Response) {
       ), 0) as "messageCount"
     FROM "chat_sessions" cs
     LEFT JOIN "User" u ON u.id = cs."userId"
+    LEFT JOIN LATERAL (
+      SELECT amount, "createdAt"
+      FROM "stripe_payments"
+      WHERE "sessionId" = cs.id AND status='succeeded' AND type='pay_per_chat'
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    ) sp ON true
+    LEFT JOIN LATERAL (
+      SELECT id
+      FROM "marketplace_listings"
+      WHERE "creatorId" = cs."creatorId" AND "isPublic"=true
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    ) ml ON true
+    LEFT JOIN "marketplace_subscriptions" msub
+      ON msub."listingId" = ml.id
+     AND msub."userId" = cs."userId"
+     AND msub.status IN ('active','trialing')
     WHERE cs."creatorId" = $1
     ORDER BY "lastMessageAt" DESC
     LIMIT $2 OFFSET $3

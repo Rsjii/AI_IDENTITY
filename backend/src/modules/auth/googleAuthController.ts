@@ -265,19 +265,29 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
         // ✅ Check if profile is completed
         const userWithProfile = await userQueries.findByEmail(user.email);
         const isProfileCompleted = userWithProfile?.profileCompleted || false;
+        const userType = (userWithProfile as any)?.userType || null;
         
-        // ✅ Redirect based on profile completion
-        if (isProfileCompleted) {
-          // Profile completed - check identity and redirect
-          const { identityQueries } = await import('../../config/database');
-          const identity = await identityQueries.findByUserId(userWithProfile.id);
-          const redirectUrl = identity ? '/mirror' : '/identity/setup';
-          res.redirect(redirectUrl);
-        } else {
-          // ✅ Profile incomplete - redirect to onboarding quiz
-          logger.info(`Google OAuth: Profile incomplete, redirecting to onboarding`);
-          res.redirect('/onboarding/quiz');
+        // ✅ Redirect based on profile completion and userType
+        if (!isProfileCompleted) {
+          res.redirect(`/signup/profile?email=${encodeURIComponent(user.email)}`);
+          return;
         }
+
+        if (!userType) {
+          res.redirect('/choose-type');
+          return;
+        }
+
+        if (userType === 'visitor') {
+          res.redirect('/explore');
+          return;
+        }
+
+        // creator behavior (existing)
+        const { identityQueries } = await import('../../config/database');
+        const identity = await identityQueries.findByUserId(userWithProfile.id);
+        const redirectUrl = identity ? '/mirror' : '/identity/setup';
+        res.redirect(redirectUrl);
       } catch (error: any) {
         logger.error('Google OAuth callback processing error:', error);
         logger.error('Error stack:', error?.stack);

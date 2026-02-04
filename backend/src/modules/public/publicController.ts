@@ -76,6 +76,38 @@ async function getActivePremiumExpiry(sessionId: string): Promise<Date | null> {
   return v && !Number.isNaN(v.getTime()) ? v : null;
 }
 
+// Marketplace helpers (subscription -> chat access)
+async function getPublicListingForCreator(
+  creatorId: string
+): Promise<{ id: string; subscriptionPriceCents: number; currency: string } | null> {
+  const r = await db.query(
+    `SELECT id, "subscriptionPriceCents", currency
+     FROM "marketplace_listings"
+     WHERE "creatorId"=$1 AND "isPublic"=true
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    [creatorId]
+  );
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    subscriptionPriceCents: Number(row.subscriptionPriceCents || 0),
+    currency: row.currency || 'USD',
+  };
+}
+
+async function hasActiveMarketplaceSubscription(userId: string, listingId: string): Promise<boolean> {
+  const r = await db.query(
+    `SELECT 1
+     FROM "marketplace_subscriptions"
+     WHERE "listingId"=$1 AND "userId"=$2 AND "status" IN ('active','trialing')
+     LIMIT 1`,
+    [listingId, userId]
+  );
+  return r.rowCount > 0;
+}
+
 export async function getCreator(req: Request, res: Response) {
   const slug = String(req.params.slug || '').trim().replace(/^@/, ''); // Remove @ prefix if present
   const u = await userQueries.findBySlugOrHandle(slug);
@@ -110,6 +142,8 @@ export async function getCreator(req: Request, res: Response) {
     }
   }
 
+  const listing = await getPublicListingForCreator(u.id);
+
   return res.json({
     success: true,
     creator: {
@@ -122,6 +156,9 @@ export async function getCreator(req: Request, res: Response) {
       expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
       topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
       priceConfig: u.priceConfig || null,
+      listingId: listing?.id || null,
+      subscriptionPriceCents: listing?.subscriptionPriceCents || 0,
+      currency: listing?.currency || 'USD',
       creatorTitle: u.creatorTitle || null,
       creatorTags: u.creatorTags || null,
       welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
@@ -170,6 +207,24 @@ async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
   return r.rows[0]?.c || 0;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+async function ensureDailyFreeReset(sessionId: string) {
+  const r = await db.query(
+    `SELECT "freeResetAt","createdAt" FROM "chat_sessions" WHERE id=$1 LIMIT 1`,
+    [sessionId]
+  );
+  const row = r.rows[0];
+  if (!row) return;
+
+  const base = row.freeResetAt ? new Date(row.freeResetAt) : new Date(row.createdAt);
+  if (Number.isNaN(base.getTime())) return;
+
+  if (Date.now() - base.getTime() >= DAY_MS) {
+    await db.query(`UPDATE "chat_sessions" SET "freeResetAt"=NOW(), "updatedAt"=NOW() WHERE id=$1`, [sessionId]);
+  }
+}
+
 /**
  * ✅ Public: message-limit + premium countdown (works for guest + authed)
  * GET /api/public/message-limit?sessionId=...&visitorId=...
@@ -214,6 +269,30 @@ export async function publicMessageLimit(req: any, res: Response) {
     }
   }
 
+  await ensureDailyFreeReset(sessionId);
+
+  // Subscription -> unlimited access (logged-in only)
+  if (viewerUserId) {
+    const listing = await getPublicListingForCreator(session.creatorId);
+    if (listing?.id) {
+      const isSubscribed = await hasActiveMarketplaceSubscription(viewerUserId, listing.id);
+      if (isSubscribed) {
+        return res.json({
+          success: true,
+          canSendMessage: true,
+          isUnlimited: true,
+          requiresPayment: false,
+          remainingFreeMessages: 0,
+          freeMessageLimit: FREE_MESSAGE_LIMIT,
+          messagesUsed: FREE_MESSAGE_LIMIT,
+          premiumExpiresAt: null,
+          premiumRemainingMs: null,
+          isSubscribed: true,
+        });
+      }
+    }
+  }
+
   const premiumExpiresAt = await getActivePremiumExpiry(sessionId);
   if (premiumExpiresAt) {
     return res.json({
@@ -226,6 +305,7 @@ export async function publicMessageLimit(req: any, res: Response) {
       messagesUsed: FREE_MESSAGE_LIMIT,
       premiumExpiresAt: premiumExpiresAt.toISOString(),
       premiumRemainingMs: Math.max(0, premiumExpiresAt.getTime() - Date.now()),
+      isSubscribed: false,
     });
   }
 
@@ -252,6 +332,7 @@ export async function publicMessageLimit(req: any, res: Response) {
     messagesUsed,
     premiumExpiresAt: null,
     premiumRemainingMs: null,
+    isSubscribed: false,
   });
 }
 
@@ -379,6 +460,8 @@ export async function publicChat(req: any, res: Response) {
     sid = s.id;
   }
 
+  await ensureDailyFreeReset(sid);
+
   // Get session row to check freeResetAt
   const sessionRow = await chatSessionQueries.findById(sid);
 
@@ -399,6 +482,15 @@ export async function publicChat(req: any, res: Response) {
   // Premium check
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
 
+  // Subscription check (logged-in users only)
+  let isSubscribed = false;
+  if (viewerUserId) {
+    const listing = await getPublicListingForCreator(creator.id);
+    if (listing?.id) {
+      isSubscribed = await hasActiveMarketplaceSubscription(viewerUserId, listing.id);
+    }
+  }
+
   const payPerChatAllowed = isFeatureEnabled('ENABLE_PAY_PER_CHAT') && isFeatureEnabled('ENABLE_PAYMENTS');
   const voiceAllowed = isFeatureEnabled('ENABLE_VOICE');
   const enablePayments = (creator.priceConfig as any)?.enablePayments === true;
@@ -407,7 +499,7 @@ export async function publicChat(req: any, res: Response) {
   const smart = shouldSmartTriggerPaywall(message, priceConfig);
 
   // If premium active OR payments not enabled => full reply
-  if (!(payPerChatAllowed && enablePayments) || hasPremiumSession) {
+  if (isSubscribed || !(payPerChatAllowed && enablePayments) || hasPremiumSession) {
     const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
       platform: 'web',
       sessionId: sid,
@@ -435,6 +527,7 @@ export async function publicChat(req: any, res: Response) {
       reply: result.reply || '',
       mirrorRunId: result.mirrorRunId,
       audioUrl,
+      isSubscribed,
     });
   }
 
@@ -465,6 +558,7 @@ export async function publicChat(req: any, res: Response) {
       sessionId: sid,
       reply: result.reply || '',
       mirrorRunId: result.mirrorRunId,
+      isSubscribed,
     });
   }
 
@@ -516,6 +610,7 @@ export async function publicChat(req: any, res: Response) {
       userMessageId: userMsgRow.id,
       teaserMessageId: teaserRow.id,
       previewReply,
+      isSubscribed,
       paymentOptions: {
         tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
         defaultAmount,
@@ -541,11 +636,82 @@ export async function publicChat(req: any, res: Response) {
     userMessageId: userMsgRow.id,
     teaserMessageId: null,
     previewReply: '',
+    isSubscribed,
     paymentOptions: {
       tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
       defaultAmount,
     },
   });
+}
+
+const unlockBySubscriptionSchema = z.object({
+  sessionId: z.string().min(1),
+  teaserMessageId: z.string().optional(), // if omitted, unlock latest truncated assistant message
+});
+
+export async function unlockBySubscription(req: any, res: Response) {
+  const viewerUserId = req.user?.id;
+  if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { sessionId, teaserMessageId } = unlockBySubscriptionSchema.parse(req.body);
+
+  const s = await db.query(
+    `SELECT id, "creatorId", "userId" FROM "chat_sessions" WHERE id=$1 LIMIT 1`,
+    [sessionId]
+  );
+  const session = s.rows[0];
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (!session.userId || session.userId !== viewerUserId) return res.status(403).json({ error: 'Session access denied' });
+
+  const listing = await getPublicListingForCreator(session.creatorId);
+  if (!listing?.id) return res.status(400).json({ error: 'Creator is not subscribable' });
+
+  const ok = await hasActiveMarketplaceSubscription(viewerUserId, listing.id);
+  if (!ok) return res.status(402).json({ error: 'Not subscribed' });
+
+  // Find teaser message row
+  const teaserRes = teaserMessageId
+    ? await db.query(
+        `SELECT id, "createdAt"
+         FROM "chat_messages"
+         WHERE id=$1 AND "sessionId"=$2 AND role='assistant' AND truncated=true
+         LIMIT 1`,
+        [teaserMessageId, sessionId]
+      )
+    : await db.query(
+        `SELECT id, "createdAt"
+         FROM "chat_messages"
+         WHERE "sessionId"=$1 AND role='assistant' AND truncated=true
+         ORDER BY "createdAt" DESC
+         LIMIT 1`,
+        [sessionId]
+      );
+
+  const teaser = teaserRes.rows[0];
+  if (!teaser) return res.json({ success: true, unlocked: false });
+
+  // Find the most recent user message before the teaser
+  const userMsgRes = await db.query(
+    `SELECT content
+     FROM "chat_messages"
+     WHERE "sessionId"=$1 AND role='user' AND "createdAt" <= $2
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    [sessionId, teaser.createdAt]
+  );
+  const userMsg = userMsgRes.rows[0]?.content || '';
+  if (!userMsg) return res.status(400).json({ error: 'No user message found to unlock' });
+
+  const result = await generateMirrorReplyWithLogging(session.creatorId, 'public_chat', userMsg, {
+    platform: 'web',
+    sessionId,
+    visitorId: null,
+  });
+
+  const full = (result.reply || '').trim();
+  await db.query(`UPDATE "chat_messages" SET content=$1, truncated=false WHERE id=$2`, [full, teaser.id]);
+
+  return res.json({ success: true, unlocked: true, teaserMessageId: teaser.id, reply: full });
 }
 
 /**

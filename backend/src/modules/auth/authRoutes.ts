@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, signupVerify, completeProfile, login, loginVerify, forgotPassword, forgotPasswordVerify, resetPassword, logout, changePassword, resendOTP, requestSetPasswordOTP, setPassword, me } from './authController';
+import { signup, signupVerify, completeProfile, login, loginVerify, forgotPassword, forgotPasswordVerify, resetPassword, logout, changePassword, resendOTP, requestSetPasswordOTP, setPassword, me, setUserType } from './authController';
 import {
     otpRequestRateLimit,
     loginRateLimit,
@@ -42,6 +42,9 @@ router.post('/set-password', requireJWTFromCookie, sanitizeInput, validateCSRF, 
 
 // Get current user
 router.get('/me', requireJWTFromCookie, me);
+
+// Set user type (creator vs visitor)
+router.post('/set-user-type', requireJWTFromCookie, sanitizeInput, validateCSRF, setUserType);
 
 // Logout
 router.post('/logout', logout);

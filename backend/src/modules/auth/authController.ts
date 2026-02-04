@@ -1002,16 +1002,22 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     if (!user.profileCompleted) {
       nextRedirect = `/signup/profile?email=${encodeURIComponent(user.email)}`;
     }
-    // ✅ STEP 2: Profile done, check onboarding status
+    // ✅ STEP 2: Profile done, check userType and onboarding status
     else {
-      // User has completed onboarding ONLY if onboardingStep is explicitly 'done'
-      const isOnboardingDone = user.onboardingStep === 'done';
+      const userType = (user as any).userType;
 
-      if (isOnboardingDone) {
-        nextRedirect = '/dashboard';
+      if (!userType) {
+        nextRedirect = '/choose-type';
+      } else if (userType === 'visitor') {
+        nextRedirect = '/explore';
       } else {
-        // Onboarding not complete - redirect to onboarding
-        nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+        // creator path (existing)
+        const isOnboardingDone = user.onboardingStep === 'done';
+        if (isOnboardingDone) {
+          nextRedirect = '/dashboard';
+        } else {
+          nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+        }
       }
     }
 
@@ -1182,16 +1188,22 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     if (!user.profileCompleted) {
       nextRedirect = `/signup/profile?email=${encodeURIComponent(user.email)}`;
     }
-    // ✅ STEP 2: Profile done, check onboarding status
+    // ✅ STEP 2: Profile done, check userType and onboarding status
     else {
-      // User has completed onboarding ONLY if onboardingStep is explicitly 'done'
-      const isOnboardingDone = user.onboardingStep === 'done';
+      const userType = (user as any).userType;
 
-      if (isOnboardingDone) {
-        nextRedirect = '/dashboard';
+      if (!userType) {
+        nextRedirect = '/choose-type';
+      } else if (userType === 'visitor') {
+        nextRedirect = '/explore';
       } else {
-        // Onboarding not complete - redirect to onboarding
-        nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+        // creator path (existing)
+        const isOnboardingDone = user.onboardingStep === 'done';
+        if (isOnboardingDone) {
+          nextRedirect = '/dashboard';
+        } else {
+          nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+        }
       }
     }
 
@@ -1540,12 +1552,33 @@ export const me = async (req: Request, res: Response) => {
       profileCompleted: user.profileCompleted,
       active: user.active,
       onboardingStep: (user as any).onboardingStep,
+      userType: (user as any).userType || null,
       isAdmin,
       hasPassword: Boolean(user.passwordHash),
       hasGoogle: Boolean(user.googleId),
       timeZone: (user as any).timeZone || null,
     },
   });
+};
+
+const setUserTypeSchema = z.object({
+  userType: z.enum(['creator', 'visitor']),
+});
+
+export const setUserType = async (req: any, res: Response) => {
+  const viewerUserId = req.user?.id || req.user?.userId;
+  if (!viewerUserId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { userType } = setUserTypeSchema.parse(req.body);
+
+  const r = await db.query(
+    `UPDATE "User" SET "userType"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$2 RETURNING "userType"`,
+    [userType, viewerUserId]
+  );
+
+  return res.json({ success: true, userType: r.rows[0]?.userType || userType });
 };
 
 export const logout = async (req: any, res: Response, next: NextFunction) => {

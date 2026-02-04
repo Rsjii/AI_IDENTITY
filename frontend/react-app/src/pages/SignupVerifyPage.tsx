@@ -78,15 +78,14 @@ export function SignupVerifyPage() {
       );
       await refresh(); // ✅ Refresh auth state after JWT cookie is set
 
-      // ✅ If user originally came from a protected page, go there after verification.
-      // ProtectedRoute will still enforce profile/onboarding steps if needed.
-      if (safeNext) {
-        navigate(safeNext, { replace: true });
-        return;
+      // ✅ Always use result.redirect (which goes to /signup/profile), append next if present
+      let redirectTo = result.redirect || '/signup/profile';
+      if (redirectTo.startsWith('/')) {
+        const u = new URL(redirectTo, window.location.origin);
+        if (safeNext) u.searchParams.set('next', safeNext);
+        redirectTo = u.pathname + u.search + u.hash;
       }
-
-      if (result.redirect) navigate(result.redirect, { replace: true });
-      else navigate('/onboarding', { replace: true });      
+      navigate(redirectTo, { replace: true });      
     } catch (err: any) {
       setError(err.message || 'OTP verification failed.');
     } finally {

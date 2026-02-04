@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "creatorTags" JSONB,
     "priceConfig" JSONB,
     "socialLinks" JSONB,
+    "userType" TEXT,
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
@@ -602,6 +603,7 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "businessHours" JSONB;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "notificationPreferences" JSONB;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletionScheduledAt" TIMESTAMPTZ;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "userType" TEXT;
 
 -- Add missing columns to mirror_runs
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "sessionId" TEXT;
@@ -918,7 +920,7 @@ export const userQueries = {
 
   findByEmail: async (email: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "deletedAt", "deletionScheduledAt" FROM "User" WHERE email = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt" FROM "User" WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -926,7 +928,7 @@ export const userQueries = {
 
   findByHandle: async (handle: string) => {
     const result = await db.query(
-      'SELECT id, email, handle, name, active, "profileCompleted" FROM "User" WHERE LOWER(handle) = LOWER($1)',
+      'SELECT id, email, handle, name, active, "profileCompleted", "userType" FROM "User" WHERE LOWER(handle) = LOWER($1)',
       [handle]
     );
     return result.rows[0];
@@ -934,7 +936,7 @@ export const userQueries = {
 
   findById: async (id: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "deletedAt", "deletionScheduledAt" FROM "User" WHERE id = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt" FROM "User" WHERE id = $1',
       [id]
     );
     return result.rows[0];

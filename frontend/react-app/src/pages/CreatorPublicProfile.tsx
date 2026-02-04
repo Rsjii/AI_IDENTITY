@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MessageCircle, Star, Zap, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { NotFoundCreator } from '@/components/NotFoundCreator';
 
 type Creator = {
   id: string;
@@ -33,11 +34,16 @@ export function CreatorPublicProfile() {
     }
 
     setLoading(true);
+    setError(null);
     fetch(`/api/public/creator/${encodeURIComponent(handle)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d?.success) {
+      .then(async (r) => {
+        if (r.status === 404) {
           setError('Creator not found');
+          return;
+        }
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d?.success) {
+          setError(d?.error || 'Creator not found');
           return;
         }
         setCreator(d.creator);
@@ -63,13 +69,11 @@ export function CreatorPublicProfile() {
   if (error || !creator) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-2">Creator Not Found</h1>
-          <p className="text-text-secondary mb-4">{error || 'The creator you are looking for does not exist.'}</p>
-          <Link to="/" className="text-accent-primary hover:underline">
-            Go to Home
-          </Link>
-        </div>
+        <NotFoundCreator
+          title="Creator Not Found"
+          subtitle={error || 'The creator you are looking for does not exist.'}
+          exploreHref="/explore"
+        />
       </Layout>
     );
   }

@@ -4,10 +4,43 @@ import { Shield, Sparkles, Zap, Play, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Testimonials } from '@/components/Testimonials';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export function LandingPage() {
   const { state } = useAuth();
   const authed = state.status === 'authenticated';
+
+  type ExploreItem = {
+    id: string;
+    description: string;
+    category: string | null;
+    freeTrialQuestions: number;
+    creator: { handle: string; name: string; profileImage: string | null };
+  };
+
+  const [featured, setFeatured] = useState<ExploreItem[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setFeaturedLoading(true);
+      try {
+        const r = await fetch(`/api/marketplace/listings?page=1&pageSize=6&sort=popular`);
+        const d = await r.json();
+        if (!cancelled) setFeatured(d.items || []);
+      } catch {
+        if (!cancelled) setFeatured([]);
+      } finally {
+        if (!cancelled) setFeaturedLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <Layout showNavbar={true} showFooter={false}>
       <div className="mx-auto max-w-6xl">
@@ -133,6 +166,66 @@ export function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Meet the AIs */}
+        <section className="mt-10">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold">Meet the AIs</h2>
+              <p className="text-muted-foreground mt-1">Real knowledge, available 24/7.</p>
+            </div>
+
+            <Button variant="outline" onClick={() => (window.location.href = '/explore')}>
+              See all →
+            </Button>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredLoading ? (
+              <div className="text-sm text-muted-foreground">Loading…</div>
+            ) : featured.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No featured creators yet.</div>
+            ) : (
+              featured.map((item) => (
+                <div key={item.id} className="rounded-2xl border bg-card/40 p-5 glass">
+                  <div className="flex items-center gap-3">
+                    {item.creator.profileImage ? (
+                      <img src={item.creator.profileImage} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-primary">
+                          {(item.creator.name || item.creator.handle || 'C').slice(0, 1).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{item.creator.name || item.creator.handle}</div>
+                      <div className="text-xs text-muted-foreground truncate">@{item.creator.handle}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-sm text-muted-foreground line-clamp-3">
+                    {item.description || 'No description yet.'}
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{item.category || 'General'}</span>
+                    <span>{item.freeTrialQuestions > 0 ? `${item.freeTrialQuestions} free` : 'Free'}</span>
+                  </div>
+
+                  <div className="mt-4">
+                    <Link
+                      to={`/chat/${encodeURIComponent(item.creator.handle)}`}
+                      className="inline-flex items-center justify-center w-full rounded-md px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90"
+                    >
+                      Chat →
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 

@@ -16,6 +16,7 @@ export type MeUser = {
   profileCompleted?: boolean;
   active?: boolean;
   onboardingStep?: 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'done';
+  userType?: 'creator' | 'visitor';
   isAdmin?: boolean;
   hasPassword?: boolean;
   hasGoogle?: boolean;
@@ -45,6 +46,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (res?.success === true && user && typeof user.id === 'string') {
         setState({ status: 'authenticated', user });
+
+        // Best-effort: claim any guest sessions after login so they appear in /my-chats
+        try {
+          const visitorId = localStorage.getItem('selflyx_visitor_id') || '';
+          const k = 'selflyx_pending_claim_session_ids';
+          const ids: string[] = JSON.parse(localStorage.getItem(k) || '[]');
+
+          for (const sessionId of ids) {
+            try {
+              await apiFetch('/api/public/claim-session', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId, visitorId }),
+              });
+            } catch {}
+          }
+
+          localStorage.removeItem(k);
+        } catch {}
       } else {
         setState({ status: 'unauthenticated', user: null });
       }

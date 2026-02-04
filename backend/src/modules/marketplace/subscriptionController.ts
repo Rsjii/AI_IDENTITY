@@ -13,6 +13,12 @@ const startSubscriptionSchema = z.object({
   listingId: z.string().min(1),
 });
 
+const checkoutSchema = z.object({
+  listingId: z.string().min(1),
+  successUrl: z.string().min(1).optional(),
+  cancelUrl: z.string().min(1).optional(),
+});
+
 export async function startSubscription(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -84,8 +90,8 @@ export async function createSubscriptionCheckout(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const listingId = String(req.body?.listingId || '').trim();
-  if (!listingId) return res.status(400).json({ error: 'listingId required' });
+  const data = checkoutSchema.parse(req.body);
+  const listingId = data.listingId;
 
   const listingRes = await db.query(
     `SELECT ml.*, u."stripeConnectId" FROM "marketplace_listings" ml
@@ -118,8 +124,14 @@ export async function createSubscriptionCheckout(req: Request, res: Response) {
         quantity: 1,
       },
     ],
-    success_url: `${frontendUrl}/marketplace/${listing.slug}?subscribed=1`,
-    cancel_url: `${frontendUrl}/marketplace/${listing.slug}?cancelled=1`,
+    success_url:
+      data.successUrl && data.successUrl.startsWith(frontendUrl)
+        ? data.successUrl
+        : `${frontendUrl}/marketplace/${listing.slug}?subscribed=1`,
+    cancel_url:
+      data.cancelUrl && data.cancelUrl.startsWith(frontendUrl)
+        ? data.cancelUrl
+        : `${frontendUrl}/marketplace/${listing.slug}?cancelled=1`,
     subscription_data: {
       application_fee_percent: 30,
       transfer_data: { destination: listing.stripeConnectId },

@@ -55,10 +55,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // 3) Onboarding incomplete => force the exact step they are on
-  const onboardingComplete = user?.onboardingStep === 'done' || user?.onboardingCompleted === true;
+  // 2.5) User type not chosen yet => force choose-type (preserve next)
+  if (user && user.profileCompleted && !user.userType && !location.pathname.startsWith('/choose-type')) {
+    return <Navigate to={`/choose-type?next=${encodeURIComponent(next)}`} replace />;
+  }
 
-  if (user && !onboardingComplete) {
+  // 3) Onboarding incomplete => force the exact step they are on (only for creators)
+  const onboardingComplete =
+    user?.userType === 'visitor'
+      ? true
+      : (user?.onboardingStep === 'done' || user?.onboardingCompleted === true);
+
+  if (user && user?.userType === 'creator' && !onboardingComplete) {
     const required = getRequiredOnboardingPath(user);
     const searchParams = new URLSearchParams(location.search);
 

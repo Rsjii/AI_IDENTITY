@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
 import { Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useAuth } from '@/contexts/AuthContext';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -19,6 +20,12 @@ interface PaymentPromptProps {
     tiers: { amount: number; label: string }[];
     defaultAmount?: number;
   };
+  subscriptionOption?: {
+    listingId: string;
+    priceCents: number;
+    currency?: string;
+  };
+  returnTo?: string;
   previewText?: string;
   messageIdToUnlock?: string;
   creatorName?: string;
@@ -27,6 +34,8 @@ interface PaymentPromptProps {
 }
 
 export function PaymentPrompt(props: PaymentPromptProps) {
+  const { state } = useAuth();
+  const isAuthed = state.status === 'authenticated';
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = React.useState<number>(() => {
     const fallback = props.paymentOptions.tiers?.[0]?.amount || 500;
@@ -38,6 +47,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
   const [visitorId, setVisitorId] = React.useState<string>('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [subLoading, setSubLoading] = React.useState(false);
 
   // Get visitor ID from localStorage
   useEffect(() => {
@@ -78,6 +88,35 @@ export function PaymentPrompt(props: PaymentPromptProps) {
     }
   }, [props.creatorId, selectedAmount, visitorId, props.sessionId, payerEmail, props.paymentOptions.tiers]);
 
+  const startSubscription = async () => {
+    const opt = props.subscriptionOption;
+    if (!opt?.listingId || !opt.priceCents) return;
+
+    const returnTo = props.returnTo || window.location.pathname + window.location.search;
+
+    if (!isAuthed) {
+      window.location.href = `/auth?next=${encodeURIComponent(returnTo)}`;
+      return;
+    }
+
+    setSubLoading(true);
+    try {
+      const res = await apiFetch<{ url: string }>('/api/marketplace/subscriptions/checkout', {
+        method: 'POST',
+        body: JSON.stringify({
+          listingId: opt.listingId,
+          successUrl: `${window.location.origin}${returnTo}${returnTo.includes('?') ? '&' : '?'}subscribed=1`,
+          cancelUrl: `${window.location.origin}${returnTo}${returnTo.includes('?') ? '&' : '?'}cancelled=1`,
+        }),
+      });
+      window.location.href = res.url;
+    } catch (e: any) {
+      setError(e.message || 'Failed to start subscription.');
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
   if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
     return (
       <Card className="glass shadow-sm">
@@ -102,6 +141,21 @@ export function PaymentPrompt(props: PaymentPromptProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {props.subscriptionOption?.priceCents ? (
+          <div className="mb-4 rounded-xl border border-border-default bg-bg-tertiary/30 p-4">
+            <div className="text-sm font-semibold text-text-primary">Better value</div>
+            <div className="text-sm text-text-secondary mt-1">
+              Subscribe for <strong>${(props.subscriptionOption.priceCents / 100).toFixed(2)}/month</strong> — unlimited chats.
+            </div>
+            <div className="mt-3">
+              <Button className="w-full h-12" onClick={startSubscription} disabled={subLoading}>
+                {subLoading ? 'Starting…' : 'Subscribe monthly'}
+              </Button>
+              <div className="text-xs text-muted-foreground mt-2">Requires account</div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Step 1: Collect email and tier BEFORE creating Elements */}
         {!clientSecret ? (
           <div className="space-y-4">

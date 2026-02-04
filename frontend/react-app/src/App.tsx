@@ -46,6 +46,9 @@ import { PhoneSetupPage } from './pages/PhoneSetupPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { CreatorConversationsPage } from './pages/CreatorConversationsPage';
 import { CreatorConversationDetailPage } from './pages/CreatorConversationDetailPage';
+import { ChooseTypePage } from './pages/ChooseTypePage';
+import { MyChatsPage } from './pages/MyChatsPage';
+import { MyProfilePage } from './pages/MyProfilePage';
 import { FLAGS } from './lib/flags';
 
 
@@ -78,6 +81,7 @@ function App() {
               <Route path="/signup/verify" element={<SignupVerifyPage />} />
               <Route path="/login/verify" element={<LoginVerifyPage />} />
               <Route path="/signup/profile" element={<ProtectedRoute><SignupProfilePage /></ProtectedRoute>} />
+              <Route path="/choose-type" element={<ProtectedRoute><ChooseTypePage /></ProtectedRoute>} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route path="/identity/setup" element={<ProtectedRoute><IdentitySetupPage /></ProtectedRoute>} />
@@ -122,6 +126,9 @@ function App() {
                 }
               />
               <Route path="/@:handle" element={<CreatorPublicProfile />} />
+              <Route path="/explore" element={<MarketplacePage />} />
+              <Route path="/my-chats" element={<ProtectedRoute><MyChatsPage /></ProtectedRoute>} />
+              <Route path="/my-profile" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
               {FLAGS.marketplace && (
                 <>
                   <Route path="/marketplace" element={<MarketplacePage />} />

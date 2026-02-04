@@ -38,6 +38,7 @@ import stripeRoutes from './modules/billing/stripeRoutes';
 import contentRoutes from './modules/content/contentRoutes';
 import publicRoutes from './modules/public/publicRoutes';
 import creatorRoutes from './modules/creator/creatorRoutes';
+import userRoutes from './modules/user/userRoutes';
 import payPerChatRoutes from './modules/payments/payPerChatRoutes';
 import rateLimitRoutes from './modules/rateLimit/rateLimitRoutes';
 import marketplaceListingRoutes from './modules/marketplace/listingRoutes';
@@ -606,6 +607,7 @@ if (isFeatureEnabled('ENABLE_PAYMENTS') && isFeatureEnabled('ENABLE_PAY_PER_CHAT
 app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/rate-limit', rateLimitRoutes);
 app.use('/api/user/conversations', conversationsRoutes);
 if (isFeatureEnabled('ENABLE_MARKETPLACE') && isFeatureEnabled('ENABLE_PAYMENTS')) {
