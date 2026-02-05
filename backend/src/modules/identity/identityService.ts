@@ -56,6 +56,11 @@ export function computeDecision(identityJson: IdentityJson, incomingMessage: str
     }
   }
 
+  // ✅ NEW: greetings should reply (not clarify)
+  if (/^(hi|hello|hey|yo|hii|hiii|namaste)\b/.test(text)) {
+    return { action: 'reply', reason: 'Greeting; respond naturally.' };
+  }
+
   // Check if message is too short
   if (text.length < 8) {
     return { action: 'clarify', reason: 'Message is too short; ask for context.' };
@@ -556,9 +561,10 @@ export async function generateMirrorReplyWithLogging(
   userId: string,
   context: string,
   incomingMessage: string,
-  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api' | 'instagram' | 'phone'; sessionId?: string; visitorId?: string; maxTokens?: number; teaserOnly?: boolean }
+  opts?: { platform?: 'web' | 'gmail' | 'linkedin' | 'api' | 'instagram' | 'phone'; sessionId?: string; visitorId?: string; maxTokens?: number; teaserOnly?: boolean; persistChat?: boolean }
 ) {
   const platform = opts?.platform || 'web';
+  const persistChat = opts?.persistChat !== false; // Default to true for backward compatibility
 
   const identity = await identityQueries.findByUserId(userId);
   if (!identity || !identity.activeVersionId) {
@@ -620,7 +626,7 @@ export async function generateMirrorReplyWithLogging(
   const templates: Record<typeof decision.action, string> = {
     ignore: '',
     defer: 'Got it — let me check and get back to you.',
-    clarify: 'Can you share a bit more context (what\'s the goal / deadline / what you need from me)?',
+    clarify: 'Hi! What would you like to ask? Give me a bit of context and I\'ll help.',
     escalate: 'This requires attention. Let me review and respond appropriately.',
     reply: '',
   };
@@ -640,8 +646,8 @@ export async function generateMirrorReplyWithLogging(
 
   const sessionId = await ensureSession();
 
-  // Always save user message when session exists
-  if (sessionId) {
+  // ✅ Only save user message when session exists AND persistChat is true
+  if (sessionId && persistChat) {
     await chatMessageQueries.add({ sessionId, role: 'user', content: incomingMessage });
   }
 
@@ -682,7 +688,8 @@ export async function generateMirrorReplyWithLogging(
       logger.warn('Failed to log AI_RUN_CREATED event:', err);
     });
 
-    if (sessionId && reply) {
+    // ✅ Only persist assistant message if persistChat is true
+    if (sessionId && persistChat && reply) {
       await chatMessageQueries.add({ sessionId, role: 'assistant', content: reply });
     }
 
@@ -751,7 +758,9 @@ export async function generateMirrorReplyWithLogging(
 
         // Save to chat session
         if (sessionId && finalReply) {
-          await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
+          if (persistChat) {
+            await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
+          }
         }
 
         // Log cache hit (no cost)
@@ -933,7 +942,8 @@ export async function generateMirrorReplyWithLogging(
   });
 
   // after final mirrorRun created:
-  if (sessionId && finalReply) {
+  // ✅ Only persist assistant message if persistChat is true
+  if (sessionId && persistChat && finalReply) {
     await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
   }
 

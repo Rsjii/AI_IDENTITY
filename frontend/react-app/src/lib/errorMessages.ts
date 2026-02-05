@@ -14,6 +14,8 @@ export function getUserFriendlyError(error: any): string {
     'AUTH_REQUIRED': 'Please log in to continue.',
     'INVALID_CREDENTIALS': 'Invalid email or password. Please try again.',
     'SESSION_EXPIRED': 'Your session has expired. Please log in again.',
+    'ACCOUNT_NOT_VERIFIED': 'Your account is not verified. Please check your email for the verification code and complete signup, or signup again to receive a new code.',
+    'ACCOUNT_DELETION_REQUESTED': 'Account deletion requested. Login is disabled.',
     
     // Validation errors
     'VALIDATION_ERROR': 'Please check your input and try again.',

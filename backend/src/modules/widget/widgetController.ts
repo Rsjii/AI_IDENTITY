@@ -171,6 +171,7 @@ export async function widgetChat(req: Request, res: Response) {
     platform: 'api',
     visitorId: finalVisitorId,
     sessionId: session.id,
+    persistChat: false, // ✅ Controller already saves messages
   });
 
   if (result.reply) {

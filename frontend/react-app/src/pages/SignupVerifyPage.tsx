@@ -10,6 +10,7 @@ import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
 import { usePreventBack } from '@/hooks/useOnboardingGuard';
+import { getUserFriendlyError } from '@/lib/errorMessages';
 
 function useQuery() {
   const { search } = useLocation();
@@ -87,14 +88,14 @@ export function SignupVerifyPage() {
       }
       navigate(redirectTo, { replace: true });      
     } catch (err: any) {
-      setError(err.message || 'OTP verification failed.');
+      setError(getUserFriendlyError(err) || 'OTP verification failed. Please check your code and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthShell title="Verify your email" subtitle="Enter the 6-digit OTP sent to your email.">
+    <AuthShell title="Verify your email" subtitle="Enter the 6-digit OTP sent to your email." showLogout={true} showBackToHome={false}>
       <Card className="glass shadow-sm">
         <CardHeader>
           <CardTitle>Signup verification</CardTitle>

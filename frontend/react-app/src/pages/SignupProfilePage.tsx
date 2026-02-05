@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePreventBack } from '@/hooks/useOnboardingGuard';
+import { getUserFriendlyError } from '@/lib/errorMessages';
 
 function useQuery() {
   const { search } = useLocation();
@@ -97,7 +98,7 @@ export function SignupProfilePage() {
       if (err.fieldErrors) {
         setFieldErrors(err.fieldErrors);
       } else {
-        setError(err.message || 'Profile save failed.');
+        setError(getUserFriendlyError(err) || 'Profile save failed. Please check your input and try again.');
       }
     } finally {
       setLoading(false);
@@ -105,7 +106,7 @@ export function SignupProfilePage() {
   };
 
   return (
-    <AuthShell title="Complete your profile" subtitle="Required step to continue - we need to know who you are!">
+    <AuthShell title="Complete your profile" subtitle="Required step to continue - we need to know who you are!" showLogout={true} showBackToHome={false}>
       <Card className="glass shadow-sm">
         <CardHeader>
           <CardTitle>Tell us about yourself</CardTitle>

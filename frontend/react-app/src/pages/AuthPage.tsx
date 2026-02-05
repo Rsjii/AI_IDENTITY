@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Chrome, Loader2, Eye, EyeOff } from 'lucide-react';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserFriendlyError } from '@/lib/errorMessages';
 
 type TabType = 'login' | 'signup';
 
@@ -149,7 +150,8 @@ export function AuthPage() {
         setError('Login successful but no redirect provided.');
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      // Use user-friendly error messages
+      setError(getUserFriendlyError(err) || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -188,7 +190,7 @@ export function AuthPage() {
         setError('Signup successful but no redirect provided.');
       }
     } catch (err: any) {
-      setError(err.message || 'Signup failed. Please try again.');
+      setError(getUserFriendlyError(err) || 'Signup failed. Please try again.');
     } finally {
       setLoading(false);
     }

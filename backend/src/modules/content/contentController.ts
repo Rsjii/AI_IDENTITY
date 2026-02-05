@@ -503,23 +503,32 @@ export async function upload(req: Request, res: Response) {
       },
     });
 
-    // Advance onboarding step
-    try {
-      const { userQueries } = await import('../../config/database');
-      await userQueries.updateOnboardingStep(userId, 'content');
-      const items = await knowledgeSourceQueries.listByUserId(userId);
-      if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
-    } catch {}
-
-    // Respond immediately — user doesn't wait for extraction/S3/chunking
+    // Respond immediately — user doesn't wait for extraction/S3/chunking/onboarding updates
     res.json({
       success: true,
       source,
       message: 'File uploaded successfully. Processing in background...',
     });
 
-    // Fire-and-forget: text extraction → S3 → chunking → training job
-    processFileContent(userId, source.id, file);
+    // ✅ Fire-and-forget: onboarding step updates (non-blocking)
+    setImmediate(async () => {
+      try {
+        const { userQueries } = await import('../../config/database');
+        await userQueries.updateOnboardingStep(userId, 'content');
+        const items = await knowledgeSourceQueries.listByUserId(userId);
+        if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+      } catch (err) {
+        logger.warn({ err, userId }, 'Failed to update onboarding step in background');
+      }
+    });
+
+    // ✅ Fire-and-forget: text extraction → S3 → chunking → training job
+    // Use setImmediate to ensure response is sent before processing starts
+    setImmediate(() => {
+      processFileContent(userId, source.id, file).catch((err) => {
+        logger.error({ err, userId, sourceId: source.id }, 'Background file processing error');
+      });
+    });
   } catch (error: any) {
     logger.error({ err: error }, 'Upload error');
 

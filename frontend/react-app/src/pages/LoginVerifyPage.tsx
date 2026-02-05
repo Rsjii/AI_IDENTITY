@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
+import { getUserFriendlyError } from '@/lib/errorMessages';
 
 function useQuery() {
   const { search } = useLocation();
@@ -69,7 +70,7 @@ export function LoginVerifyPage() {
       if (result.redirect) navigate(result.redirect, { replace: true });
       else navigate('/onboarding', { replace: true });      
     } catch (err: any) {
-      setError(err.message || 'OTP verification failed.');
+      setError(getUserFriendlyError(err) || 'OTP verification failed. Please check your code and try again.');
     } finally {
       setLoading(false);
     }

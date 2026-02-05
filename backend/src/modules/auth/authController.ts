@@ -549,11 +549,38 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
 
 export const completeProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // ✅ OPTIMIZATION: Validate username length FIRST before any DB queries
+    // This prevents slow DB queries for invalid usernames
+    const rawData = req.body;
+    if (rawData.username && rawData.username.length < 3) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        errorCode: ErrorCodes.VALIDATION_ERROR,
+        fieldErrors: {
+          username: 'Username must be at least 3 characters',
+        },
+      });
+    }
+
     const { email, name, username, phone, profileImage, timeZone } = completeProfileSchema.parse(req.body);
 
     // Check if username is already taken
     const existingUser = await userQueries.findByHandle(username.toLowerCase());
     if (existingUser) {
+      // Log username conflict event
+      try {
+        const user = await userQueries.findByEmail(email.toLowerCase()).catch(() => null);
+        if (user) {
+          await EventLogger.logUserEvent(user.id, EVENT_TYPES.ERROR, {
+            errorType: 'USERNAME_TAKEN',
+            errorMessage: 'Username already taken during profile completion',
+            attemptedUsername: username.toLowerCase(),
+          });
+        }
+      } catch (eventError) {
+        logger.warn('Failed to log USERNAME_TAKEN event:', eventError);
+      }
+      
       return res.status(409).json({
         error: 'Username is already taken',
         errorCode: 'USERNAME_TAKEN',
@@ -630,6 +657,23 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
 
     // ✅ 1) Zod validation errors → fieldErrors map (already there)
     if (error instanceof z.ZodError) {
+      // Log validation error event
+      try {
+        const email = req.body?.email;
+        if (email) {
+          const user = await userQueries.findByEmail(email.toLowerCase()).catch(() => null);
+          if (user) {
+            await EventLogger.logUserEvent(user.id, EVENT_TYPES.ERROR, {
+              errorType: 'PROFILE_VALIDATION_ERROR',
+              errorMessage: 'Profile completion validation failed',
+              validationErrors: error.errors.map(e => ({ field: e.path[0], message: e.message })),
+            });
+          }
+        }
+      } catch (eventError) {
+        logger.warn('Failed to log profile validation error event:', eventError);
+      }
+
       // Format errors for frontend
       const fieldErrors: Record<string, string> = {};
       error.errors.forEach((err) => {
@@ -923,9 +967,21 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     
     // Check if user is active
     if (!user.active) {
+      // Log the login attempt failure
+      try {
+        await EventLogger.logUserEvent(user.id, EVENT_TYPES.ERROR, {
+          errorType: 'ACCOUNT_NOT_VERIFIED',
+          errorMessage: 'Login attempt with unverified account',
+          email: user.email,
+        });
+      } catch (eventError) {
+        logger.warn('Failed to log ACCOUNT_NOT_VERIFIED event:', eventError);
+      }
+      
       return res.status(403).json({
-        error: 'Account not activated. Please signup again to activate your account.',
+        error: 'Your account is not verified. Please check your email for the verification code and complete signup, or signup again to receive a new code.',
         errorCode: 'ACCOUNT_NOT_VERIFIED',
+        message: 'Please verify your email to continue. Check your inbox for the OTP code.',
       });
     }
     

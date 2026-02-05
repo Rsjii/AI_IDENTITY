@@ -320,22 +320,30 @@ class RAGService {
     let errors = 0;
     let totalCost = 0;
 
-    // Update each chunk with its embedding
-    for (let i = 0; i < chunks.length; i++) {
-      try {
-        const embedding = embeddings[i];
+    // ✅ OPTIMIZATION: Batch update chunks instead of one-by-one
+    // Update chunks in batches of 50 for better performance
+    const batchSize = 50;
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
+      const batchEmbeddings = embeddings.slice(i, i + batchSize);
+      
+      // Prepare batch update queries
+      const updatePromises = batch.map((chunk, j) => {
+        const embedding = batchEmbeddings[j];
         totalCost += embedding.cost;
-
-        await db.query(
+        
+        return db.query(
           `UPDATE "knowledge_chunks" SET embedding = $1 WHERE id = $2`,
-          [JSON.stringify(embedding.embedding), chunks[i].id]
-        );
-
-        processed++;
-      } catch (error: any) {
-        logger.error(`[RAG] Failed to update embedding for chunk ${chunks[i].id}:`, error.message);
-        errors++;
-      }
+          [JSON.stringify(embedding.embedding), chunk.id]
+        ).then(() => {
+          processed++;
+        }).catch((error: any) => {
+          logger.error(`[RAG] Failed to update embedding for chunk ${chunk.id}:`, error.message);
+          errors++;
+        });
+      });
+      
+      await Promise.all(updatePromises);
     }
 
     // Clear cache for this user

@@ -159,11 +159,22 @@ class EmbeddingService {
 
         logger.info(`Generated batch embeddings: ${uncachedTexts.length} new, ${texts.length - uncachedTexts.length} cached`);
       } catch (error: any) {
-        logger.error('Batch embedding failed, using fallback:', error.message);
-        // Fill remaining with fallback
+        logger.error('Batch embedding failed, using fallback:', error.message, error.stack);
+        // Fill remaining with fallback (one by one, slower but more reliable)
         for (let i = 0; i < uncachedIndices.length; i++) {
           if (!results[uncachedIndices[i]]) {
-            results[uncachedIndices[i]] = await this.generateFallbackEmbedding(uncachedTexts[i]);
+            try {
+              results[uncachedIndices[i]] = await this.generateFallbackEmbedding(uncachedTexts[i]);
+            } catch (fallbackError: any) {
+              logger.error(`Fallback embedding failed for text ${i}:`, fallbackError.message);
+              // Use zero vector as last resort
+              results[uncachedIndices[i]] = {
+                embedding: new Array(EMBEDDING_DIMENSIONS).fill(0),
+                model: 'fallback-error',
+                tokensUsed: 0,
+                cost: 0,
+              };
+            }
           }
         }
       }

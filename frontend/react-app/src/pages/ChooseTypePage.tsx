@@ -66,7 +66,7 @@ export function ChooseTypePage() {
   }
 
   return (
-    <AuthShell title="Welcome to Selflyx" subtitle="What would you like to do?">
+    <AuthShell title="Welcome to Selflyx" subtitle="What would you like to do?" showLogout={true} showBackToHome={false}>
       <Card className="glass shadow-sm">
         <CardHeader>
           <CardTitle>Choose your path</CardTitle>

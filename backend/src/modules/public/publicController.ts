@@ -538,6 +538,7 @@ export async function publicChat(req: any, res: Response) {
       platform: 'web',
       sessionId: sid,
       visitorId: visitorId || null,
+      persistChat: false, // ✅ Controller already saves messages
     });
 
     if (result.reply) {
@@ -580,6 +581,7 @@ export async function publicChat(req: any, res: Response) {
       platform: 'web',
       sessionId: sid,
       visitorId,
+      persistChat: false, // ✅ Controller already saves messages
     });
 
     let audioUrl: string | null = null;
@@ -625,6 +627,7 @@ export async function publicChat(req: any, res: Response) {
       platform: 'web',
       sessionId: sid,
       visitorId,
+      persistChat: false, // ✅ Controller already saves messages
     });
 
     if (result.reply) await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
@@ -653,6 +656,7 @@ export async function publicChat(req: any, res: Response) {
         visitorId,
         teaserOnly: true,
         maxTokens: 220, // longer so UI can blur "the rest"
+        persistChat: false, // ✅ Controller already saves messages
       });
 
       previewReply = (teaserResult.reply || '').trim();
@@ -784,6 +788,7 @@ export async function unlockBySubscription(req: any, res: Response) {
     platform: 'web',
     sessionId,
     visitorId: null,
+    persistChat: false, // ✅ User message already exists in DB, don't re-save
   });
 
   const full = (result.reply || '').trim();

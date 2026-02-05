@@ -204,6 +204,7 @@ export async function confirmPayment(req: Request, res: Response) {
               platform: 'web',
               sessionId: resolvedSessionId,
               visitorId,
+              persistChat: false, // ✅ User message already exists in DB, don't re-save
             });
             fullReply = result.reply || '';
             
