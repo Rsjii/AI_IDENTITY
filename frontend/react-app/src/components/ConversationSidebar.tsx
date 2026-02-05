@@ -322,10 +322,10 @@ export function ConversationSidebar({
                       </div>
 
                       {list.map((conv) => (
-                        <button
+                        <div
                           key={conv.sessionId}
                           onClick={() => handleConversationClick(conv)}
-                          className={`group w-full text-left p-4 hover:bg-bg-elevated transition-colors ${
+                          className={`group w-full text-left p-4 hover:bg-bg-elevated transition-colors cursor-pointer ${
                             currentSessionId === conv.sessionId ? 'bg-bg-elevated border-l-4 border-accent-primary' : ''
                           }`}
                         >
@@ -429,7 +429,7 @@ export function ConversationSidebar({
                               </button>
                             </div>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   );

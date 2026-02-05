@@ -24,7 +24,7 @@ export function CreatorProfileModal({
 }) {
   // Use handle first, fallback to slug
   const handleOrSlug = creator.handle || creator.slug;
-  const profileHref = creator.handle ? `/@${creator.handle}` : `/@${creator.slug}`;
+  const profileHref = creator.handle ? `/u/${creator.handle}` : `/u/${creator.slug}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center md:justify-center" onClick={onClose}>

@@ -89,7 +89,7 @@ export function CreatorConversationDetailPage() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => window.open(`/@${conversationData.user!.handle}`, '_blank')}
+                    onClick={() => window.open(`/u/${conversationData.user!.handle}`, '_blank')}
                   >
                     View Profile
                   </Button>

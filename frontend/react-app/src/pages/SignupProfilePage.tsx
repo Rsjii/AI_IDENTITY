@@ -147,7 +147,7 @@ export function SignupProfilePage() {
                 <p className="text-xs text-destructive">{fieldErrors.username}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Your profile will be: /@{username || 'username'} • Only letters, numbers, and underscores
+                  Your profile will be: /u/{username || 'username'} • Only letters, numbers, and underscores
                 </p>
               )}
             </div>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../middleware/errorHandler';
 import {
   getCreator,
+  getProfile,
   publicChat,
   publicFeedback,
   publicHistory,
@@ -15,6 +16,9 @@ import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 
 const router = Router();
 
+// Unified profile endpoint - works for both creators and end users
+router.get('/profile/:handle', asyncHandler(getProfile));
+// Keep old route for backward compatibility
 router.get('/creator/:slug', asyncHandler(getCreator));
 
 // ✅ Guest allowed (JWT optional because app.ts already runs extractJWTFromCookie globally)

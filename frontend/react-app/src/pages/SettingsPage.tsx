@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, UserCog, Store } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, Settings2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { SpendingDashboard } from '@/components/SpendingDashboard';
@@ -16,7 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
 import { IntegrationsPage } from './Integrations';
 
-type Tab = 'profile' | 'pricing' | 'marketplace' | 'integrations' | 'account';
+type Tab = 'profile' | 'billing' | 'integrations' | 'notifications' | 'security' | 'preferences';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
@@ -24,7 +24,16 @@ export function SettingsPage() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const validTabs: Tab[] = ['profile', 'pricing', 'marketplace', 'integrations', 'account'];
+
+  // Determine valid tabs based on user type
+  const getValidTabs = (): Tab[] => {
+    if (state.status === 'authenticated' && state.user?.userType === 'creator') {
+      return ['profile', 'billing', 'integrations', 'notifications', 'security', 'preferences'];
+    }
+    return ['profile', 'notifications', 'security', 'preferences'];
+  };
+
+  const validTabs = getValidTabs();
   const [activeTab, setActiveTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'profile');
 
   useEffect(() => {
@@ -42,21 +51,21 @@ export function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // Privacy settings
+  // Privacy settings (moved to Profile tab)
   const [allowSearchEngineIndexing, setAllowSearchEngineIndexing] = useState(true);
   const [showInPublicDirectory, setShowInPublicDirectory] = useState(true);
   const [allowAnalytics, setAllowAnalytics] = useState(true);
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
 
-  // Appearance settings
+  // Appearance settings (in Preferences tab)
   const [language, setLanguage] = useState('en');
   const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
   const [timeFormat, setTimeFormat] = useState('12h');
   const [highContrast, setHighContrast] = useState(false);
   const [reduceAnimations, setReduceAnimations] = useState(false);
   const [largerText, setLargerText] = useState(false);
-  
-  // Social links
+
+  // Social links (creators only, in Profile tab)
   const [socialLinks, setSocialLinks] = useState({
     twitter: '',
     instagram: '',
@@ -64,7 +73,7 @@ export function SettingsPage() {
     website: '',
   });
 
-  // Payment settings
+  // Payment settings (in Billing tab - creators only)
   const [payPerChatTiers, setPayPerChatTiers] = useState<number[]>([100, 500, 1000, 2500, 5000]);
   const [defaultTierCents, setDefaultTierCents] = useState(500);
   const [customTierInput, setCustomTierInput] = useState('');
@@ -84,7 +93,7 @@ export function SettingsPage() {
     { label: '$50', value: 5000 },
   ];
 
-  // Billing
+  // Billing (in Billing tab - creators only)
   const [planTier, setPlanTier] = useState('free');
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
@@ -98,11 +107,11 @@ export function SettingsPage() {
   const [stripeConnectStatus, setStripeConnectStatus] = useState<any>(null);
   const [connectingStripe, setConnectingStripe] = useState(false);
 
-  // Active sessions (chat sessions) for Security tab
+  // Active sessions (in Security tab)
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
-  // Password management
+  // Password management (in Security tab)
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -114,7 +123,7 @@ export function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
 
-  // Data export and account deletion
+  // Data export and account deletion (in Preferences tab - Danger Zone)
   const [exportingData, setExportingData] = useState(false);
   const [deleteOtpCode, setDeleteOtpCode] = useState('');
   const [deleteOtpSent, setDeleteOtpSent] = useState(false);
@@ -122,23 +131,19 @@ export function SettingsPage() {
   const [deleteError, setDeleteError] = useState('');
   const [deleteSuccess, setDeleteSuccess] = useState('');
 
-  // Notification preferences
+  // Notification preferences (in Notifications tab)
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [paymentNotifications, setPaymentNotifications] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
-  // A/B Testing (Scale plan only)
+  // A/B Testing (moved to Integrations tab - Scale plan only)
   const [variantGroups, setVariantGroups] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [variantMetrics, setVariantMetrics] = useState<any[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [newVariantName, setNewVariantName] = useState('');
   const [baseVersionId, setBaseVersionId] = useState('');
-
-  // Marketplace listing
-  const [marketplaceListing, setMarketplaceListing] = useState<any>(null);
-  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
 
   useEffect(() => {
     if (state.status === 'authenticated') {
@@ -164,55 +169,44 @@ export function SettingsPage() {
       setHighContrast(appearance.highContrast || false);
       setReduceAnimations(appearance.reduceAnimations || false);
       setLargerText(appearance.largerText || false);
-      
-      // Load social links
-      const links = (state.user as any).socialLinks || {};
-      setSocialLinks({
-        twitter: links.twitter || '',
-        instagram: links.instagram || '',
-        youtube: links.youtube || '',
-        website: links.website || '',
-      });
-      
-      const config = (state.user as any).priceConfig || {};
-      const tiers = Array.isArray(config.payPerChatTiers) && config.payPerChatTiers.length
-        ? config.payPerChatTiers
-        : [100, 500, 1000, 2500, 5000];
 
-      setPayPerChatTiers(tiers);
-      const preferred = Number(config.defaultTierCents || 0);
-      setDefaultTierCents(tiers.includes(preferred) ? preferred : tiers[0]);
-
-      setEnablePayments(config.enablePayments || false);
-      setWelcomeMessage(config.welcomeMessage || '');
-      setPopularQuestions(config.popularQuestions?.length ? config.popularQuestions : ['']);
-      setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
-
-      loadBillingHistory();
-      loadStripeConnectStatus();
-
-      // Load variant groups if Scale plan
-      if ((state.user as any).planTier === 'scale') {
-        loadVariantGroups();
+      // Load social links (creators only)
+      if (state.user.userType === 'creator') {
+        const links = (state.user as any).socialLinks || {};
+        setSocialLinks({
+          twitter: links.twitter || '',
+          instagram: links.instagram || '',
+          youtube: links.youtube || '',
+          website: links.website || '',
+        });
       }
 
-      // Load marketplace listing
-      loadMarketplaceListing();
+      // Load payment config (creators only)
+      if (state.user.userType === 'creator') {
+        const config = (state.user as any).priceConfig || {};
+        const tiers = Array.isArray(config.payPerChatTiers) && config.payPerChatTiers.length
+          ? config.payPerChatTiers
+          : [100, 500, 1000, 2500, 5000];
+
+        setPayPerChatTiers(tiers);
+        const preferred = Number(config.defaultTierCents || 0);
+        setDefaultTierCents(tiers.includes(preferred) ? preferred : tiers[0]);
+
+        setEnablePayments(config.enablePayments || false);
+        setWelcomeMessage(config.welcomeMessage || '');
+        setPopularQuestions(config.popularQuestions?.length ? config.popularQuestions : ['']);
+        setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
+
+        loadBillingHistory();
+        loadStripeConnectStatus();
+
+        // Load variant groups if Scale plan
+        if ((state.user as any).planTier === 'scale') {
+          loadVariantGroups();
+        }
+      }
     }
   }, [state]);
-
-  const loadMarketplaceListing = async () => {
-    setMarketplaceLoading(true);
-    try {
-      const data = await apiFetch('/api/marketplace/my-listing');
-      setMarketplaceListing(data.item || null);
-    } catch (e: any) {
-      // Listing doesn't exist yet, that's okay
-      setMarketplaceListing(null);
-    } finally {
-      setMarketplaceLoading(false);
-    }
-  };
 
   const loadVariantGroups = async () => {
     setLoadingVariants(true);
@@ -231,7 +225,7 @@ export function SettingsPage() {
     }
   };
 
-  // Load active sessions when user is authenticated and Security tab is opened
+  // Load active sessions when Security tab is opened
   useEffect(() => {
     if (state.status !== 'authenticated') return;
     if (activeTab !== 'security') return;
@@ -397,10 +391,12 @@ export function SettingsPage() {
     setError('');
     try {
       const socialLinksData: any = {};
-      if (socialLinks.twitter) socialLinksData.twitter = socialLinks.twitter;
-      if (socialLinks.instagram) socialLinksData.instagram = socialLinks.instagram;
-      if (socialLinks.youtube) socialLinksData.youtube = socialLinks.youtube;
-      if (socialLinks.website) socialLinksData.website = socialLinks.website;
+      if (state.user?.userType === 'creator') {
+        if (socialLinks.twitter) socialLinksData.twitter = socialLinks.twitter;
+        if (socialLinks.instagram) socialLinksData.instagram = socialLinks.instagram;
+        if (socialLinks.youtube) socialLinksData.youtube = socialLinks.youtube;
+        if (socialLinks.website) socialLinksData.website = socialLinks.website;
+      }
 
       await apiFetch('/api/profile/update', {
         method: 'POST',
@@ -409,7 +405,7 @@ export function SettingsPage() {
           bio: bio || undefined,
           phone: phone || undefined,
           timeZone,
-          socialLinks: Object.keys(socialLinksData).length > 0 ? socialLinksData : undefined,
+          socialLinks: state.user?.userType === 'creator' && Object.keys(socialLinksData).length > 0 ? socialLinksData : undefined,
         }),
       });
       await refresh();
@@ -417,6 +413,30 @@ export function SettingsPage() {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setError(e.message || 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onSaveProfileVisibility = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch('/api/profile/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          privacySettings: {
+            allowSearchEngineIndexing,
+            showInPublicDirectory,
+            profileVisibility,
+          }
+        }),
+      });
+      await refresh();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e: any) {
+      setError(e.message || 'Failed to save profile visibility settings.');
     } finally {
       setSaving(false);
     }
@@ -430,10 +450,7 @@ export function SettingsPage() {
         method: 'POST',
         body: JSON.stringify({
           privacySettings: {
-            allowSearchEngineIndexing,
-            showInPublicDirectory,
             allowAnalytics,
-            profileVisibility,
           }
         }),
       });
@@ -504,6 +521,29 @@ export function SettingsPage() {
       setError(e.message || 'Failed to save payment settings.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onSaveNotificationSettings = async () => {
+    setSavingNotifications(true);
+    setError('');
+    try {
+      await apiFetch('/api/profile/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          notificationPreferences: {
+            emailNotifications,
+            paymentNotifications,
+            weeklySummary,
+          }
+        }),
+      });
+      await refresh();
+      showToast('Notification preferences saved!', 'success');
+    } catch (e: any) {
+      setError(e.message || 'Failed to save notification preferences.');
+    } finally {
+      setSavingNotifications(false);
     }
   };
 
@@ -661,6 +701,8 @@ export function SettingsPage() {
     scale: 'Unlimited',
   };
 
+  const isCreator = state.status === 'authenticated' && state.user?.userType === 'creator';
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -671,17 +713,20 @@ export function SettingsPage() {
 
         {/* Tabs */}
         <div className="flex gap-2 border-b overflow-x-auto">
-          {(state.status === 'authenticated' && state.user?.userType === 'creator'
+          {(isCreator
             ? [
                 { id: 'profile' as Tab, label: 'Profile', icon: User },
-                { id: 'pricing' as Tab, label: 'Pricing', icon: CreditCard },
-                { id: 'marketplace' as Tab, label: 'Marketplace', icon: Store },
+                { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
                 { id: 'integrations' as Tab, label: 'Integrations', icon: Globe },
-                { id: 'account' as Tab, label: 'Account', icon: UserCog },
+                { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
+                { id: 'security' as Tab, label: 'Security', icon: Shield },
+                { id: 'preferences' as Tab, label: 'Preferences', icon: Settings2 },
               ]
             : [
                 { id: 'profile' as Tab, label: 'Profile', icon: User },
-                { id: 'account' as Tab, label: 'Account', icon: UserCog },
+                { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
+                { id: 'security' as Tab, label: 'Security', icon: Shield },
+                { id: 'preferences' as Tab, label: 'Preferences', icon: Settings2 },
               ]
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -709,309 +754,112 @@ export function SettingsPage() {
           </Alert>
         )}
 
-        {/* Profile Tab */}
+        {/* ===== PROFILE TAB ===== */}
         {activeTab === 'profile' && (
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle>Public Profile</CardTitle>
-              <CardDescription>Manage your public-facing identity</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Avatar</label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setProfileImageFile(e.target.files?.[0] || null)}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!profileImageFile || saving}
-                  onClick={async () => {
-                    if (!profileImageFile) return;
-                    setSaving(true);
-                    setError('');
-                    try {
-                      const fd = new FormData();
-                      fd.append('profileImageFile', profileImageFile);
-                      await apiFetchForm('/api/profile/update', { method: 'POST', body: fd });
-                      await refresh();
-                      setProfileImageFile(null);
-                    } catch (e: any) {
-                      setError(e.message || 'Upload failed.');
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  Upload avatar
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Display Name</label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bio (160 characters)</label>
-                <textarea
-                  className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value.slice(0, 160))}
-                  placeholder="Tell people about yourself..."
-                  maxLength={160}
-                />
-                <p className="text-xs text-muted-foreground">{bio.length}/160 characters</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Timezone</label>
-                <Input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="UTC-5" />
-              </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-lg font-semibold">Social Links</h3>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Twitter/X</label>
-                  <Input
-                    value={socialLinks.twitter}
-                    onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
-                    placeholder="https://twitter.com/yourhandle"
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Instagram</label>
-                  <Input
-                    value={socialLinks.instagram}
-                    onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
-                    placeholder="https://instagram.com/yourhandle"
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">YouTube</label>
-                  <Input
-                    value={socialLinks.youtube}
-                    onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
-                    placeholder="https://youtube.com/@yourhandle"
-                    type="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Website</label>
-                  <Input
-                    value={socialLinks.website}
-                    onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
-                    placeholder="https://yourwebsite.com"
-                    type="url"
-                  />
-                </div>
-              </div>
-
-              <Button className="w-full" onClick={onSaveProfile} disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : saveSuccess ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4 animate-scale-in" />
-                    Saved!
-                  </>
-                ) : (
-                  'Save changes'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Account Tab */}
-        {activeTab === 'account' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Email & Authentication</CardTitle>
-                <CardDescription>Manage your email and login methods</CardDescription>
+                <CardTitle>Basic Information</CardTitle>
+                <CardDescription>Manage your public-facing identity</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email Address</label>
-                  <Input value={state.user.email} readOnly disabled />
-                  <p className="text-xs text-muted-foreground">Contact support to change your email</p>
+                  <label className="text-sm font-medium">Avatar</label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setProfileImageFile(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!profileImageFile || saving}
+                    onClick={async () => {
+                      if (!profileImageFile) return;
+                      setSaving(true);
+                      setError('');
+                      try {
+                        const fd = new FormData();
+                        fd.append('profileImageFile', profileImageFile);
+                        await apiFetchForm('/api/profile/update', { method: 'POST', body: fd });
+                        await refresh();
+                        setProfileImageFile(null);
+                      } catch (e: any) {
+                        setError(e.message || 'Upload failed.');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    Upload avatar
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Phone (optional)</label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
+                  <label className="text-sm font-medium">Display Name</label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
                 </div>
 
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-semibold mb-3">Password</h3>
-                  {passwordError && (
-                    <Alert variant="destructive" className="mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{passwordError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {passwordSuccess && (
-                    <Alert className="mb-4">
-                      <Check className="h-4 w-4" />
-                      <AlertDescription>{passwordSuccess}</AlertDescription>
-                    </Alert>
-                  )}
-                  {state.user.hasPassword ? (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Current Password</Label>
-                        <div className="relative">
-                          <Input
-                            type={showCurrentPassword ? 'text' : 'password'}
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            placeholder="Enter current password"
-                            className="pr-10"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowCurrentPassword((v) => !v)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                          >
-                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>New Password</Label>
-                        <div className="relative">
-                          <Input
-                            type={showNewPassword ? 'text' : 'password'}
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            placeholder="Enter new password"
-                            className="pr-10"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowNewPassword((v) => !v)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                          >
-                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                        <PasswordStrengthMeter password={newPassword} />
-                      </div>
-                      <Button
-                        onClick={handleChangePassword}
-                        disabled={passwordSaving || !currentPassword || !newPassword}
-                      >
-                        {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Change Password
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertDescription>
-                          You're using Google login. Set a password to enable email/password login.
-                        </AlertDescription>
-                      </Alert>
-                      <Button
-                        variant="outline"
-                        onClick={handleRequestSetPasswordOTP}
-                        disabled={passwordSaving || otpSent}
-                      >
-                        {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Send OTP to {state.user.email}
-                      </Button>
-                      {otpSent && (
-                        <>
-                          <Input
-                            value={otpCode}
-                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                            placeholder="Enter 6-digit OTP"
-                            maxLength={6}
-                          />
-                          <div className="relative">
-                            <Input
-                              type={showSetPassword ? 'text' : 'password'}
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              placeholder="Enter new password"
-                              className="pr-10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowSetPassword((v) => !v)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                            >
-                              {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          <PasswordStrengthMeter password={newPassword} />
-                          <Button
-                            onClick={handleSetPassword}
-                            disabled={passwordSaving || !otpCode || !newPassword || otpCode.length !== 6}
-                          >
-                            {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Set Password
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Bio (160 characters)</label>
+                  <textarea
+                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value.slice(0, 160))}
+                    placeholder="Tell people about yourself..."
+                    maxLength={160}
+                  />
+                  <p className="text-xs text-muted-foreground">{bio.length}/160 characters</p>
                 </div>
 
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-semibold mb-3">Connected Accounts</h3>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Globe className="h-5 w-5" />
-                      <div>
-                        <div className="font-medium">Google</div>
-                        <div className="text-sm text-muted-foreground">
-                          {state.user.hasGoogle ? 'Connected' : 'Not connected'}
-                        </div>
-                      </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Timezone</label>
+                  <Input value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="UTC-5" />
+                </div>
+
+                {isCreator && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="text-lg font-semibold">Social Links</h3>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Twitter/X</label>
+                      <Input
+                        value={socialLinks.twitter}
+                        onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+                        placeholder="https://twitter.com/yourhandle"
+                        type="url"
+                      />
                     </div>
-                    {state.user.hasGoogle ? (
-                      <Button variant="outline" size="sm" disabled>
-                        Connected
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.location.href = buildApiUrl('/api/auth/google')}
-                      >
-                        Connect
-                      </Button>
-                    )}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Instagram</label>
+                      <Input
+                        value={socialLinks.instagram}
+                        onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                        placeholder="https://instagram.com/yourhandle"
+                        type="url"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">YouTube</label>
+                      <Input
+                        value={socialLinks.youtube}
+                        onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
+                        placeholder="https://youtube.com/@yourhandle"
+                        type="url"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Website</label>
+                      <Input
+                        value={socialLinks.website}
+                        onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
+                        placeholder="https://yourwebsite.com"
+                        type="url"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <Button className="w-full" onClick={async () => {
-                  setSaving(true);
-                  setError('');
-                  try {
-                    await apiFetch('/api/profile/update', {
-                      method: 'POST',
-                      body: JSON.stringify({ phone: phone || undefined }),
-                    });
-                    await refresh();
-                    setSaveSuccess(true);
-                    setTimeout(() => setSaveSuccess(false), 3000);
-                  } catch (e: any) {
-                    setError(e.message || 'Failed to save.');
-                  } finally {
-                    setSaving(false);
-                  }
-                }} disabled={saving}>
+                <Button className="w-full" onClick={onSaveProfile} disabled={saving}>
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1023,15 +871,16 @@ export function SettingsPage() {
                       Saved!
                     </>
                   ) : (
-                    'Save Changes'
+                    'Save changes'
                   )}
                 </Button>
               </CardContent>
             </Card>
 
+            {/* Profile Visibility (moved from Account > Preferences) */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Privacy Settings</CardTitle>
+                <CardTitle>Profile Visibility</CardTitle>
                 <CardDescription>Control how your profile is visible to others</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1048,13 +897,6 @@ export function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Show profile in public directory</p>
                   </div>
                   <Switch checked={showInPublicDirectory} onCheckedChange={setShowInPublicDirectory} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <label className="text-sm font-medium">Analytics Tracking</label>
-                    <p className="text-xs text-muted-foreground">Allow analytics tracking for improvements</p>
-                  </div>
-                  <Switch checked={allowAnalytics} onCheckedChange={setAllowAnalytics} />
                 </div>
 
                 <div className="space-y-2 pt-2">
@@ -1099,7 +941,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={onSavePrivacySettings} disabled={saving}>
+                <Button className="w-full" onClick={onSaveProfileVisibility} disabled={saving}>
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1111,77 +953,97 @@ export function SettingsPage() {
                       Saved!
                     </>
                   ) : (
-                    'Save Privacy Settings'
+                    'Save Visibility Settings'
                   )}
                 </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-destructive/50">
-              <CardHeader>
-                <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                <CardDescription>Irreversible actions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Export Account Data</h3>
-                  <p className="text-sm text-muted-foreground">Download your profile, chats, payments, and uploads in a ZIP file.</p>
-                  <Button variant="outline" onClick={handleExportData} disabled={exportingData}>
-                    {exportingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Download Export
-                  </Button>
-                </div>
-
-                <div className="space-y-2 pt-4 border-t">
-                  <h3 className="text-sm font-semibold text-destructive">Delete Account</h3>
-                  <p className="text-sm text-muted-foreground">Soft delete with a 30-day grace period. Login will be blocked.</p>
-                  {deleteError && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{deleteError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {deleteSuccess && (
-                    <Alert>
-                      <Check className="h-4 w-4" />
-                      <AlertDescription>{deleteSuccess}</AlertDescription>
-                    </Alert>
-                  )}
-                  <Button variant="outline" onClick={requestDeleteOtp} disabled={deleteInProgress || deleteOtpSent}>
-                    {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Send OTP
-                  </Button>
-                  {deleteOtpSent && (
-                    <div className="space-y-2 pt-2">
-                      <Label>OTP Code</Label>
-                      <Input
-                        value={deleteOtpCode}
-                        onChange={(e) => setDeleteOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="Enter 6-digit OTP"
-                        maxLength={6}
-                      />
-                      <Button
-                        variant="destructive"
-                        onClick={confirmDeleteAccount}
-                        disabled={deleteInProgress || deleteOtpCode.length !== 6}
-                      >
-                        {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Confirm Delete
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Pricing Tab */}
-        {activeTab === 'pricing' && (
+        {/* ===== BILLING TAB (CREATORS ONLY) ===== */}
+        {activeTab === 'billing' && isCreator && (
           <div className="space-y-6">
+            {/* Earnings Overview */}
+            {earningsBalances && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>Earnings Overview</CardTitle>
+                  <CardDescription>Your pay-per-chat earnings and payout status</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">Total Earnings</div>
+                      <div className="text-2xl font-bold">{formatCurrency(earningsBalances.totalEarningsCents)}</div>
+                    </div>
+                    <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Available for Payout</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(earningsBalances.availableEarningsCents)}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Ready to withdraw (7+ days old)</div>
+                    </div>
+                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Pending</div>
+                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(earningsBalances.pendingEarningsCents)}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Hold period (last 7 days)</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRequestPayout}
+                      disabled={requestingPayout || earningsBalances.availableEarningsCents < 1000}
+                      className="flex-1"
+                    >
+                      {requestingPayout ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        `Request Payout (Min $10.00)`
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleExportCSV}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  </div>
+                  {earningsBalances.availableEarningsCents < 1000 && (
+                    <p className="text-xs text-muted-foreground">
+                      Minimum payout is $10.00. You need ${formatCurrency(1000 - earningsBalances.availableEarningsCents)} more to request a payout.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payout Settings - Stripe Connect */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Pay-Per-Chat Settings</CardTitle>
+                <CardTitle>Payout Settings</CardTitle>
+                <CardDescription>Enable marketplace payouts by connecting Stripe</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {stripeConnectStatus?.connected ? (
+                  <div className="space-y-2 text-sm text-text-secondary">
+                    <div>Connected: {stripeConnectStatus.chargesEnabled ? 'Charges enabled' : 'Charges pending'}</div>
+                    <div>Payouts: {stripeConnectStatus.payoutsEnabled ? 'Enabled' : 'Disabled'}</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-text-secondary">
+                    Not connected. Connect to receive marketplace payouts.
+                  </div>
+                )}
+                <Button onClick={handleConnectStripe} disabled={connectingStripe}>
+                  {connectingStripe ? 'Connecting…' : stripeConnectStatus?.connected ? 'Update Stripe Info' : 'Connect Stripe'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Pay-Per-Chat Configuration */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Pay-Per-Chat Configuration</CardTitle>
                 <CardDescription>Configure pricing for detailed answers</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1283,7 +1145,7 @@ export function SettingsPage() {
                       <p className="text-xs text-muted-foreground">
                         Configure when payment should be required (in addition to the 3 free messages limit)
                       </p>
-                      
+
                       <div className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -1346,133 +1208,46 @@ export function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        )}
 
-        {/* Integrations Tab */}
-        {/* Marketplace Tab */}
-        {activeTab === 'marketplace' && (
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle>Marketplace Listing</CardTitle>
-              <CardDescription>
-                Control how your AI clone appears in the public marketplace
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {marketplaceLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-accent-primary" />
-                </div>
-              ) : marketplaceListing ? (
-                <>
-                  <div className="flex items-center justify-between p-4 bg-bg-tertiary rounded-lg">
-                    <div>
-                      <div className="font-semibold text-text-primary">
-                        {marketplaceListing.isPublic ? '✅ Public' : '🔒 Private'}
-                      </div>
-                      <div className="text-sm text-text-secondary mt-1">
-                        {marketplaceListing.isPublic 
-                          ? 'Your listing is visible in marketplace'
-                          : 'Your listing is hidden from marketplace'}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => nav('/marketplace/manage')}
-                    >
-                      Manage Listing
-                    </Button>
-                  </div>
-                  
-                  {!marketplaceListing.isPublic && (
-                    <Alert className="border-yellow-500/30 bg-yellow-500/10">
-                      <AlertCircle className="h-4 w-4 text-yellow-500" />
-                      <AlertDescription>
-                        <strong>Your listing is private.</strong> To make it visible in marketplace, 
-                        go to <button onClick={() => nav('/marketplace/manage')} className="underline text-accent-primary">Manage Listing</button> 
-                        and turn on "Make listing public".
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-text-secondary mb-4">
-                    You haven't created a marketplace listing yet.
-                  </p>
-                  <Button onClick={() => nav('/marketplace/manage')}>
-                    Create Marketplace Listing
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+            {/* Spending Dashboard */}
+            <SpendingDashboard />
 
-        {activeTab === 'integrations' && (
-          <IntegrationsPage embedded />
-        )}
-
-        {/* Earnings (Account) */}
-        {activeTab === 'account' && (
-          <div className="space-y-6">
-            {/* Earnings Balances */}
-            {earningsBalances && (
-              <Card className="glass">
-                <CardHeader>
-                  <CardTitle>Earnings & Payouts</CardTitle>
-                  <CardDescription>Your pay-per-chat earnings and payout status</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-muted rounded-lg">
-                      <div className="text-sm text-muted-foreground mb-1">Total Earnings</div>
-                      <div className="text-2xl font-bold">{formatCurrency(earningsBalances.totalEarningsCents)}</div>
-                    </div>
-                    <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                      <div className="text-sm text-muted-foreground mb-1">Available for Payout</div>
-                      <div className="text-2xl font-bold text-green-600">{formatCurrency(earningsBalances.availableEarningsCents)}</div>
-                      <div className="text-xs text-muted-foreground mt-1">Ready to withdraw (7+ days old)</div>
-                    </div>
-                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                      <div className="text-sm text-muted-foreground mb-1">Pending</div>
-                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(earningsBalances.pendingEarningsCents)}</div>
-                      <div className="text-xs text-muted-foreground mt-1">Hold period (last 7 days)</div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleRequestPayout} 
-                      disabled={requestingPayout || earningsBalances.availableEarningsCents < 1000}
-                      className="flex-1"
-                    >
-                      {requestingPayout ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        `Request Payout (Min $10.00)`
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={handleExportCSV}>
-                      <FileText className="mr-2 h-4 w-4" />
-                      Export CSV
-                    </Button>
-                  </div>
-                  {earningsBalances.availableEarningsCents < 1000 && (
-                    <p className="text-xs text-muted-foreground">
-                      Minimum payout is $10.00. You need ${formatCurrency(1000 - earningsBalances.availableEarningsCents)} more to request a payout.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
+            {/* Billing History */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Current Plan</CardTitle>
+                <CardTitle>Billing History</CardTitle>
+                <CardDescription>Your payment transactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingBilling ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                ) : billingHistory.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No transactions yet</div>
+                ) : (
+                  <div className="space-y-3">
+                    {billingHistory.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{item.type || 'Payment'}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">{formatCurrency(item.amount || 0)}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{item.status}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Subscription Plans */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Subscription & Plans</CardTitle>
                 <CardDescription>Your subscription and usage</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1518,97 +1293,440 @@ export function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+          </div>
+        )}
 
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>Stripe Connect</CardTitle>
-                <CardDescription>Enable marketplace payouts by connecting Stripe.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {stripeConnectStatus?.connected ? (
-                  <div className="space-y-2 text-sm text-text-secondary">
-                    <div>Connected: {stripeConnectStatus.chargesEnabled ? 'Charges enabled' : 'Charges pending'}</div>
-                    <div>Payouts: {stripeConnectStatus.payoutsEnabled ? 'Enabled' : 'Disabled'}</div>
+        {/* ===== INTEGRATIONS TAB (CREATORS ONLY) ===== */}
+        {activeTab === 'integrations' && isCreator && (
+          <div className="space-y-6">
+            <IntegrationsPage embedded />
+
+            {/* A/B Testing (moved from Account tab - Scale plan only) */}
+            {planTier === 'scale' && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>A/B Testing</CardTitle>
+                  <CardDescription>Create and manage variant groups (Scale plan feature)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {loadingVariants ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : variantGroups.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No variant groups yet. Create one below.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {variantGroups.map((group: any) => (
+                        <div key={group.id} className="p-3 border rounded-lg">
+                          <div className="font-medium">{group.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {group.variants?.length || 0} variants
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t space-y-4">
+                    <h3 className="text-sm font-semibold">Create New Variant</h3>
+                    <div>
+                      <Label>Base Version ID</Label>
+                      <Input
+                        value={baseVersionId}
+                        onChange={(e) => setBaseVersionId(e.target.value)}
+                        placeholder="Enter identity version ID"
+                      />
+                    </div>
+                    <div>
+                      <Label>Variant Name</Label>
+                      <Input
+                        value={newVariantName}
+                        onChange={(e) => setNewVariantName(e.target.value)}
+                        placeholder="e.g., Variant B"
+                      />
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!baseVersionId || !newVariantName) {
+                          setError('Please fill in all fields');
+                          return;
+                        }
+                        setSaving(true);
+                        setError('');
+                        try {
+                          const res = await apiFetch('/api/identity/variants/create', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                              baseVersionId,
+                              variantName: newVariantName,
+                            }),
+                          });
+                          if (res.success) {
+                            setNewVariantName('');
+                            setBaseVersionId('');
+                            const groupsRes = await apiFetch('/api/identity/variants/list');
+                            if (groupsRes.success) {
+                              setVariantGroups(groupsRes.groups);
+                            }
+                          }
+                        } catch (e: any) {
+                          setError(e.message || 'Failed to create variant');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving || !baseVersionId || !newVariantName}
+                    >
+                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Create Variant
+                    </Button>
                   </div>
-                ) : (
-                  <div className="text-sm text-text-secondary">
-                    Not connected. Connect to receive marketplace payouts.
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ===== NOTIFICATIONS TAB ===== */}
+        {activeTab === 'notifications' && (
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Email Notifications</CardTitle>
+              <CardDescription>Choose what emails you receive and how often</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Chat & Messages</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="font-medium text-sm mb-2">New Chat Messages</div>
+                      <div className="flex gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="chatNotifications"
+                            checked={!emailNotifications}
+                            onChange={() => setEmailNotifications(false)}
+                          />
+                          <span className="text-sm">Off</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="chatNotifications"
+                            checked={emailNotifications}
+                            onChange={() => setEmailNotifications(true)}
+                          />
+                          <span className="text-sm">Instant</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer opacity-50">
+                          <input type="radio" name="chatNotifications" disabled />
+                          <span className="text-sm">Daily digest (Soon)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {isCreator && (
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-semibold mb-3">Payments & Billing</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-medium text-sm mb-2">Payment Received</div>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="paymentNotifications"
+                              checked={!paymentNotifications}
+                              onChange={() => setPaymentNotifications(false)}
+                            />
+                            <span className="text-sm">Off</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="paymentNotifications"
+                              checked={paymentNotifications}
+                              onChange={() => setPaymentNotifications(true)}
+                            />
+                            <span className="text-sm">Instant</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer opacity-50">
+                            <input type="radio" name="paymentNotifications" disabled />
+                            <span className="text-sm">Daily digest (Soon)</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
-                <Button onClick={handleConnectStripe} disabled={connectingStripe}>
-                  {connectingStripe ? 'Connecting…' : stripeConnectStatus?.connected ? 'Update Stripe Info' : 'Connect Stripe'}
+
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold mb-3">Activity & Insights</h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">Weekly Activity Summary</div>
+                      <div className="text-xs text-muted-foreground">Receive weekly stats every Monday</div>
+                    </div>
+                    <Switch checked={weeklySummary} onCheckedChange={setWeeklySummary} />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold mb-3">Product & Features</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="font-medium text-sm mb-2">Product Updates</div>
+                      <div className="flex gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="productUpdates" defaultChecked />
+                          <span className="text-sm">Important only</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="productUpdates" />
+                          <span className="text-sm">All updates</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div>
+                        <div className="font-medium text-sm">Security Alerts</div>
+                        <div className="text-xs text-muted-foreground">Cannot be disabled</div>
+                      </div>
+                      <Switch checked={true} disabled />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button className="w-full" onClick={onSaveNotificationSettings} disabled={savingNotifications}>
+                {savingNotifications ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save Notification Preferences'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== SECURITY TAB ===== */}
+        {activeTab === 'security' && (
+          <div className="space-y-6">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Email & Phone</CardTitle>
+                <CardDescription>Manage your email and phone for account recovery</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email Address</label>
+                  <Input value={state.user.email} readOnly disabled />
+                  <p className="text-xs text-muted-foreground">Contact support to change your email</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone (optional)</label>
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 1234567890" />
+                </div>
+
+                <Button className="w-full" onClick={async () => {
+                  setSaving(true);
+                  setError('');
+                  try {
+                    await apiFetch('/api/profile/update', {
+                      method: 'POST',
+                      body: JSON.stringify({ phone: phone || undefined }),
+                    });
+                    await refresh();
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3000);
+                  } catch (e: any) {
+                    setError(e.message || 'Failed to save.');
+                  } finally {
+                    setSaving(false);
+                  }
+                }} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </CardContent>
             </Card>
 
-            {/* User Spending Dashboard */}
-            <SpendingDashboard />
-
+            {/* Password Management */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Billing History</CardTitle>
-                <CardDescription>Your payment transactions</CardDescription>
+                <CardTitle>Password Management</CardTitle>
+                <CardDescription>Change or set your account password</CardDescription>
               </CardHeader>
-              <CardContent>
-                {loadingBilling ? (
-                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
-                ) : billingHistory.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No transactions yet</div>
-                ) : (
-                  <div className="space-y-3">
-                    {billingHistory.map((item: any) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <div className="font-medium">{item.type || 'Payment'}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(item.createdAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold">{formatCurrency(item.amount || 0)}</div>
-                          <div className="text-xs text-muted-foreground capitalize">{item.status}</div>
-                        </div>
+              <CardContent className="space-y-4">
+                {passwordError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{passwordError}</AlertDescription>
+                  </Alert>
+                )}
+                {passwordSuccess && (
+                  <Alert>
+                    <Check className="h-4 w-4" />
+                    <AlertDescription>{passwordSuccess}</AlertDescription>
+                  </Alert>
+                )}
+                {state.user.hasPassword ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Current Password</Label>
+                      <div className="relative">
+                        <Input
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        >
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>New Password</Label>
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <PasswordStrengthMeter password={newPassword} />
+                    </div>
+                    <Button
+                      onClick={handleChangePassword}
+                      disabled={passwordSaving || !currentPassword || !newPassword}
+                    >
+                      {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Change Password
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        You're using Google login. Set a password to enable email/password login.
+                      </AlertDescription>
+                    </Alert>
+                    <Button
+                      variant="outline"
+                      onClick={handleRequestSetPasswordOTP}
+                      disabled={passwordSaving || otpSent}
+                    >
+                      {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Send OTP to {state.user.email}
+                    </Button>
+                    {otpSent && (
+                      <>
+                        <Input
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="Enter 6-digit OTP"
+                          maxLength={6}
+                        />
+                        <div className="relative">
+                          <Input
+                            type={showSetPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSetPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          >
+                            {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        <PasswordStrengthMeter password={newPassword} />
+                        <Button
+                          onClick={handleSetPassword}
+                          disabled={passwordSaving || !otpCode || !newPassword || otpCode.length !== 6}
+                        >
+                          {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Set Password
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
-        )}
 
-        {/* 2FA + Sessions (Account) */}
-        {activeTab === 'account' && (
-          <div className="space-y-6">
-            {/* Two-Factor Authentication */}
+            {/* Connected Accounts */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Two-Factor Authentication</CardTitle>
-                <CardDescription>Add an extra layer of security to your account</CardDescription>
+                <CardTitle>Connected Accounts</CardTitle>
+                <CardDescription>Manage third-party account connections</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                  <div>
-                    <div className="font-medium">Status: Not Enabled</div>
-                    <div className="text-sm text-muted-foreground mt-1">Protect your account with 2FA</div>
+              <CardContent>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-5 w-5" />
+                    <div>
+                      <div className="font-medium">Google</div>
+                      <div className="text-sm text-muted-foreground">
+                        {state.user.hasGoogle ? 'Connected' : 'Not connected'}
+                      </div>
+                    </div>
                   </div>
-                  <Lock className="h-8 w-8 text-muted-foreground" />
-                </div>
-
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    Two-factor authentication will be available soon. When enabled, you'll need to enter a code from your authenticator app in addition to your password.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-2 p-4 border rounded-lg bg-muted/10">
-                  <h4 className="font-medium text-sm">Planned Options:</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                    <li>• Authenticator app (Google Authenticator, Authy)</li>
-                    <li>• SMS backup (optional)</li>
-                    <li>• Recovery codes for account recovery</li>
-                  </ul>
+                  {state.user.hasGoogle ? (
+                    <Button variant="outline" size="sm" disabled>
+                      Connected
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = buildApiUrl('/api/auth/google')}
+                    >
+                      Connect
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1698,50 +1816,36 @@ export function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Activity Log */}
+            {/* Two-Factor Authentication (Future) */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Activity Log</CardTitle>
-                <CardDescription>Monitor your account activity (last 30 days)</CardDescription>
+                <CardTitle>Two-Factor Authentication</CardTitle>
+                <CardDescription>Add an extra layer of security to your account</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                  <div>
+                    <div className="font-medium">Status: Not Enabled</div>
+                    <div className="text-sm text-muted-foreground mt-1">Protect your account with 2FA</div>
+                  </div>
+                  <Lock className="h-8 w-8 text-muted-foreground" />
+                </div>
+
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Activity logging will be available soon. Track login attempts, password changes, and important account events.
+                    Two-factor authentication will be available soon. When enabled, you'll need to enter a code from your authenticator app in addition to your password.
                   </AlertDescription>
                 </Alert>
-                <div className="mt-4 space-y-2 opacity-50">
-                  <div className="flex items-start gap-3 p-3 border rounded-lg">
-                    <Check className="h-4 w-4 mt-0.5 text-green-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">Login successful</div>
-                      <div className="text-xs text-muted-foreground">Chrome • 192.168.1.1 • 2 minutes ago</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 border rounded-lg">
-                    <Check className="h-4 w-4 mt-0.5 text-green-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">Password changed</div>
-                      <div className="text-xs text-muted-foreground">Chrome • 192.168.1.1 • 2 days ago</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 border rounded-lg">
-                    <AlertCircle className="h-4 w-4 mt-0.5 text-yellow-500" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">Failed login attempt</div>
-                      <div className="text-xs text-muted-foreground">Unknown • 45.67.89.10 • 3 days ago</div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Appearance (Account) */}
-        {activeTab === 'account' && (
+        {/* ===== PREFERENCES TAB ===== */}
+        {activeTab === 'preferences' && (
           <div className="space-y-6">
+            {/* Appearance */}
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Theme</CardTitle>
@@ -1855,6 +1959,7 @@ export function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Accessibility */}
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Accessibility</CardTitle>
@@ -1900,355 +2005,23 @@ export function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        )}
 
-        {/* Notifications (Account) */}
-        {activeTab === 'account' && (
-          <div className="space-y-6">
+            {/* Privacy */}
             <Card className="glass">
               <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>Choose what emails you receive and how often</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3">Chat & Messages</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="font-medium text-sm mb-2">New Chat Messages</div>
-                        <div className="flex gap-3">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="chatNotifications"
-                              checked={!emailNotifications}
-                              onChange={() => setEmailNotifications(false)}
-                            />
-                            <span className="text-sm">Off</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="chatNotifications"
-                              checked={emailNotifications}
-                              onChange={() => setEmailNotifications(true)}
-                            />
-                            <span className="text-sm">Instant</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer opacity-50">
-                            <input type="radio" name="chatNotifications" disabled />
-                            <span className="text-sm">Daily digest (Soon)</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <h3 className="text-sm font-semibold mb-3">Payments & Billing</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="font-medium text-sm mb-2">Payment Received</div>
-                        <div className="flex gap-3">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="paymentNotifications"
-                              checked={!paymentNotifications}
-                              onChange={() => setPaymentNotifications(false)}
-                            />
-                            <span className="text-sm">Off</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="paymentNotifications"
-                              checked={paymentNotifications}
-                              onChange={() => setPaymentNotifications(true)}
-                            />
-                            <span className="text-sm">Instant</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer opacity-50">
-                            <input type="radio" name="paymentNotifications" disabled />
-                            <span className="text-sm">Daily digest (Soon)</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <h3 className="text-sm font-semibold mb-3">Activity & Insights</h3>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-sm">Weekly Activity Summary</div>
-                        <div className="text-xs text-muted-foreground">Receive weekly stats every Monday</div>
-                      </div>
-                      <Switch checked={weeklySummary} onCheckedChange={setWeeklySummary} />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <h3 className="text-sm font-semibold mb-3">Product & Features</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="font-medium text-sm mb-2">Product Updates</div>
-                        <div className="flex gap-3">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="productUpdates" defaultChecked />
-                            <span className="text-sm">Important only</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="productUpdates" />
-                            <span className="text-sm">All updates</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2">
-                        <div>
-                          <div className="font-medium text-sm">Security Alerts</div>
-                          <div className="text-xs text-muted-foreground">Cannot be disabled</div>
-                        </div>
-                        <Switch checked={true} disabled />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={async () => {
-                    setSavingNotifications(true);
-                    setError('');
-                    try {
-                      await apiFetch('/api/profile/update', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          notificationPreferences: {
-                            emailNotifications,
-                            paymentNotifications,
-                            weeklySummary,
-                          }
-                        }),
-                      });
-                      await refresh();
-                      setSaveSuccess(true);
-                      setTimeout(() => setSaveSuccess(false), 3000);
-                    } catch (e: any) {
-                      setError(e.message || 'Failed to save notification preferences.');
-                    } finally {
-                      setSavingNotifications(false);
-                    }
-                  }}
-                  disabled={savingNotifications}
-                  className="w-full"
-                >
-                  {savingNotifications ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving…
-                    </>
-                  ) : saveSuccess ? (
-                    <>
-                      <Check className="mr-2 h-4 w-4 animate-scale-in" />
-                      Saved!
-                    </>
-                  ) : (
-                    'Save Preferences'
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>Marketing Preferences</CardTitle>
-                <CardDescription>Optional promotional communications</CardDescription>
+                <CardTitle>Privacy</CardTitle>
+                <CardDescription>Control your data and privacy preferences</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">Newsletter & Tips</div>
-                    <div className="text-xs text-muted-foreground">Best practices and success stories</div>
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Analytics Tracking</label>
+                    <p className="text-xs text-muted-foreground">Allow analytics tracking for improvements</p>
                   </div>
-                  <Switch defaultChecked={false} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">Special Offers</div>
-                    <div className="text-xs text-muted-foreground">Promotions and discounts</div>
-                  </div>
-                  <Switch defaultChecked={false} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">Partner Recommendations</div>
-                    <div className="text-xs text-muted-foreground">Curated tools and services</div>
-                  </div>
-                  <Switch defaultChecked={false} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Advanced Pay-Per-Chat (Account) */}
-        {activeTab === 'account' && (
-          <div className="space-y-6">
-            {/* Pay-Per-Chat Configuration */}
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>Pay-Per-Chat Settings</CardTitle>
-                <CardDescription>Configure pricing for detailed answers</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="enablePayments"
-                    checked={enablePayments}
-                    onChange={(e) => setEnablePayments(e.target.checked)}
-                    className="rounded"
-                  />
-                  <label htmlFor="enablePayments" className="text-sm font-medium cursor-pointer">
-                    Enable pay-per-chat
-                  </label>
+                  <Switch checked={allowAnalytics} onCheckedChange={setAllowAnalytics} />
                 </div>
 
-                {enablePayments && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Select tiers</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {payTierOptions.map((opt) => (
-                          <label key={opt.value} className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={payPerChatTiers.includes(opt.value)}
-                              onChange={() => toggleTier(opt.value)}
-                            />
-                            <span>{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          step="0.01"
-                          value={customTierInput}
-                          onChange={(e) => setCustomTierInput(e.target.value)}
-                          placeholder="Custom amount (USD)"
-                        />
-                        <Button type="button" variant="outline" onClick={addCustomTier}>
-                          Add
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Default tier</label>
-                      <select
-                        className="w-full border rounded-md px-3 py-2 bg-background"
-                        value={defaultTierCents}
-                        onChange={(e) => setDefaultTierCents(Number(e.target.value))}
-                      >
-                        {payPerChatTiers.map((amount) => (
-                          <option key={amount} value={amount}>
-                            {formatCurrency(amount)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Welcome Message</label>
-                      <Input
-                        value={welcomeMessage}
-                        onChange={(e) => setWelcomeMessage(e.target.value)}
-                        placeholder="Hey! I'm here to help. Ask me anything!"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Popular Questions</label>
-                      {popularQuestions.map((q, i) => (
-                        <Input
-                          key={i}
-                          value={q}
-                          onChange={(e) => {
-                            const newQs = [...popularQuestions];
-                            newQs[i] = e.target.value;
-                            setPopularQuestions(newQs);
-                          }}
-                          placeholder={`Question ${i + 1}`}
-                          className="mb-2"
-                        />
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPopularQuestions([...popularQuestions, ''])}
-                      >
-                        Add Question
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4 pt-4 border-t">
-                      <label className="text-sm font-medium">Payment Trigger Rules</label>
-                      <p className="text-xs text-muted-foreground">
-                        Configure when payment should be required (in addition to the 3 free messages limit)
-                      </p>
-
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="alwaysRequire"
-                          checked={paymentTriggerRules.alwaysRequire}
-                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, alwaysRequire: e.target.checked })}
-                          className="rounded"
-                        />
-                        <label htmlFor="alwaysRequire" className="text-sm cursor-pointer">
-                          Always require payment (after free messages)
-                        </label>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Keywords (comma-separated)</label>
-                        <Input
-                          value={paymentTriggerRules.keywords.join(', ')}
-                          onChange={(e) => {
-                            const keywords = e.target.value.split(',').map(k => k.trim()).filter(Boolean);
-                            setPaymentTriggerRules({ ...paymentTriggerRules, keywords });
-                          }}
-                          placeholder="consultation, detailed, premium, urgent"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Questions containing these keywords will require payment
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Minimum Length (characters)</label>
-                        <Input
-                          type="number"
-                          value={paymentTriggerRules.minLength || 0}
-                          onChange={(e) => setPaymentTriggerRules({ ...paymentTriggerRules, minLength: parseInt(e.target.value) || 0 })}
-                          min={0}
-                          placeholder="0 = disabled"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Questions longer than this will require payment (0 to disable)
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <Button className="w-full" onClick={onSavePaymentSettings} disabled={saving}>
+                <Button className="w-full" onClick={onSavePrivacySettings} disabled={saving}>
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2260,184 +2033,66 @@ export function SettingsPage() {
                       Saved!
                     </>
                   ) : (
-                    'Save Payment Settings'
+                    'Save Privacy Settings'
                   )}
                 </Button>
               </CardContent>
             </Card>
 
-            {/* A/B Testing (Scale plan only) */}
-            {planTier === 'scale' && (
-              <Card className="glass">
-                <CardHeader>
-                  <CardTitle>A/B Testing</CardTitle>
-                  <CardDescription>Test different AI identity variants (Scale plan only)</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      Create variant groups to test different versions of your AI identity. Variants are selected randomly based on weights you set.
-                    </AlertDescription>
-                  </Alert>
+            {/* Danger Zone */}
+            <Card className="glass border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>Irreversible actions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Export Account Data</h3>
+                  <p className="text-sm text-muted-foreground">Download your profile, chats, payments, and uploads in a ZIP file.</p>
+                  <Button variant="outline" onClick={handleExportData} disabled={exportingData}>
+                    {exportingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Download Export
+                  </Button>
+                </div>
 
-                  {variantGroups.length === 0 && !loadingVariants && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No variant groups yet. Create one to start A/B testing.
-                    </div>
+                <div className="space-y-2 pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-destructive">Delete Account</h3>
+                  <p className="text-sm text-muted-foreground">Soft delete with a 30-day grace period. Login will be blocked.</p>
+                  {deleteError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{deleteError}</AlertDescription>
+                    </Alert>
                   )}
-
-                  {variantGroups.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="font-semibold">Variant Groups</h3>
-                      {variantGroups.map((group: any) => (
-                        <Card key={group.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{group.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {group.variants.length} variants
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              onClick={async () => {
-                                setSelectedGroup(group.id);
-                                setLoadingVariants(true);
-                                try {
-                                  const res = await apiFetch(`/api/identity/variants/${group.id}/metrics`);
-                                  if (res.success) {
-                                    setVariantMetrics(res.metrics);
-                                  }
-                                } catch (e: any) {
-                                  setError(e.message || 'Failed to load metrics');
-                                } finally {
-                                  setLoadingVariants(false);
-                                }
-                              }}
-                            >
-                              View Metrics
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
+                  {deleteSuccess && (
+                    <Alert>
+                      <Check className="h-4 w-4" />
+                      <AlertDescription>{deleteSuccess}</AlertDescription>
+                    </Alert>
                   )}
-
-                  {selectedGroup && variantMetrics.length > 0 && (
-                    <Card className="mt-4">
-                      <CardHeader>
-                        <CardTitle>Variant Metrics</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left p-2">Variant</th>
-                                <th className="text-right p-2">Chats</th>
-                                <th className="text-right p-2">Rating</th>
-                                <th className="text-right p-2">Conversion</th>
-                                <th className="text-right p-2">Response Time</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {variantMetrics.map((metric: any) => (
-                                <tr key={metric.variantId} className="border-b">
-                                  <td className="p-2 font-medium">Variant {metric.label}</td>
-                                  <td className="p-2 text-right">{metric.totalChats}</td>
-                                  <td className="p-2 text-right">
-                                    {metric.avgRating > 0 ? metric.avgRating.toFixed(2) : 'N/A'}
-                                  </td>
-                                  <td className="p-2 text-right">{metric.conversionRate.toFixed(1)}%</td>
-                                  <td className="p-2 text-right">{metric.avgResponseTime}ms</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <div className="pt-4 border-t">
-                    <h3 className="font-semibold mb-4">Create New Variant</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Base Version ID</Label>
-                        <Input
-                          value={baseVersionId}
-                          onChange={(e) => setBaseVersionId(e.target.value)}
-                          placeholder="Enter identity version ID"
-                        />
-                      </div>
-                      <div>
-                        <Label>Variant Name</Label>
-                        <Input
-                          value={newVariantName}
-                          onChange={(e) => setNewVariantName(e.target.value)}
-                          placeholder="e.g., Variant B"
-                        />
-                      </div>
+                  <Button variant="outline" onClick={requestDeleteOtp} disabled={deleteInProgress || deleteOtpSent}>
+                    {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Send OTP
+                  </Button>
+                  {deleteOtpSent && (
+                    <div className="space-y-2 pt-2">
+                      <Label>OTP Code</Label>
+                      <Input
+                        value={deleteOtpCode}
+                        onChange={(e) => setDeleteOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Enter 6-digit OTP"
+                        maxLength={6}
+                      />
                       <Button
-                        onClick={async () => {
-                          if (!baseVersionId || !newVariantName) {
-                            setError('Please fill in all fields');
-                            return;
-                          }
-                          setSaving(true);
-                          setError('');
-                          try {
-                            const res = await apiFetch('/api/identity/variants/create', {
-                              method: 'POST',
-                              body: JSON.stringify({
-                                baseVersionId,
-                                variantName: newVariantName,
-                              }),
-                            });
-                            if (res.success) {
-                              setNewVariantName('');
-                              setBaseVersionId('');
-                              const groupsRes = await apiFetch('/api/identity/variants/list');
-                              if (groupsRes.success) {
-                                setVariantGroups(groupsRes.groups);
-                              }
-                            }
-                          } catch (e: any) {
-                            setError(e.message || 'Failed to create variant');
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                        disabled={saving || !baseVersionId || !newVariantName}
+                        variant="destructive"
+                        onClick={confirmDeleteAccount}
+                        disabled={deleteInProgress || deleteOtpCode.length !== 6}
                       >
-                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Create Variant
+                        {deleteInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Confirm Delete
                       </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* API & Integrations (Placeholder) */}
-            <Card className="glass">
-              <CardHeader>
-                <CardTitle>API & Integrations</CardTitle>
-                <CardDescription>Manage API keys and webhooks (Coming soon)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    API access and webhook integrations will be available in a future update. These features will allow you to:
-                  </AlertDescription>
-                </Alert>
-                <div className="mt-4 space-y-2 text-sm text-muted-foreground pl-4">
-                  <div>• Generate API keys for programmatic access</div>
-                  <div>• Configure webhooks for real-time events</div>
-                  <div>• Monitor rate limits and usage</div>
-                  <div>• Integrate with third-party services</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -2448,4 +2103,3 @@ export function SettingsPage() {
     </Layout>
   );
 }
-

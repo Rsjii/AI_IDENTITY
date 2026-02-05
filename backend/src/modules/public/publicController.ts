@@ -108,85 +108,134 @@ async function hasActiveMarketplaceSubscription(userId: string, listingId: strin
   return r.rowCount > 0;
 }
 
-export async function getCreator(req: Request, res: Response) {
-  const slug = String(req.params.slug || '').trim().replace(/^@/, ''); // Remove @ prefix if present
-  const u = await userQueries.findBySlugOrHandle(slug);
-  if (!u) return res.status(404).json({ error: 'Creator not found' });
+// Unified profile endpoint - handles both creators and end users
+export async function getProfile(req: Request, res: Response) {
+  const handle = String(req.params.handle || '').trim().replace(/^@/, '');
+  const viewerUserId = (req as any).user?.id || null;
+  
+  const u = await userQueries.findBySlugOrHandle(handle);
+  
+  if (!u || !u.active) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
-  // ✅ Approach B: if trial ended and still free -> creator unavailable to everyone
-  const { tier, trialActive } = await getUserPlan(u.id);
-  if (!trialActive && tier === 'free') {
-    return res.status(402).json({
-      error: 'Creator unavailable',
-      errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
-      upgradeUrl: '/pricing',
+  // Base user data (common for both creators and end users)
+  const baseUserData = {
+    id: u.id,
+    handle: u.handle,
+    name: u.name || u.handle || 'User',
+    avatarUrl: u.profileImage || null,
+    userType: u.userType || 'user',
+    memberSince: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+  };
+
+  // If user is a creator, return creator-specific data
+  if (u.userType === 'creator') {
+    // Check if creator is available (trial check)
+    const { tier, trialActive } = await getUserPlan(u.id);
+    
+    if (!trialActive && tier === 'free') {
+      return res.status(402).json({
+        error: 'Creator unavailable',
+        errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+        upgradeUrl: '/pricing',
+      });
+    }
+
+    // Get creator stats
+    const statsResult = await db.query(
+      `SELECT
+        COUNT(DISTINCT cs.id)::int AS "totalChats",
+        COALESCE(AVG(CASE WHEN te.event = 'confirm_yes' THEN 1 WHEN te.event = 'confirm_no' THEN 0 END), 0)::numeric AS rating,
+        COUNT(DISTINCT te.id)::int AS "totalRatings"
+       FROM "User" u
+       LEFT JOIN "chat_sessions" cs ON cs."creatorId" = u.id
+       LEFT JOIN "identity_versions" iv ON iv."identityId" = (SELECT id FROM identities WHERE "userId" = u.id LIMIT 1)
+       LEFT JOIN "trust_events" te ON te."identityVersionId" = iv.id
+       WHERE u.id = $1
+       GROUP BY u.id`,
+      [u.id]
+    );
+
+    const stats = statsResult.rows[0] || { totalChats: 0, rating: 0, totalRatings: 0 };
+
+    // Get identity info for bio/expertise
+    const identity = await identityQueries.findByUserId(u.id);
+    let identityJson: any = null;
+    if (identity?.activeVersionId) {
+      const version = await identityVersionQueries.findById(identity.activeVersionId);
+      if (version) {
+        identityJson = typeof version.identityJson === 'string' 
+          ? JSON.parse(version.identityJson) 
+          : version.identityJson;
+      }
+    }
+
+    const listing = await getPublicListingForCreator(u.id);
+    
+    return res.json({
+      success: true,
+      user: {
+        ...baseUserData,
+        slug: u.publicSlug || u.handle,
+        displayName: u.name || u.handle || 'Creator',
+        bio: identityJson?.defaults?.bio || u.bio || '',
+        expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
+        topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
+        priceConfig: u.priceConfig || null,
+        listingId: listing?.id || null,
+        subscriptionPriceCents: listing?.subscriptionPriceCents || 0,
+        currency: listing?.currency || 'USD',
+        creatorTitle: u.creatorTitle || null,
+        creatorTags: u.creatorTags || null,
+        welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
+        popularQuestions: (u.priceConfig as any)?.popularQuestions || [],
+        stats: {
+          totalChats: stats.totalChats || 0,
+          rating: parseFloat(stats.rating || '0') || 0,
+          totalRatings: stats.totalRatings || 0,
+        },
+        socialLinks: (u.socialLinks as any) || {
+          twitter: null,
+          instagram: null,
+          youtube: null,
+          website: null,
+        },
+      },
+    });
+  } else {
+    // End user profile
+    let conversationCount = 0;
+    if (viewerUserId) {
+      const viewerUser = await userQueries.findById(viewerUserId);
+      if (viewerUser?.userType === 'creator') {
+        const convResult = await db.query(
+          `SELECT COUNT(DISTINCT id)::int AS count
+           FROM "chat_sessions"
+           WHERE "creatorId" = $1 AND "userId" = $2`,
+          [viewerUserId, u.id]
+        );
+        conversationCount = convResult.rows[0]?.count || 0;
+      }
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        ...baseUserData,
+        conversationCount: conversationCount,
+      },
     });
   }
-
-  // ✅ Get creator stats
-  const statsResult = await db.query(
-    `SELECT
-      COUNT(DISTINCT cs.id)::int AS "totalChats",
-      COALESCE(AVG(CASE WHEN te.event = 'confirm_yes' THEN 1 WHEN te.event = 'confirm_no' THEN 0 END), 0)::numeric AS rating,
-      COUNT(DISTINCT te.id)::int AS "totalRatings"
-     FROM "User" u
-     LEFT JOIN "chat_sessions" cs ON cs."creatorId" = u.id
-     LEFT JOIN "identity_versions" iv ON iv."identityId" = (SELECT id FROM identities WHERE "userId" = u.id LIMIT 1)
-     LEFT JOIN "trust_events" te ON te."identityVersionId" = iv.id
-     WHERE u.id = $1
-     GROUP BY u.id`,
-    [u.id]
-  );
-
-  const stats = statsResult.rows[0] || { totalChats: 0, rating: 0, totalRatings: 0 };
-
-  // Get identity info for bio/expertise
-  const identity = await identityQueries.findByUserId(u.id);
-  let identityJson: any = null;
-  if (identity?.activeVersionId) {
-    const version = await identityVersionQueries.findById(identity.activeVersionId);
-    if (version) {
-      identityJson = typeof version.identityJson === 'string' 
-        ? JSON.parse(version.identityJson) 
-        : version.identityJson;
-    }
-  }
-
-  const listing = await getPublicListingForCreator(u.id);
-
-  return res.json({
-    success: true,
-    creator: {
-      id: u.id,
-      handle: u.handle,
-      slug: u.publicSlug || u.handle,
-      displayName: u.name || u.handle || 'Creator',
-      bio: identityJson?.defaults?.bio || u.bio || '',
-      avatarUrl: u.profileImage || null,
-      expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
-      topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
-      priceConfig: u.priceConfig || null,
-      listingId: listing?.id || null,
-      subscriptionPriceCents: listing?.subscriptionPriceCents || 0,
-      currency: listing?.currency || 'USD',
-      creatorTitle: u.creatorTitle || null,
-      creatorTags: u.creatorTags || null,
-      welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
-      popularQuestions: (u.priceConfig as any)?.popularQuestions || [],
-      stats: {
-        totalChats: stats.totalChats || 0,
-        rating: parseFloat(stats.rating || '0') || 0,
-        totalRatings: stats.totalRatings || 0,
-      },
-      socialLinks: (u.socialLinks as any) || {
-        twitter: null,
-        instagram: null,
-        youtube: null,
-        website: null,
-      },
-    },
-  });
 }
+
+// Keep getCreator for backward compatibility (deprecated - use getProfile instead)
+export async function getCreator(req: Request, res: Response) {
+  // Redirect to new unified endpoint
+  req.params.handle = req.params.slug;
+  return getProfile(req, res);
+}
+
 
 // Plan tier limits (same as planGate.ts)
 type PlanTier = 'free' | 'starter' | 'growth' | 'scale';

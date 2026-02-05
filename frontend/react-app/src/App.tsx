@@ -127,7 +127,7 @@ function App() {
                   </Layout>
                 }
               />
-              <Route path="/@:handle" element={<CreatorPublicProfile />} />
+              <Route path="/u/:handle" element={<CreatorPublicProfile />} />
               <Route path="/explore" element={<MarketplacePage />} />
               <Route path="/my-chats" element={<ProtectedRoute><MyChatsPage /></ProtectedRoute>} />
               <Route path="/my-profile" element={<Navigate to="/settings" replace />} />
