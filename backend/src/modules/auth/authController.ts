@@ -611,8 +611,8 @@ export const completeProfile = async (req: Request, res: Response, next: NextFun
       logger.warn('Failed to log profile_completed event:', eventError);
     }
 
-    // Get redirect URL - go to onboarding quiz
-    const redirectUrl = '/onboarding/quiz';
+    // Get redirect URL - let user choose visitor or creator
+    const redirectUrl = '/choose-type';
 
     res.json({ 
       message: 'Profile completed successfully', 
@@ -1573,12 +1573,36 @@ export const setUserType = async (req: any, res: Response) => {
 
   const { userType } = setUserTypeSchema.parse(req.body);
 
+  // Load current type (enforce one-way upgrade)
+  const cur = await db.query(`SELECT "userType" FROM "User" WHERE id=$1 LIMIT 1`, [viewerUserId]);
+  const currentType = (cur.rows[0]?.userType || null) as null | 'creator' | 'visitor';
+
+  // ✅ No downgrade allowed
+  if (currentType === 'creator' && userType === 'visitor') {
+    return res.status(400).json({ error: 'Creators cannot downgrade to visitor.' });
+  }
+
+  // ✅ Visitor -> Creator upgrade should restart onboarding
   const r = await db.query(
-    `UPDATE "User" SET "userType"=$1, "updatedAt"=CURRENT_TIMESTAMP WHERE id=$2 RETURNING "userType"`,
+    `
+    UPDATE "User"
+    SET
+      "userType" = $1,
+      "onboardingStep" = CASE WHEN $1 = 'creator' THEN 'quiz' ELSE "onboardingStep" END,
+      "onboardingCompleted" = CASE WHEN $1 = 'creator' THEN false ELSE "onboardingCompleted" END,
+      "updatedAt" = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING "userType", "onboardingStep", "onboardingCompleted"
+    `,
     [userType, viewerUserId]
   );
 
-  return res.json({ success: true, userType: r.rows[0]?.userType || userType });
+  return res.json({
+    success: true,
+    userType: r.rows[0]?.userType || userType,
+    onboardingStep: r.rows[0]?.onboardingStep,
+    onboardingCompleted: r.rows[0]?.onboardingCompleted,
+  });
 };
 
 export const logout = async (req: any, res: Response, next: NextFunction) => {

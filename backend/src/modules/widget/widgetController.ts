@@ -69,6 +69,16 @@ export async function widgetChat(req: Request, res: Response) {
 
   // ✅ Check creator's plan limit (PHASE1 requirement - same as public chat)
   const { tier, trialActive } = await getUserPlan(creatorUserId);
+  
+  // ✅ Approach B: block widget chat for everyone if creator trial ended + free plan
+  if (!trialActive && tier === 'free') {
+    return res.status(402).json({
+      error: 'Creator unavailable',
+      errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+      upgradeUrl: '/pricing',
+    });
+  }
+  
   const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
   const limit = PLAN_LIMITS[effectiveTier];
   const used = await countCreatorChatsThisMonth(creatorUserId);

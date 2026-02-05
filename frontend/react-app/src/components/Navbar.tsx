@@ -5,15 +5,31 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { FLAGS } from '@/lib/flags';
+import { apiFetch } from '@/lib/api';
 
 export function Navbar() {
   const nav = useNavigate();
-  const { state, logout } = useAuth();
+  const { state, logout, refresh } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   const onLogout = async () => {
     await logout();
     nav('/auth');
+  };
+
+  const upgradeToCreator = async () => {
+    setUpgradeLoading(true);
+    try {
+      await apiFetch('/api/auth/set-user-type', {
+        method: 'POST',
+        body: JSON.stringify({ userType: 'creator' }),
+      });
+      await refresh();
+      nav('/onboarding/quiz');
+    } finally {
+      setUpgradeLoading(false);
+    }
   };
 
   const isAuthed = state.status === 'authenticated';
@@ -44,9 +60,19 @@ export function Navbar() {
                   <Link to="/my-profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Profile
                   </Link>
+                  {(state.user as any)?.userType === 'visitor' ? (
+                    <Button size="sm" variant="outline" onClick={upgradeToCreator} disabled={upgradeLoading}>
+                      {upgradeLoading ? 'Starting…' : '➕ Create AI'}
+                    </Button>
+                  ) : null}
                   {(state.user as any)?.userType === 'creator' ? (
                     <Link to="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                       Dashboard
+                    </Link>
+                  ) : null}
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <Link to="/conversations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      Conversations
                     </Link>
                   ) : null}
                   {(state.user as any)?.userType === 'creator' ? (
@@ -133,8 +159,18 @@ export function Navbar() {
                   <MobileNavLink to="/explore" onClick={() => nav('/explore')}>Explore</MobileNavLink>
                   <MobileNavLink to="/my-chats" onClick={() => nav('/my-chats')}>My Chats</MobileNavLink>
                   <MobileNavLink to="/my-profile" onClick={() => nav('/my-profile')}>Profile</MobileNavLink>
+                  {(state.user as any)?.userType === 'visitor' ? (
+                    <div className="px-2 pt-2">
+                      <Button className="w-full h-11" variant="outline" onClick={upgradeToCreator} disabled={upgradeLoading}>
+                        {upgradeLoading ? 'Starting…' : '➕ Create AI'}
+                      </Button>
+                    </div>
+                  ) : null}
                   {(state.user as any)?.userType === 'creator' ? (
                     <MobileNavLink to="/dashboard" onClick={() => nav('/dashboard')}>Dashboard</MobileNavLink>
+                  ) : null}
+                  {(state.user as any)?.userType === 'creator' ? (
+                    <MobileNavLink to="/conversations" onClick={() => nav('/conversations')}>Conversations</MobileNavLink>
                   ) : null}
                   {(state.user as any)?.userType === 'creator' ? (
                     <>

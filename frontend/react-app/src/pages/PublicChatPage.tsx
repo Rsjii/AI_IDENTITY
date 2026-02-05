@@ -241,6 +241,14 @@ export function PublicChatPage() {
           if (!cancelled) setCreatorNotFound(true);
           return null;
         }
+
+        // ✅ Approach B: trial-ended creator is unavailable
+        if (r.status === 402) {
+          const d = await r.json().catch(() => null);
+          if (!cancelled) setCreatorLoadError(d?.error || 'Creator unavailable');
+          return null;
+        }
+
         const d = await r.json().catch(() => null);
         if (!r.ok || !d?.success) {
           throw new Error(d?.error || 'Failed to load creator');
@@ -495,7 +503,7 @@ export function PublicChatPage() {
         setCookie(sessionKey, newSessionId, THIRTY_DAYS_SECONDS);
       }
 
-      if (FLAGS.payPerChat && d.requiresPayment) {
+      if (d.requiresPayment) {
         setTyping(false);
 
         const stage = (d.paywallStage as 'teaser' | 'hard') || 'hard';
@@ -518,7 +526,9 @@ export function PublicChatPage() {
           setMessageIdToUnlock(null);
           const lockedMsg: Msg = {
             role: 'assistant',
-            content: 'This answer is locked. Unlock to continue and get 24h premium access.',
+            content: d.requiresLogin
+              ? 'Your free messages are used up. Log in to save your conversations (recommended), or unlock to continue.'
+              : 'This answer is locked. Unlock to continue and get 24h premium access.',
             timestamp: new Date(),
             id: `msg_locked_${Date.now()}`,
             isTeaser: true,
@@ -869,6 +879,9 @@ export function PublicChatPage() {
               >
                 <div className="text-xs text-text-secondary flex items-center gap-2">
                   <span>{creator?.displayName || slug}</span>
+                  {isAuthed && creator?.id && (state.user as any)?.id === creator.id ? (
+                    <span className="px-2 py-0.5 rounded-full bg-green-500/15 text-green-300">👤 Owner</span>
+                  ) : null}
                   {isSubscribed ? (
                     <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-300">⭐ Subscribed</span>
                   ) : null}

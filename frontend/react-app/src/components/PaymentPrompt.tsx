@@ -132,8 +132,23 @@ export function PaymentPrompt(props: PaymentPromptProps) {
     );
   }
 
+  const returnTo = props.returnTo || window.location.pathname + window.location.search;
+
   return (
     <Card className="glass shadow-sm">
+      {!isAuthed && (
+        <div className="mx-4 mt-4 rounded-lg border border-accent-primary/30 bg-accent-primary/10 p-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-text-primary">
+            <strong>Log in</strong> to save your chat and unlock more options.
+          </p>
+          <a
+            href={`/auth?next=${encodeURIComponent(returnTo)}`}
+            className="shrink-0 text-sm font-semibold text-accent-primary hover:underline"
+          >
+            Log in →
+          </a>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Unlock Premium Content</CardTitle>
         <CardDescription>

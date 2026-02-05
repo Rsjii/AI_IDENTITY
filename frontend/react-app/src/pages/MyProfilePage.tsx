@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,10 +22,12 @@ type SubItem = {
 type Tab = 'profile' | 'subscriptions' | 'privacy';
 
 export function MyProfilePage() {
+  const nav = useNavigate();
   const { state, refresh } = useAuth();
   const [tab, setTab] = useState<Tab>('profile');
   const [subs, setSubs] = useState<SubItem[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   const loadSubs = async () => {
     setLoadingSubs(true);
@@ -53,6 +56,20 @@ export function MyProfilePage() {
       await loadSubs();
     } catch (e: any) {
       showToast(e.message || 'Failed to cancel subscription', 'error');
+    }
+  };
+
+  const upgradeToCreator = async () => {
+    setUpgradeLoading(true);
+    try {
+      await apiFetch('/api/auth/set-user-type', {
+        method: 'POST',
+        body: JSON.stringify({ userType: 'creator' }),
+      });
+      await refresh();
+      nav('/onboarding/quiz');
+    } finally {
+      setUpgradeLoading(false);
     }
   };
 
@@ -107,6 +124,19 @@ export function MyProfilePage() {
               <div className="text-sm text-text-secondary">
                 <strong className="text-text-primary">Handle:</strong> {user.handle || '—'}
               </div>
+              {(user as any)?.userType === 'visitor' ? (
+                <div className="rounded-xl border border-border-default bg-bg-tertiary p-4">
+                  <div className="font-semibold text-text-primary">Want to create your own AI?</div>
+                  <div className="text-sm text-text-secondary mt-1">
+                    Upgrade your account to Creator. Your chats + subscriptions stay intact.
+                  </div>
+                  <div className="mt-3">
+                    <Button onClick={upgradeToCreator} disabled={upgradeLoading}>
+                      {upgradeLoading ? 'Starting…' : '➕ Upgrade to Creator'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="text-xs text-text-tertiary">
                 For editing details (avatar, bio, password, etc.) use the Settings page.
               </div>

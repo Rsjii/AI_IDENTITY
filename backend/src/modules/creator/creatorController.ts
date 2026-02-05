@@ -447,7 +447,7 @@ export async function startTrial(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const u = await userQueries.startTrial(userId, 7);
+  const u = await userQueries.startTrial(userId, 14);
 
   // ✅ FIX: Plan chosen => next step is deploy (NOT done yet)
   await userQueries.updateOnboardingStep(userId, 'deploy');

@@ -96,9 +96,9 @@ export async function createCheckoutSession(req: Request, res: Response) {
       // ✅ India Export Compliance: Require billing address collection
       // This is mandatory for export transactions from India
       billing_address_collection: 'required',
-      // ✅ Trial period: 7 days for new subscriptions only
+      // ✅ Trial period: 14 days for new subscriptions only
       subscription_data: hasActiveSubscription ? undefined : {
-        trial_period_days: 7,
+        trial_period_days: 14,
       },
       // Also collect shipping address if needed (optional, but good for compliance)
       // shipping_address_collection: { allowed_countries: ['IN', 'US', 'GB', 'CA', 'AU'] },

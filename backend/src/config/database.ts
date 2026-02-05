@@ -1053,7 +1053,7 @@ export const userQueries = {
     return r.rows[0];
   },
 
-  startTrial: async (userId: string, days = 7) => {
+  startTrial: async (userId: string, days = 14) => {
     const r = await db.query(
       `UPDATE "User"
        SET "trialEndsAt" = (now() + ($1 || ' days')::interval),

@@ -69,7 +69,15 @@ export function IntegrationsPage() {
   }, [user]);
 
   const publicSlug = (user as any)?.publicSlug || user?.handle || '';
-  const standaloneLink = publicSlug ? `${window.location.origin}/chat/${publicSlug}` : '';
+  // Phase 2 Feature: Subdomain links (only if VITE_PUBLIC_BASE_DOMAIN is set)
+  // Falls back to /chat/:slug if not set (Phase 1 behavior)
+  const baseDomain = (import.meta.env.VITE_PUBLIC_BASE_DOMAIN || '').trim(); // e.g. "selflyx.com"
+
+  const standaloneLink = publicSlug
+    ? baseDomain
+      ? `https://${publicSlug}.${baseDomain}/` // Phase 2: subdomain
+      : `${window.location.origin}/chat/${publicSlug}` // Phase 1: path-based
+    : '';
   const apiBase = window.location.origin;
 
   // Social share templates

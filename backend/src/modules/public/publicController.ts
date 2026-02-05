@@ -113,6 +113,16 @@ export async function getCreator(req: Request, res: Response) {
   const u = await userQueries.findBySlugOrHandle(slug);
   if (!u) return res.status(404).json({ error: 'Creator not found' });
 
+  // ✅ Approach B: if trial ended and still free -> creator unavailable to everyone
+  const { tier, trialActive } = await getUserPlan(u.id);
+  if (!trialActive && tier === 'free') {
+    return res.status(402).json({
+      error: 'Creator unavailable',
+      errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+      upgradeUrl: '/pricing',
+    });
+  }
+
   // ✅ Get creator stats
   const statsResult = await db.query(
     `SELECT
@@ -269,7 +279,36 @@ export async function publicMessageLimit(req: any, res: Response) {
     }
   }
 
+  // ✅ Approach B: block for everyone if creator trial ended + free plan
+  const plan = await getUserPlan(session.creatorId);
+  if (!plan.trialActive && plan.tier === 'free') {
+    return res.status(402).json({
+      success: false,
+      error: 'Creator unavailable',
+      errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+      upgradeUrl: '/pricing',
+    });
+  }
+
   await ensureDailyFreeReset(sessionId);
+
+  // ✅ Creator preview: creator chatting with their OWN AI => unlimited, no paywall
+  const isOwnAI = Boolean(viewerUserId && viewerUserId === session.creatorId);
+  if (isOwnAI) {
+    return res.json({
+      success: true,
+      canSendMessage: true,
+      isUnlimited: true,
+      requiresPayment: false,
+      remainingFreeMessages: 0,
+      freeMessageLimit: FREE_MESSAGE_LIMIT,
+      messagesUsed: FREE_MESSAGE_LIMIT,
+      premiumExpiresAt: null,
+      premiumRemainingMs: null,
+      isSubscribed: false,
+      isOwnAI: true,
+    });
+  }
 
   // Subscription -> unlimited access (logged-in only)
   if (viewerUserId) {
@@ -288,6 +327,7 @@ export async function publicMessageLimit(req: any, res: Response) {
           premiumExpiresAt: null,
           premiumRemainingMs: null,
           isSubscribed: true,
+          isOwnAI: false,
         });
       }
     }
@@ -333,6 +373,7 @@ export async function publicMessageLimit(req: any, res: Response) {
     premiumExpiresAt: null,
     premiumRemainingMs: null,
     isSubscribed: false,
+    isOwnAI: false,
   });
 }
 
@@ -384,6 +425,17 @@ export async function publicChat(req: any, res: Response) {
 
   const creator = await userQueries.findBySlugOrHandle(cleanSlug);
   if (!creator) return res.status(404).json({ error: 'Creator not found' });
+
+  // ✅ Approach B: block chat for everyone if creator trial ended + free plan
+  const plan = await getUserPlan(creator.id);
+  if (!plan.trialActive && plan.tier === 'free') {
+    return res.status(402).json({
+      success: false,
+      error: 'Creator unavailable',
+      errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+      upgradeUrl: '/pricing',
+    });
+  }
 
   // ✅ Check creator's plan limit (PHASE1 requirement) - only for logged-in creators
   if (viewerUserId && viewerUserId === creator.id) {
@@ -479,6 +531,30 @@ export async function publicChat(req: any, res: Response) {
   // Save user message (capture ID)
   const userMsgRow = await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
 
+  // ✅ Creator preview: own AI => unlimited, no paywall, no subscription needed
+  const isOwnAI = Boolean(viewerUserId && viewerUserId === creator.id);
+  if (isOwnAI) {
+    const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
+      platform: 'web',
+      sessionId: sid,
+      visitorId: visitorId || null,
+    });
+
+    if (result.reply) {
+      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+    }
+
+    return res.json({
+      success: true,
+      sessionId: sid,
+      reply: result.reply || '',
+      mirrorRunId: result.mirrorRunId,
+      audioUrl: null,
+      isSubscribed: false,
+      isOwnAI: true,
+    });
+  }
+
   // Premium check
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
 
@@ -498,8 +574,8 @@ export async function publicChat(req: any, res: Response) {
   const forced = shouldForcePaywall(priceConfig);
   const smart = shouldSmartTriggerPaywall(message, priceConfig);
 
-  // If premium active OR payments not enabled => full reply
-  if (isSubscribed || !(payPerChatAllowed && enablePayments) || hasPremiumSession) {
+  // ✅ Subscribed or premium active → legitimately unlocked, full reply always
+  if (isSubscribed || hasPremiumSession) {
     const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
       platform: 'web',
       sessionId: sid,
@@ -605,6 +681,7 @@ export async function publicChat(req: any, res: Response) {
       success: true,
       sessionId: sid,
       requiresPayment: true,
+      requiresLogin: !viewerUserId,
       paywallStage: 'teaser',
       creatorId: creator.id,
       userMessageId: userMsgRow.id,
@@ -631,6 +708,7 @@ export async function publicChat(req: any, res: Response) {
     success: true,
     sessionId: sid,
     requiresPayment: true,
+    requiresLogin: !viewerUserId,
     paywallStage: 'hard',
     creatorId: creator.id,
     userMessageId: userMsgRow.id,
