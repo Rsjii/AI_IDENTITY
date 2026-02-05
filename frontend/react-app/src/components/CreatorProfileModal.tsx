@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { X, Star, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buildApiUrl } from '@/lib/api';
 
 type Creator = {
   slug: string;
@@ -21,8 +22,9 @@ export function CreatorProfileModal({
   creator: Creator;
   onClose: () => void;
 }) {
+  // Use handle first, fallback to slug
   const handleOrSlug = creator.handle || creator.slug;
-  const profileHref = `/@${handleOrSlug}`;
+  const profileHref = creator.handle ? `/@${creator.handle}` : `/@${creator.slug}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center md:justify-center" onClick={onClose}>
@@ -33,7 +35,7 @@ export function CreatorProfileModal({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {creator.avatarUrl ? (
-              <img src={creator.avatarUrl} className="w-12 h-12 rounded-full object-cover" />
+              <img src={creator.avatarUrl.startsWith('/uploads/') ? buildApiUrl(creator.avatarUrl) : creator.avatarUrl} className="w-12 h-12 rounded-full object-cover" />
             ) : (
               <div className="w-12 h-12 rounded-full bg-accent-primary/20 flex items-center justify-center">
                 <span className="font-semibold text-accent-primary">

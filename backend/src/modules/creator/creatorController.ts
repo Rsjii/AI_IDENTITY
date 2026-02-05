@@ -625,6 +625,24 @@ export async function chatDetails(req: Request, res: Response) {
   if (!row) return res.status(404).json({ error: 'Chat session not found' });
   if (row.creatorId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
+  // Get session user info
+  const sessionInfo = await db.query(
+    `
+    SELECT 
+      cs."userId",
+      cs."visitorId",
+      u.handle,
+      u.name,
+      u."profileImage",
+      u.id as "userId"
+    FROM "chat_sessions" cs
+    LEFT JOIN "User" u ON u.id = cs."userId"
+    WHERE cs.id = $1
+    LIMIT 1
+    `,
+    [sessionId]
+  );
+
   const m = await db.query(
     `
     SELECT id, "createdAt", "role", "content"
@@ -635,7 +653,20 @@ export async function chatDetails(req: Request, res: Response) {
     [sessionId]
   );
 
-  return res.json({ success: true, sessionId, messages: m.rows });
+  const userInfo = sessionInfo.rows[0] ? {
+    userId: sessionInfo.rows[0].userId,
+    handle: sessionInfo.rows[0].handle,
+    name: sessionInfo.rows[0].name,
+    profileImage: sessionInfo.rows[0].profileImage,
+    visitorId: sessionInfo.rows[0].visitorId,
+  } : null;
+
+  return res.json({ 
+    success: true, 
+    sessionId, 
+    messages: m.rows,
+    user: userInfo
+  });
 }
 
 export async function listSubscribers(req: Request, res: Response) {

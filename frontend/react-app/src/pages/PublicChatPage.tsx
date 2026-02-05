@@ -28,8 +28,10 @@ import { NotFoundCreator } from '@/components/NotFoundCreator';
 import { CreatorProfileModal } from '@/components/CreatorProfileModal';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { showToast } from '@/lib/toast';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, buildApiUrl } from '@/lib/api';
 
 type Creator = {
   id: string;
@@ -168,6 +170,7 @@ export function PublicChatPage() {
   const { slug = '' } = useParams();
   const [searchParams] = useSearchParams();
   const { state, logout } = useAuth();
+  const { theme } = useTheme();
   const isAuthed = state.status === 'authenticated';
   
   const sessionIdFromUrl = searchParams.get('sessionId') || '';
@@ -696,7 +699,7 @@ export function PublicChatPage() {
       {/* Creator mini-card */}
       <div className="flex items-center gap-3 mb-3">
         {creator?.avatarUrl ? (
-          <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-10 h-10 rounded-full object-cover" />
+          <img src={creator.avatarUrl.startsWith('/uploads/') ? buildApiUrl(creator.avatarUrl) : creator.avatarUrl} alt={creator.displayName || slug} className="w-10 h-10 rounded-full object-cover" />
         ) : (
           <div className="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
             <span className="text-sm font-semibold text-accent-primary">{(creator?.displayName || slug).slice(0, 1).toUpperCase()}</span>
@@ -763,7 +766,7 @@ export function PublicChatPage() {
   // Early returns for loading/error states
   if (creatorLoading) {
     return (
-      <div className="theme-light h-screen bg-bg-primary flex items-center justify-center">
+      <div className="h-screen bg-bg-primary flex items-center justify-center">
         <Loader2 className="h-7 w-7 animate-spin text-accent-primary" />
       </div>
     );
@@ -784,7 +787,7 @@ export function PublicChatPage() {
   }
 
   return (
-    <div className="theme-light h-screen overflow-hidden bg-bg-primary flex">
+    <div className="h-screen overflow-hidden bg-bg-primary flex">
       {/* LEFT: Conversations (authed) / Creator info (guest) -- desktop only */}
       {!isMobile && (
         <div className="w-[280px] flex-shrink-0 border-r border-border-default bg-bg-secondary h-full overflow-hidden">
@@ -882,7 +885,7 @@ export function PublicChatPage() {
             {/* Creator identity -- no marketplace breadcrumb */}
             <div className="flex items-center gap-3 min-w-0">
               {creator?.avatarUrl && (
-                <img src={creator.avatarUrl} alt={creator.displayName || slug} className="w-9 h-9 rounded-full" />
+                <img src={creator.avatarUrl.startsWith('/uploads/') ? buildApiUrl(creator.avatarUrl) : creator.avatarUrl} alt={creator.displayName || slug} className="w-9 h-9 rounded-full" />
               )}
               <button
                 type="button"
@@ -907,6 +910,9 @@ export function PublicChatPage() {
 
             {/* Right actions: Share, New chat, auth buttons, mobile info */}
             <div className="ml-auto flex items-center gap-1">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
               {/* Share (copy link) */}
               <button
                 onClick={() => {
@@ -1274,7 +1280,7 @@ export function PublicChatPage() {
           <div className="rounded-xl border border-border-default bg-bg-primary p-4">
             <div className="flex items-start gap-3">
               {creator?.avatarUrl ? (
-                <img src={creator.avatarUrl} className="w-12 h-12 rounded-full" />
+                <img src={creator.avatarUrl.startsWith('/uploads/') ? buildApiUrl(creator.avatarUrl) : creator.avatarUrl} className="w-12 h-12 rounded-full" />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-accent-primary/20 flex items-center justify-center">
                   <span className="font-semibold text-accent-primary">{(creator?.displayName || slug).slice(0, 1).toUpperCase()}</span>

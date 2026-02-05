@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 
@@ -79,6 +81,17 @@ export function MarketplaceManagePage() {
           <h1 className="text-3xl font-bold">Marketplace Listing</h1>
           <p className="text-text-secondary">Manage your public listing and pricing.</p>
         </div>
+
+        {!form.isPublic && (
+          <Alert className="border-yellow-500/30 bg-yellow-500/10">
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+            <AlertDescription>
+              <strong>Your listing is currently private.</strong> Turn on "Make listing public" 
+              below to make it visible in the marketplace. Users won't be able to find your AI 
+              clone until you make it public.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="space-y-3">
           <label className="flex items-center gap-2">

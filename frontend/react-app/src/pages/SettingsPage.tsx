@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, UserCog } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, UserCog, Store } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { SpendingDashboard } from '@/components/SpendingDashboard';
@@ -16,7 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
 import { IntegrationsPage } from './Integrations';
 
-type Tab = 'profile' | 'pricing' | 'integrations' | 'account';
+type Tab = 'profile' | 'pricing' | 'marketplace' | 'integrations' | 'account';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
@@ -24,7 +24,7 @@ export function SettingsPage() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const validTabs: Tab[] = ['profile', 'pricing', 'integrations', 'account'];
+  const validTabs: Tab[] = ['profile', 'pricing', 'marketplace', 'integrations', 'account'];
   const [activeTab, setActiveTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'profile');
 
   useEffect(() => {
@@ -136,6 +136,10 @@ export function SettingsPage() {
   const [newVariantName, setNewVariantName] = useState('');
   const [baseVersionId, setBaseVersionId] = useState('');
 
+  // Marketplace listing
+  const [marketplaceListing, setMarketplaceListing] = useState<any>(null);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+
   useEffect(() => {
     if (state.status === 'authenticated') {
       setName(state.user.name || '');
@@ -191,8 +195,24 @@ export function SettingsPage() {
       if ((state.user as any).planTier === 'scale') {
         loadVariantGroups();
       }
+
+      // Load marketplace listing
+      loadMarketplaceListing();
     }
   }, [state]);
+
+  const loadMarketplaceListing = async () => {
+    setMarketplaceLoading(true);
+    try {
+      const data = await apiFetch('/api/marketplace/my-listing');
+      setMarketplaceListing(data.item || null);
+    } catch (e: any) {
+      // Listing doesn't exist yet, that's okay
+      setMarketplaceListing(null);
+    } finally {
+      setMarketplaceLoading(false);
+    }
+  };
 
   const loadVariantGroups = async () => {
     setLoadingVariants(true);
@@ -655,6 +675,7 @@ export function SettingsPage() {
             ? [
                 { id: 'profile' as Tab, label: 'Profile', icon: User },
                 { id: 'pricing' as Tab, label: 'Pricing', icon: CreditCard },
+                { id: 'marketplace' as Tab, label: 'Marketplace', icon: Store },
                 { id: 'integrations' as Tab, label: 'Integrations', icon: Globe },
                 { id: 'account' as Tab, label: 'Account', icon: UserCog },
               ]
@@ -1329,6 +1350,66 @@ export function SettingsPage() {
         )}
 
         {/* Integrations Tab */}
+        {/* Marketplace Tab */}
+        {activeTab === 'marketplace' && (
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Marketplace Listing</CardTitle>
+              <CardDescription>
+                Control how your AI clone appears in the public marketplace
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {marketplaceLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-accent-primary" />
+                </div>
+              ) : marketplaceListing ? (
+                <>
+                  <div className="flex items-center justify-between p-4 bg-bg-tertiary rounded-lg">
+                    <div>
+                      <div className="font-semibold text-text-primary">
+                        {marketplaceListing.isPublic ? '✅ Public' : '🔒 Private'}
+                      </div>
+                      <div className="text-sm text-text-secondary mt-1">
+                        {marketplaceListing.isPublic 
+                          ? 'Your listing is visible in marketplace'
+                          : 'Your listing is hidden from marketplace'}
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => nav('/marketplace/manage')}
+                    >
+                      Manage Listing
+                    </Button>
+                  </div>
+                  
+                  {!marketplaceListing.isPublic && (
+                    <Alert className="border-yellow-500/30 bg-yellow-500/10">
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      <AlertDescription>
+                        <strong>Your listing is private.</strong> To make it visible in marketplace, 
+                        go to <button onClick={() => nav('/marketplace/manage')} className="underline text-accent-primary">Manage Listing</button> 
+                        and turn on "Make listing public".
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-text-secondary mb-4">
+                    You haven't created a marketplace listing yet.
+                  </p>
+                  <Button onClick={() => nav('/marketplace/manage')}>
+                    Create Marketplace Listing
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {activeTab === 'integrations' && (
           <IntegrationsPage embedded />
         )}

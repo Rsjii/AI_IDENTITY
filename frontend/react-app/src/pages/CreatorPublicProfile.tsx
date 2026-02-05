@@ -3,6 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { MessageCircle, Star, Zap, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { NotFoundCreator } from '@/components/NotFoundCreator';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { apiFetch, buildApiUrl } from '@/lib/api';
+import { showToast } from '@/lib/toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Creator = {
   id: string;
@@ -18,16 +24,24 @@ type Creator = {
   stats?: { totalChats: number; rating: number; totalRatings: number };
   priceConfig?: any;
   socialLinks?: any;
+  listingId?: string | null;
 };
 
 export function CreatorPublicProfile() {
   const { handle } = useParams<{ handle: string }>();
+  const { state } = useAuth();
+  const isAuthed = state.status === 'authenticated';
   const [creator, setCreator] = useState<Creator | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
-    if (!handle) {
+    const cleanHandle = handle?.replace(/^@/, '') || '';
+    if (!cleanHandle) {
       setError('Invalid handle');
       setLoading(false);
       return;
@@ -35,26 +49,50 @@ export function CreatorPublicProfile() {
 
     setLoading(true);
     setError(null);
-    fetch(`/api/public/creator/${encodeURIComponent(handle)}`)
-      .then(async (r) => {
-        if (r.status === 404) {
-          setError('Creator not found');
-          return;
-        }
-        const d = await r.json().catch(() => null);
-        if (!r.ok || !d?.success) {
+    apiFetch<{ success: boolean; creator?: Creator; error?: string }>(
+      `/api/public/creator/${encodeURIComponent(cleanHandle)}`
+    )
+      .then((d) => {
+        if (!d?.success || !d.creator) {
           setError(d?.error || 'Creator not found');
           return;
         }
         setCreator(d.creator);
       })
-      .catch(() => {
-        setError('Failed to load creator profile');
+      .catch((e: any) => {
+        if (e.status === 404) {
+          setError('Creator not found');
+        } else {
+          setError(e.message || 'Failed to load creator profile');
+        }
       })
       .finally(() => {
         setLoading(false);
       });
   }, [handle]);
+
+  const submitReview = async () => {
+    if (!creator?.listingId || !userRating) return;
+    setSubmittingReview(true);
+    try {
+      await apiFetch('/api/marketplace/reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          listingId: creator.listingId,
+          rating: userRating,
+          comment: reviewComment.trim() || undefined,
+        }),
+      });
+      showToast('Review submitted!', 'success');
+      setShowReviewForm(false);
+      setUserRating(0);
+      setReviewComment('');
+    } catch (e: any) {
+      showToast(e.message || 'Failed to submit review', 'error');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -88,7 +126,7 @@ export function CreatorPublicProfile() {
           <div className="flex items-start gap-6 mb-6">
             {creator.avatarUrl ? (
               <img
-                src={creator.avatarUrl}
+                src={creator.avatarUrl.startsWith('/uploads/') ? buildApiUrl(creator.avatarUrl) : creator.avatarUrl}
                 alt={creator.displayName || handle}
                 className="w-24 h-24 rounded-full object-cover"
               />
@@ -153,6 +191,68 @@ export function CreatorPublicProfile() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Rating Form (if listing exists and user is authenticated) */}
+          {isAuthed && creator.listingId && (
+            <div className="mb-6 pt-6 border-t border-border-default">
+              <Card className="bg-bg-secondary border-border-default">
+                <CardContent className="pt-6">
+                  {!showReviewForm ? (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowReviewForm(true)}
+                      className="w-full"
+                    >
+                      Leave a Review
+                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Rating</Label>
+                        <div className="flex gap-2 mt-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setUserRating(star)}
+                              className={`text-2xl transition-colors ${
+                                star <= userRating 
+                                  ? 'text-yellow-500 fill-yellow-500' 
+                                  : 'text-text-tertiary hover:text-yellow-400'
+                              }`}
+                            >
+                              <Star className="h-6 w-6" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Comment (optional)</Label>
+                        <textarea
+                          className="w-full min-h-[100px] border rounded-md px-3 py-2 bg-background mt-2"
+                          placeholder="Share your experience..."
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          maxLength={1000}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={submitReview} disabled={!userRating || submittingReview}>
+                          {submittingReview ? 'Submitting...' : 'Submit Review'}
+                        </Button>
+                        <Button variant="outline" onClick={() => {
+                          setShowReviewForm(false);
+                          setUserRating(0);
+                          setReviewComment('');
+                        }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
 

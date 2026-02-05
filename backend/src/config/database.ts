@@ -1038,7 +1038,7 @@ export const userQueries = {
   findBySlugOrHandle: async (slugOrHandle: string) => {
     const r = await db.query(
       `SELECT * FROM "User"
-       WHERE "publicSlug"=$1 OR handle=$1
+       WHERE LOWER("publicSlug")=LOWER($1) OR LOWER(handle)=LOWER($1)
        LIMIT 1`,
       [slugOrHandle]
     );

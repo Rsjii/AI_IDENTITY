@@ -3,8 +3,11 @@ import { useParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Star } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Listing {
   id: string;
@@ -36,10 +39,16 @@ interface ReviewItem {
 
 export function MarketplaceListingPage() {
   const { slug = '' } = useParams();
+  const { state } = useAuth();
+  const isAuthed = state.status === 'authenticated';
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -74,6 +83,32 @@ export function MarketplaceListingPage() {
       showToast(err.message || 'Failed to subscribe', 'error');
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!listing || !userRating) return;
+    setSubmittingReview(true);
+    try {
+      await apiFetch('/api/marketplace/reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          listingId: listing.id,
+          rating: userRating,
+          comment: reviewComment.trim() || undefined,
+        }),
+      });
+      showToast('Review submitted!', 'success');
+      setShowReviewForm(false);
+      setUserRating(0);
+      setReviewComment('');
+      // Reload reviews
+      const reviewData = await fetch(`/api/marketplace/reviews/${encodeURIComponent(listing.id)}`).then((r) => r.json());
+      setReviews(reviewData.items || []);
+    } catch (e: any) {
+      showToast(e.message || 'Failed to submit review', 'error');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -139,6 +174,65 @@ export function MarketplaceListingPage() {
             )}
           </CardContent>
         </Card>
+
+        {isAuthed && (
+          <Card className="bg-bg-secondary border-border-default mb-6">
+            <CardContent className="pt-6">
+              {!showReviewForm ? (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowReviewForm(true)}
+                  className="w-full"
+                >
+                  Leave a Review
+                </Button>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Rating</Label>
+                    <div className="flex gap-2 mt-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setUserRating(star)}
+                          className={`text-2xl transition-colors ${
+                            star <= userRating 
+                              ? 'text-yellow-500 fill-yellow-500' 
+                              : 'text-text-tertiary hover:text-yellow-400'
+                          }`}
+                        >
+                          <Star className="h-6 w-6" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Comment (optional)</Label>
+                    <textarea
+                      className="w-full min-h-[100px] border rounded-md px-3 py-2 bg-background mt-2"
+                      placeholder="Share your experience..."
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      maxLength={1000}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={submitReview} disabled={!userRating || submittingReview}>
+                      {submittingReview ? 'Submitting...' : 'Submit Review'}
+                    </Button>
+                    <Button variant="outline" onClick={() => {
+                      setShowReviewForm(false);
+                      setUserRating(0);
+                      setReviewComment('');
+                    }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-bg-secondary border-border-default">
           <CardContent className="pt-6 space-y-3">
