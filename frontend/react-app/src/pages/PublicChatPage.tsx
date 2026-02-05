@@ -209,6 +209,8 @@ export function PublicChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
+  const skipNextHistoryRef = useRef(false);
 
   // Layout: left drawer + right info sheet on mobile
   const [showSidebar, setShowSidebar] = useState(false);
@@ -225,6 +227,8 @@ export function PublicChatPage() {
   const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [showTransparencyNotice, setShowTransparencyNotice] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const isOwnAI = isAuthed && !!creator?.id && (state.user as any)?.id === creator.id;
 
   // Fetch creator with proper 404 handling
   useEffect(() => {
@@ -376,6 +380,10 @@ export function PublicChatPage() {
   // Load history (guest + authed)
   useEffect(() => {
     if (!sessionId) return;
+    if (skipNextHistoryRef.current) {
+      skipNextHistoryRef.current = false;
+      return;
+    }
 
     fetch(`/api/public/history?sessionId=${encodeURIComponent(sessionId)}&visitorId=${encodeURIComponent(visitorId)}`, {
       credentials: 'include',
@@ -467,7 +475,8 @@ export function PublicChatPage() {
 
   const send = async () => {
     const m = text.trim();
-    if (!m || typing) return;
+    if (!m || typing || sendingRef.current) return;
+    sendingRef.current = true;
 
     setText('');
     const userMsg: Msg = {
@@ -497,6 +506,7 @@ export function PublicChatPage() {
 
       const newSessionId = d.sessionId || sessionId;
       if (newSessionId) {
+        if (newSessionId !== sessionId) skipNextHistoryRef.current = true;
         setSessionId(newSessionId);
         localStorage.setItem(sessionKey, newSessionId);
         localStorage.setItem(sessionTsKey, String(Date.now()));
@@ -562,6 +572,7 @@ export function PublicChatPage() {
       setMsgs((x) => [...x, errorMsg]);
     } finally {
       setTyping(false);
+      sendingRef.current = false;
     }
   };
 
@@ -623,10 +634,11 @@ export function PublicChatPage() {
   };
 
   const regenerateResponse = async (messageIndex: number) => {
-    if (messageIndex === 0) return;
+    if (messageIndex === 0 || typing || sendingRef.current) return;
     const userMsg = msgs[messageIndex - 1];
     if (!userMsg || userMsg.role !== 'user') return;
 
+    sendingRef.current = true;
     const messagesToKeep = msgs.slice(0, messageIndex);
     setMsgs(messagesToKeep);
     setTyping(true);
@@ -652,6 +664,7 @@ export function PublicChatPage() {
       showToast('Failed to regenerate response', 'error');
     } finally {
       setTyping(false);
+      sendingRef.current = false;
     }
   };
 
@@ -970,8 +983,19 @@ export function PublicChatPage() {
           </div>
         ) : null}
 
-        {/* Premium banner */}
-        {premiumRemainingMs !== null && premiumRemainingMs > 0 && (
+        {/* Own AI: Preview Mode banner */}
+        {isOwnAI && (
+          <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 flex-shrink-0">
+            <div className="max-w-5xl mx-auto text-sm text-indigo-800 flex items-center gap-2">
+              <span>🔧</span>
+              <strong>Preview Mode</strong>
+              <span className="text-indigo-600">— You're testing your own AI. Unlimited messages.</span>
+            </div>
+          </div>
+        )}
+
+        {/* Premium banner (hide if own AI) */}
+        {!isOwnAI && premiumRemainingMs !== null && premiumRemainingMs > 0 && (
           <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-b border-amber-200 px-4 py-2 flex-shrink-0">
             <div className="max-w-5xl mx-auto text-sm text-amber-900 flex items-center justify-between">
               <span>
@@ -987,8 +1011,8 @@ export function PublicChatPage() {
           </div>
         )}
 
-        {/* Free counter banner (only when not premium) -- no marketplace link */}
-        {(!premiumRemainingMs || premiumRemainingMs <= 0) && (
+        {/* Free counter banner (hide if own AI or premium active) */}
+        {!isOwnAI && (!premiumRemainingMs || premiumRemainingMs <= 0) && (
           <div className="bg-bg-primary border-b border-border-default px-4 py-2 flex-shrink-0">
             <div className="max-w-5xl mx-auto text-sm">
               <span className="text-text-secondary">
@@ -1046,8 +1070,8 @@ export function PublicChatPage() {
               return (
                 <div key={m.id || i} className={`group flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
                   {!isUser && (
-                    <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0 mt-1">
-                      <span className="text-xs font-semibold text-accent-primary">AI</span>
+                    <div className={`h-8 w-8 rounded-full ${isOwnAI ? 'bg-indigo-500/20' : 'bg-accent-primary/20'} flex items-center justify-center flex-shrink-0 mt-1`}>
+                      <span className={`text-xs font-semibold ${isOwnAI ? 'text-indigo-500' : 'text-accent-primary'}`}>AI</span>
                     </div>
                   )}
 
@@ -1056,7 +1080,9 @@ export function PublicChatPage() {
                       className={`relative rounded-xl px-4 py-3 shadow-sm ${
                         isUser
                           ? 'bg-bg-tertiary text-text-primary rounded-tr-sm'
-                          : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary rounded-tl-sm'
+                          : isOwnAI
+                            ? 'bg-indigo-500/10 border border-indigo-500/20 text-text-primary rounded-tl-sm'
+                            : 'bg-accent-primary/10 border border-accent-primary/20 text-text-primary rounded-tl-sm'
                       }`}
                     >
                       <div className="relative">
@@ -1184,16 +1210,16 @@ export function PublicChatPage() {
 
             {typing && (
               <div className="flex gap-3 justify-start">
-                <div className="h-8 w-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0 mt-1 animate-pulse">
-                  <span className="text-xs font-semibold text-accent-primary">AI</span>
+                <div className={`h-8 w-8 rounded-full ${isOwnAI ? 'bg-indigo-500/20' : 'bg-accent-primary/20'} flex items-center justify-center flex-shrink-0 mt-1 animate-pulse`}>
+                  <span className={`text-xs font-semibold ${isOwnAI ? 'text-indigo-500' : 'text-accent-primary'}`}>AI</span>
                 </div>
-                <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-xl rounded-tl-sm px-4 py-3 shadow-sm">
+                <div className={`${isOwnAI ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-accent-primary/10 border border-accent-primary/20'} rounded-xl rounded-tl-sm px-4 py-3 shadow-sm`}>
                   <div className="flex items-center gap-2">
                     <span className="text-text-secondary text-sm font-medium">AI is typing</span>
                     <div className="flex gap-1.5">
-                      <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className={`w-2 h-2 ${isOwnAI ? 'bg-indigo-500' : 'bg-accent-primary'} rounded-full animate-bounce`} style={{ animationDelay: '0ms' }} />
+                      <span className={`w-2 h-2 ${isOwnAI ? 'bg-indigo-500' : 'bg-accent-primary'} rounded-full animate-bounce`} style={{ animationDelay: '150ms' }} />
+                      <span className={`w-2 h-2 ${isOwnAI ? 'bg-indigo-500' : 'bg-accent-primary'} rounded-full animate-bounce`} style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 </div>
@@ -1276,62 +1302,76 @@ export function PublicChatPage() {
 
             {creator?.bio ? <p className="text-sm text-text-secondary mt-3">{creator.bio}</p> : null}
 
-            <div className="mt-4 border-t border-border-default pt-4">
-              <div className="text-sm font-semibold text-text-primary mb-2">Pricing</div>
-
-              <div className="text-sm text-text-secondary space-y-1">
-                <div>🆓 First {freeLimit} questions free</div>
-                <div className="text-xs text-text-tertiary">
-                  ✨ Any payment unlocks <strong>24h unlimited</strong> access for this session
+            {isOwnAI ? (
+              <>
+                <div className="mt-4 border-t border-border-default pt-4">
+                  <div className="text-sm font-semibold text-text-primary mb-2">Preview Mode</div>
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+                    <div className="font-semibold">🔧 Testing your own AI</div>
+                    <div className="text-xs mt-1 text-indigo-600">All messages are unlimited. No paywall applies.</div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-4 border-t border-border-default pt-4">
+                  <div className="text-sm font-semibold text-text-primary mb-2">Pricing</div>
 
-                {Array.isArray(creator?.priceConfig?.payPerChatTiers) && creator.priceConfig.payPerChatTiers.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {creator.priceConfig.payPerChatTiers
-                      .slice(0, 4)
-                      .map((cents: number) => (
-                        <div key={cents} className="flex items-center justify-between">
-                          <span className="text-text-secondary">• Tier</span>
-                          <span className="font-semibold text-text-primary">${(cents / 100).toFixed(0)}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => setShowPaymentModal(true)}
-                className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
-              >
-                View pricing / Upgrade
-              </button>
-            </div>
-
-            {/* Session status box */}
-            <div className="mt-4 border-t border-border-default pt-4">
-              <div className="text-sm font-semibold text-text-primary mb-2">Your session</div>
-
-              {premiumRemainingMs !== null && premiumRemainingMs > 0 ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
-                  <div className="font-semibold">⚡ Premium active</div>
-                  <div className="text-xs mt-1">
-                    Time left: <strong>{formatDuration(premiumRemainingMs)}</strong>
-                  </div>
-                  {premiumExpiresAt && (
-                    <div className="text-xs text-amber-800 dark:text-amber-200 mt-1">
-                      Expires: {new Date(premiumExpiresAt).toLocaleString()}
+                  <div className="text-sm text-text-secondary space-y-1">
+                    <div>🆓 First {freeLimit} questions free</div>
+                    <div className="text-xs text-text-tertiary">
+                      ✨ Any payment unlocks <strong>24h unlimited</strong> access for this session
                     </div>
-                  )}
-                  <button onClick={() => setShowPaymentModal(true)} className="mt-2 text-xs underline">
-                    Extend access
+
+                    {Array.isArray(creator?.priceConfig?.payPerChatTiers) && creator.priceConfig.payPerChatTiers.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {creator.priceConfig.payPerChatTiers
+                          .slice(0, 4)
+                          .map((cents: number) => (
+                            <div key={cents} className="flex items-center justify-between">
+                              <span className="text-text-secondary">• Tier</span>
+                              <span className="font-semibold text-text-primary">${(cents / 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setShowPaymentModal(true)}
+                    className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
+                  >
+                    View pricing / Upgrade
                   </button>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-border-default bg-bg-tertiary p-3 text-sm text-text-secondary">
-                  Free remaining: <strong>{remainingFree}/{freeLimit}</strong>
+
+                {/* Session status box */}
+                <div className="mt-4 border-t border-border-default pt-4">
+                  <div className="text-sm font-semibold text-text-primary mb-2">Your session</div>
+
+                  {premiumRemainingMs !== null && premiumRemainingMs > 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+                      <div className="font-semibold">⚡ Premium active</div>
+                      <div className="text-xs mt-1">
+                        Time left: <strong>{formatDuration(premiumRemainingMs)}</strong>
+                      </div>
+                      {premiumExpiresAt && (
+                        <div className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+                          Expires: {new Date(premiumExpiresAt).toLocaleString()}
+                        </div>
+                      )}
+                      <button onClick={() => setShowPaymentModal(true)} className="mt-2 text-xs underline">
+                        Extend access
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border-default bg-bg-tertiary p-3 text-sm text-text-secondary">
+                      Free remaining: <strong>{remainingFree}/{freeLimit}</strong>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* Social links + trust badges */}
             <div className="mt-4 border-t border-border-default pt-4">
@@ -1395,13 +1435,21 @@ export function PublicChatPage() {
               <div><strong>{creator?.displayName || slug}</strong></div>
               <div className="mt-1">{creator?.expertise || 'AI Assistant'}</div>
               {creator?.bio && <div className="mt-2 text-xs text-text-tertiary">{creator.bio}</div>}
-              <div className="mt-3">🆓 {freeLimit} free questions • ✨ Pay once = 24h unlimited</div>
+              {isOwnAI ? (
+                <div className="mt-3 px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs">
+                  🔧 <strong>Preview Mode</strong> — Unlimited messages
+                </div>
+              ) : (
+                <div className="mt-3">🆓 {freeLimit} free questions • ✨ Pay once = 24h unlimited</div>
+              )}
             </div>
-            <div className="mt-4">
-              <button onClick={() => setShowPaymentModal(true)} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
-                View pricing / Upgrade
-              </button>
-            </div>
+            {!isOwnAI && (
+              <div className="mt-4">
+                <button onClick={() => setShowPaymentModal(true)} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
+                  View pricing / Upgrade
+                </button>
+              </div>
+            )}
             <div className="mt-3">
               <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2">Share this AI</div>
               <ShareButtons slug={slug} creatorName={creator?.displayName} />

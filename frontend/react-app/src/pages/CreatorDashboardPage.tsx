@@ -364,24 +364,40 @@ const handleGenerateInsightsReport = () => {
             <p className="text-text-secondary mt-1">Monitor your AI clone's performance</p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => nav('/knowledge')}
+            <Button
+              variant="outline"
+              onClick={() => nav('/my-ai?tab=train')}
               className="border-border-default text-text-secondary hover:text-text-primary"
             >
               <Database className="h-4 w-4 mr-2" />
               Knowledge Base
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => nav('/identity/edit')}
+            <Button
+              variant="outline"
+              onClick={() => nav('/my-ai?tab=setup')}
               className="border-border-default text-text-secondary hover:text-text-primary"
             >
               <Settings className="h-4 w-4 mr-2" />
-              Settings
+              My AI
             </Button>
           </div>
         </div>
+
+        {/* Empty State: AI not yet set up */}
+        {aiStatus === 'not_setup' && (
+          <div className="rounded-xl border border-accent-primary/30 bg-gradient-to-r from-accent-primary/[0.08] to-accent-primary/[0.03] p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">Your AI clone isn't set up yet</h2>
+              <p className="text-sm text-text-secondary mt-1">
+                Complete your AI setup to start receiving conversations, earn revenue, and see analytics here.
+              </p>
+            </div>
+            <Button onClick={() => nav('/my-ai?tab=setup')} className="shrink-0">
+              <Zap className="h-4 w-4 mr-2" />
+              Set up My AI
+            </Button>
+          </div>
+        )}
 
         {/* Top Row: 4 Large Metric Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

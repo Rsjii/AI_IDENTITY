@@ -49,6 +49,7 @@ import { CreatorConversationDetailPage } from './pages/CreatorConversationDetail
 import { ChooseTypePage } from './pages/ChooseTypePage';
 import { MyChatsPage } from './pages/MyChatsPage';
 import { MyProfilePage } from './pages/MyProfilePage';
+import { MyAIPage } from './pages/MyAIPage';
 import { FLAGS } from './lib/flags';
 
 
@@ -84,9 +85,10 @@ function App() {
               <Route path="/choose-type" element={<ProtectedRoute><ChooseTypePage /></ProtectedRoute>} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+              <Route path="/my-ai" element={<ProtectedRoute><MyAIPage /></ProtectedRoute>} />
               <Route path="/identity/setup" element={<ProtectedRoute><IdentitySetupPage /></ProtectedRoute>} />
-              <Route path="/identity/edit" element={<ProtectedRoute><IdentityEditPage /></ProtectedRoute>} />
-              <Route path="/mirror" element={<ProtectedRoute><MirrorPage /></ProtectedRoute>} />
+              <Route path="/identity/edit" element={<Navigate to="/my-ai?tab=setup" replace />} />
+              <Route path="/mirror" element={<Navigate to="/my-ai?tab=preview" replace />} />
               {FLAGS.voice && (
                 <>
                   <Route path="/voice/setup" element={<ProtectedRoute><VoiceSetupPage /></ProtectedRoute>} />
@@ -116,7 +118,7 @@ function App() {
               <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
-              <Route path="/knowledge" element={<ProtectedRoute><KnowledgeBasePage /></ProtectedRoute>} />
+              <Route path="/knowledge" element={<Navigate to="/my-ai?tab=train" replace />} />
               <Route
                 path="/chat/:slug"
                 element={
@@ -128,7 +130,7 @@ function App() {
               <Route path="/@:handle" element={<CreatorPublicProfile />} />
               <Route path="/explore" element={<MarketplacePage />} />
               <Route path="/my-chats" element={<ProtectedRoute><MyChatsPage /></ProtectedRoute>} />
-              <Route path="/my-profile" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
+              <Route path="/my-profile" element={<Navigate to="/settings" replace />} />
               {FLAGS.marketplace && (
                 <>
                   <Route path="/marketplace" element={<MarketplacePage />} />

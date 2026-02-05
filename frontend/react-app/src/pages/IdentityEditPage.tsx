@@ -24,7 +24,7 @@ function toList(s: string): string[] {
 }
 
 
-export function IdentityEditPage() {
+export function IdentityEditPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -457,9 +457,9 @@ export function IdentityEditPage() {
     setProhibitedTopics(prohibitedTopics.filter((_, i) => i !== index));
   };
 
-  if (loading) {
-    return (
-      <Layout>
+  const content = (
+    <>
+      {loading ? (
         <div className="max-w-7xl mx-auto">
           <Card className="glass">
             <CardHeader>
@@ -468,12 +468,7 @@ export function IdentityEditPage() {
             </CardHeader>
           </Card>
         </div>
-      </Layout>
-    );
-  }
-
-  return (
-    <Layout>
+      ) : (
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -1288,6 +1283,9 @@ export function IdentityEditPage() {
           </div>
         )}
       </div>
-    </Layout>
+      )}
+    </>
   );
+
+  return embedded ? content : <Layout>{content}</Layout>;
 }

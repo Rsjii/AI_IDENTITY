@@ -14,8 +14,9 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
+import { IntegrationsPage } from './Integrations';
 
-type Tab = 'profile' | 'account' | 'security' | 'appearance' | 'notifications' | 'billing' | 'advanced';
+type Tab = 'profile' | 'pricing' | 'integrations' | 'account';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
@@ -23,7 +24,7 @@ export function SettingsPage() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as Tab | null;
-  const validTabs: Tab[] = ['profile', 'account', 'security', 'appearance', 'notifications', 'billing', 'advanced'];
+  const validTabs: Tab[] = ['profile', 'pricing', 'integrations', 'account'];
   const [activeTab, setActiveTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'profile');
 
   useEffect(() => {
@@ -650,15 +651,18 @@ export function SettingsPage() {
 
         {/* Tabs */}
         <div className="flex gap-2 border-b overflow-x-auto">
-          {([
-            { id: 'profile' as Tab, label: 'Profile', icon: User },
-            { id: 'account' as Tab, label: 'Account', icon: UserCog },
-            { id: 'security' as Tab, label: 'Security', icon: Shield },
-            { id: 'appearance' as Tab, label: 'Appearance', icon: Palette },
-            { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
-            { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
-            { id: 'advanced' as Tab, label: 'Advanced', icon: Zap },
-          ]).map(({ id, label, icon: Icon }) => (
+          {(state.status === 'authenticated' && state.user?.userType === 'creator'
+            ? [
+                { id: 'profile' as Tab, label: 'Profile', icon: User },
+                { id: 'pricing' as Tab, label: 'Pricing', icon: CreditCard },
+                { id: 'integrations' as Tab, label: 'Integrations', icon: Globe },
+                { id: 'account' as Tab, label: 'Account', icon: UserCog },
+              ]
+            : [
+                { id: 'profile' as Tab, label: 'Profile', icon: User },
+                { id: 'account' as Tab, label: 'Account', icon: UserCog },
+              ]
+          ).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => {
@@ -1151,8 +1155,8 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Security Tab */}
-        {activeTab === 'security' && (
+        {/* Pricing Tab */}
+        {activeTab === 'pricing' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
@@ -1324,8 +1328,13 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Billing Tab */}
-        {activeTab === 'billing' && (
+        {/* Integrations Tab */}
+        {activeTab === 'integrations' && (
+          <IntegrationsPage embedded />
+        )}
+
+        {/* Earnings (Account) */}
+        {activeTab === 'account' && (
           <div className="space-y-6">
             {/* Earnings Balances */}
             {earningsBalances && (
@@ -1487,8 +1496,8 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Security Tab */}
-        {activeTab === 'security' && (
+        {/* 2FA + Sessions (Account) */}
+        {activeTab === 'account' && (
           <div className="space-y-6">
             {/* Two-Factor Authentication */}
             <Card className="glass">
@@ -1649,8 +1658,8 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Appearance Tab */}
-        {activeTab === 'appearance' && (
+        {/* Appearance (Account) */}
+        {activeTab === 'account' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
@@ -1813,8 +1822,8 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
+        {/* Notifications (Account) */}
+        {activeTab === 'account' && (
           <div className="space-y-6">
             <Card className="glass">
               <CardHeader>
@@ -2004,8 +2013,8 @@ export function SettingsPage() {
           </div>
         )}
 
-        {/* Advanced Tab */}
-        {activeTab === 'advanced' && (
+        {/* Advanced Pay-Per-Chat (Account) */}
+        {activeTab === 'account' && (
           <div className="space-y-6">
             {/* Pay-Per-Chat Configuration */}
             <Card className="glass">

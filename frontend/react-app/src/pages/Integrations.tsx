@@ -10,7 +10,7 @@ import { Copy, Eye, FileCode, MessageCircle, Check, ExternalLink, Download } fro
 import { FLAGS } from '@/lib/flags';
 import QRCode from 'qrcode';
 
-export function IntegrationsPage() {
+export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
   const { state } = useAuth();
   const user = state.status === 'authenticated' ? state.user : null;
 
@@ -302,8 +302,7 @@ export function IntegrationsPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  return (
-    <Layout>
+  const content = (
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">🚀 Integrations & Deployment</h1>
@@ -924,6 +923,7 @@ export function IntegrationsPage() {
           </div>
         )}
       </div>
-    </Layout>
   );
+
+  return embedded ? content : <Layout>{content}</Layout>;
 }

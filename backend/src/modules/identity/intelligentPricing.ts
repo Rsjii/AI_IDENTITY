@@ -405,3 +405,4 @@ export function generateTeaserPrompt(tier: 'basic' | 'premium' | 'vip'): string 
 
 
 
+
