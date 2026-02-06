@@ -727,6 +727,13 @@ export async function generateMirrorReplyWithLogging(
 
   if (!isTeaser) {
     try {
+      logger.info({
+        step: 'LLM_1_RAG_START',
+        userId,
+        incomingMessageLength: incomingMessage.length,
+        messagePreview: incomingMessage.substring(0, 100),
+      }, '[LLM] 🔍 Starting RAG retrieval for LLM context');
+
       const retrieved = await ragService.retrieveRelevantContext(userId, incomingMessage, {
         maxChunks: 5,
         maxTokens: 800,
@@ -737,11 +744,41 @@ export async function generateMirrorReplyWithLogging(
         ragContext = ragService.buildContextString(retrieved);
         ragChunksUsed = retrieved.chunks.length;
         ragTokensEstimate = retrieved.totalTokensEstimate;
-        logger.info(`[RAG] Using ${ragChunksUsed} relevant chunks (~${ragTokensEstimate} tokens) for context`);
+        
+        logger.info({
+          step: 'LLM_2_RAG_SUCCESS',
+          userId,
+          chunksUsed: ragChunksUsed,
+          tokensEstimate: ragTokensEstimate,
+          retrievalTimeMs: retrieved.retrievalTimeMs,
+          contextLength: ragContext.length,
+          contextPreview: ragContext.substring(0, 200),
+          chunkDetails: retrieved.chunks.map((c, i) => ({
+            index: i + 1,
+            similarity: c.similarity.toFixed(3),
+            contentPreview: c.content.substring(0, 80),
+          })),
+        }, `[LLM] ✅ RAG retrieved ${ragChunksUsed} chunks (~${ragTokensEstimate} tokens) - context built`);
+      } else {
+        logger.warn({
+          step: 'LLM_2_RAG_NO_CHUNKS',
+          userId,
+        }, '[LLM] ⚠️ RAG returned no chunks - proceeding without knowledge base context');
       }
     } catch (ragError: any) {
-      logger.warn('[RAG] Failed to retrieve context, proceeding without:', ragError.message);
+      logger.error({
+        step: 'LLM_2_RAG_ERROR',
+        userId,
+        error: ragError.message,
+        stack: ragError.stack,
+      }, '[LLM] ❌ RAG failed - proceeding without context');
     }
+  } else {
+    logger.debug({
+      step: 'LLM_1_RAG_SKIPPED',
+      userId,
+      reason: 'teaser_mode',
+    }, '[LLM] ⏭️ RAG skipped - teaser mode');
   }
 
   // ✅ CACHE: Check if we have a cached response for this query
@@ -806,7 +843,28 @@ export async function generateMirrorReplyWithLogging(
     ? `${ragContext}\n\nADDITIONAL CONTEXT: ${context}`
     : context;
 
+  logger.info({
+    step: 'LLM_3_CONTEXT_BUILT',
+    userId,
+    hasRagContext: !!ragContext,
+    ragContextLength: ragContext.length,
+    additionalContextLength: context.length,
+    enrichedContextLength: enrichedContext.length,
+    totalTokensEstimate: Math.ceil(enrichedContext.length / 4) + Math.ceil(incomingMessage.length / 4),
+  }, '[LLM] 📝 Context built - ready for LLM call');
+
   for (let attempt = 0; attempt < (isTeaser ? 1 : 3); attempt++) {
+    logger.info({
+      step: 'LLM_4_CALLING_LLM',
+      userId,
+      attempt: attempt + 1,
+      maxAttempts: isTeaser ? 1 : 3,
+      isTeaser,
+      maxTokens,
+      systemPromptLength: identityPrompt.length,
+      userPromptLength: enrichedContext.length + incomingMessage.length,
+    }, '[LLM] 🤖 Calling LLM API...');
+
     const gen = await llmClient.generateResponse(
       [
         { role: 'system', content: identityPrompt },
@@ -830,6 +888,18 @@ export async function generateMirrorReplyWithLogging(
     tokensInTotal += gen.inputTokens || 0;
     tokensOutTotal += gen.outputTokens || 0;
 
+    logger.info({
+      step: 'LLM_5_RESPONSE_RECEIVED',
+      userId,
+      attempt: attempt + 1,
+      model: genModel,
+      inputTokens: gen.inputTokens || 0,
+      outputTokens: gen.outputTokens || 0,
+      replyLength: finalReply.length,
+      replyPreview: finalReply.substring(0, 200),
+      cost: gen.cost || 0,
+    }, '[LLM] ✅ LLM response received');
+
     // rulesApplied (same logic as before)
     rulesApplied = [];
     if (identityJson.hardRules?.always) {
@@ -838,6 +908,13 @@ export async function generateMirrorReplyWithLogging(
     if (identityJson.hardRules?.never) {
       rulesApplied.push(...identityJson.hardRules.never.map((r: string) => `never: ${String(r).substring(0, 50)}`));
     }
+
+    logger.debug({
+      step: 'LLM_6_RULES_APPLIED',
+      userId,
+      rulesCount: rulesApplied.length,
+      rules: rulesApplied,
+    }, '[LLM] 📋 Rules applied to response');
 
     // Skip validation for teaser
     if (isTeaser) {
@@ -872,6 +949,19 @@ export async function generateMirrorReplyWithLogging(
   // ✅ Calculate cost
   const costUsd = calculateCost(tokensInTotal, tokensOutTotal, genModel);
   const costCents = costToCents(costUsd);
+
+  logger.info({
+    step: 'LLM_7_SAVING_TO_DB',
+    userId,
+    replyLength: finalReply.length,
+    model: genModel,
+    tokensIn: tokensInTotal,
+    tokensOut: tokensOutTotal,
+    costCents,
+    latencyMs,
+    validatorStatus,
+    validatorViolationsCount: validatorViolations.length,
+  }, '[LLM] 💾 Saving LLM run to mirror_runs table');
 
   const mirrorRun = await mirrorRunQueries.create(
     version.id,
@@ -944,7 +1034,23 @@ export async function generateMirrorReplyWithLogging(
   // after final mirrorRun created:
   // ✅ Only persist assistant message if persistChat is true
   if (sessionId && persistChat && finalReply) {
-    await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
+    logger.info({
+      step: 'LLM_8_SAVING_CHAT_MESSAGE',
+      userId,
+      sessionId,
+      messageLength: finalReply.length,
+      messagePreview: finalReply.substring(0, 100),
+    }, '[LLM] 💾 Saving assistant message to chat_messages table');
+
+    const savedMessage = await chatMessageQueries.add({ sessionId, role: 'assistant', content: finalReply });
+    
+    logger.info({
+      step: 'LLM_9_CHAT_MESSAGE_SAVED',
+      userId,
+      sessionId,
+      messageId: savedMessage.id,
+      totalDuration: Date.now() - startTime,
+    }, '[LLM] ✅ Chat message saved - complete');
   }
 
   return {

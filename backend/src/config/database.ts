@@ -1727,12 +1727,32 @@ export const chatSessionQueries = {
 export const chatMessageQueries = {
   add: async (params: { sessionId: string; role: 'user' | 'assistant'; content: string; truncated?: boolean }) => {
     const id = `cm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    
+    // Log database write
+    const { logger } = await import('./logger');
+    logger.debug({
+      step: 'DB_CHAT_MESSAGE_INSERT',
+      messageId: id,
+      sessionId: params.sessionId,
+      role: params.role,
+      contentLength: params.content.length,
+      truncated: params.truncated || false,
+    }, '[DB] 💾 Inserting chat message');
+
     const r = await db.query(
       `INSERT INTO "chat_messages" (id,"sessionId","role","content","truncated")
        VALUES ($1,$2,$3,$4,$5)
        RETURNING *`,
       [id, params.sessionId, params.role, params.content, params.truncated ?? false]
     );
+    
+    logger.debug({
+      step: 'DB_CHAT_MESSAGE_INSERTED',
+      messageId: id,
+      sessionId: params.sessionId,
+      createdAt: r.rows[0]?.createdAt,
+    }, '[DB] ✅ Chat message inserted successfully');
+
     return r.rows[0];
   },
 

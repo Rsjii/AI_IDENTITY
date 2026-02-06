@@ -63,11 +63,32 @@ class RAGService {
     } = options;
 
     try {
+      logger.info({
+        step: 'RAG_1_START',
+        userId,
+        queryLength: query.length,
+        queryPreview: query.substring(0, 100),
+        maxChunks,
+        maxTokens,
+        minSimilarity,
+      }, '[RAG] 🔍 Starting RAG retrieval');
+
       // 1. Get user's knowledge chunks with embeddings
       const chunks = await this.getUserKnowledgeChunks(userId);
 
+      logger.info({
+        step: 'RAG_2_CHUNKS_LOADED',
+        userId,
+        totalChunks: chunks.length,
+        chunksWithEmbeddings: chunks.filter(c => c.embedding && c.embedding.length > 0).length,
+        chunksWithoutEmbeddings: chunks.filter(c => !c.embedding || c.embedding.length === 0).length,
+      }, '[RAG] 📚 Knowledge chunks loaded from database');
+
       if (chunks.length === 0) {
-        logger.debug(`[RAG] No knowledge chunks for user ${userId}`);
+        logger.warn({
+          step: 'RAG_3_NO_CHUNKS',
+          userId,
+        }, '[RAG] ⚠️ No knowledge chunks found for user');
         return {
           chunks: [],
           totalTokensEstimate: 0,
@@ -76,7 +97,22 @@ class RAGService {
       }
 
       // 2. Generate embedding for query
+      logger.info({
+        step: 'RAG_4_GENERATING_QUERY_EMBEDDING',
+        userId,
+        queryLength: query.length,
+      }, '[RAG] 🔢 Generating embedding for user query');
+
       const queryEmbedding = await embeddingService.generateEmbedding(query);
+
+      logger.info({
+        step: 'RAG_5_QUERY_EMBEDDING_GENERATED',
+        userId,
+        embeddingDimensions: queryEmbedding.embedding.length,
+        model: queryEmbedding.model,
+        tokensUsed: queryEmbedding.tokensUsed,
+        cost: queryEmbedding.cost,
+      }, '[RAG] ✅ Query embedding generated');
 
       // 3. Find most similar chunks
       const chunksWithEmbeddings = chunks.filter(c => c.embedding && c.embedding.length > 0);
@@ -86,6 +122,13 @@ class RAGService {
         logger.debug('[RAG] No embeddings found, using keyword fallback');
         return this.keywordFallbackSearch(chunks, query, maxChunks, maxTokens, startTime);
       }
+
+      logger.info({
+        step: 'RAG_6_FINDING_SIMILAR_CHUNKS',
+        userId,
+        candidateChunks: chunksWithEmbeddings.length,
+        minSimilarity,
+      }, '[RAG] 🔎 Finding similar chunks using cosine similarity');
 
       const similar = embeddingService.findTopKSimilar(
         queryEmbedding.embedding,
@@ -97,6 +140,29 @@ class RAGService {
         maxChunks * 2, // Get more, then trim by tokens
         minSimilarity
       );
+
+      logger.info({
+        step: 'RAG_7_SIMILARITY_SEARCH_COMPLETE',
+        userId,
+        similarChunksFound: similar.length,
+        topSimilarities: similar.slice(0, 5).map(s => ({
+          similarity: s.similarity.toFixed(3),
+          contentPreview: s.content.substring(0, 80),
+        })),
+      }, '[RAG] ✅ Similarity search complete');
+
+      // If semantic similarity finds nothing (common with fallback embeddings),
+      // gracefully fall back to keyword-based search so we still return context.
+      if (similar.length === 0) {
+        logger.warn({
+          step: 'RAG_7_NO_SIMILAR_RESULTS',
+          userId,
+          model: queryEmbedding.model,
+          reason: 'no semantic matches above minSimilarity; using keyword fallback',
+        }, '[RAG] ⚠️ No similar chunks found from embeddings, falling back to keyword search');
+
+        return this.keywordFallbackSearch(chunks, query, maxChunks, maxTokens, startTime);
+      }
 
       // 4. Build context within token limit
       let tokenCount = 0;
@@ -116,6 +182,13 @@ class RAGService {
 
         if (tokenCount + chunkTokens > maxTokens) {
           // Would exceed limit - stop here
+          logger.debug({
+            step: 'RAG_8_TOKEN_LIMIT_REACHED',
+            userId,
+            currentTokens: tokenCount,
+            maxTokens,
+            chunksSelected: selectedChunks.length,
+          }, '[RAG] ⚠️ Token limit reached, stopping chunk selection');
           break;
         }
 
@@ -132,15 +205,26 @@ class RAGService {
 
       const retrievalTimeMs = Date.now() - startTime;
 
-      logger.info(`[RAG] Retrieved ${selectedChunks.length} chunks (~${tokenCount} tokens) in ${retrievalTimeMs}ms`, {
+      logger.info({
+        step: 'RAG_9_RETRIEVAL_COMPLETE',
         userId,
         queryLength: query.length,
         totalChunks: chunks.length,
         selectedChunks: selectedChunks.length,
+        totalTokensEstimate: tokenCount,
+        retrievalTimeMs,
         avgSimilarity: selectedChunks.length > 0
           ? (selectedChunks.reduce((s, c) => s + c.similarity, 0) / selectedChunks.length).toFixed(3)
           : 0,
-      });
+        selectedChunksDetails: selectedChunks.map((c, i) => ({
+          index: i + 1,
+          chunkId: c.id,
+          sourceId: c.sourceId,
+          similarity: c.similarity.toFixed(3),
+          contentLength: c.content.length,
+          contentPreview: c.content.substring(0, 100),
+        })),
+      }, `[RAG] ✅ Retrieved ${selectedChunks.length} chunks (~${tokenCount} tokens) in ${retrievalTimeMs}ms`);
 
       return {
         chunks: selectedChunks,
@@ -164,8 +248,19 @@ class RAGService {
     // Check cache
     const cached = this.userKnowledgeCache.get(userId);
     if (cached && Date.now() - cached.lastRefreshed < this.cacheExpireMs) {
+      logger.debug({
+        step: 'RAG_CACHE_HIT',
+        userId,
+        cachedChunks: cached.chunks.length,
+        cacheAge: Date.now() - cached.lastRefreshed,
+      }, '[RAG] 💾 Cache hit - using cached chunks');
       return cached.chunks;
     }
+
+    logger.info({
+      step: 'RAG_DB_QUERY',
+      userId,
+    }, '[RAG] 📊 Querying database for knowledge chunks');
 
     // Fetch from database
     const result = await db.query(
@@ -175,6 +270,14 @@ class RAGService {
        ORDER BY kc."sourceId", kc."chunkIndex"`,
       [userId]
     );
+
+    logger.info({
+      step: 'RAG_DB_RESULT',
+      userId,
+      rowsReturned: result.rows.length,
+      chunksWithEmbeddings: result.rows.filter(r => r.embedding && r.embedding !== '[]').length,
+      chunksWithoutEmbeddings: result.rows.filter(r => !r.embedding || r.embedding === '[]').length,
+    }, '[RAG] ✅ Database query complete');
 
     const chunks: KnowledgeChunk[] = result.rows.map(row => ({
       id: row.id,
@@ -189,6 +292,12 @@ class RAGService {
       chunks,
       lastRefreshed: Date.now(),
     });
+
+    logger.debug({
+      step: 'RAG_CACHE_UPDATED',
+      userId,
+      chunksCached: chunks.length,
+    }, '[RAG] 💾 Cache updated with fresh chunks');
 
     return chunks;
   }

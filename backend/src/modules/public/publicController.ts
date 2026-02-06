@@ -509,13 +509,34 @@ export async function claimSession(req: any, res: Response) {
  * - messagesUsedBefore >= 4 => hard paywall
  */
 export async function publicChat(req: any, res: Response) {
+  const chatStartTime = Date.now();
   const { slug, message, visitorId, sessionId, voiceEnabled } = chatSchema.parse(req.body);
   const cleanSlug = safeSlug(slug);
 
   const viewerUserId = req.user?.id || null;
 
+  logger.info({
+    step: '1_INIT',
+    slug: cleanSlug,
+    messageLength: message.length,
+    visitorId,
+    sessionId,
+    viewerUserId,
+  }, '[PUBLIC_CHAT] 🚀 Starting chat request');
+
   const creator = await userQueries.findBySlugOrHandle(cleanSlug);
-  if (!creator) return res.status(404).json({ error: 'Creator not found' });
+  if (!creator) {
+    logger.warn({ step: '1_CREATOR_NOT_FOUND', slug: cleanSlug }, '[PUBLIC_CHAT] ❌ Creator not found');
+    return res.status(404).json({ error: 'Creator not found' });
+  }
+
+  logger.info({
+    step: '2_CREATOR_FOUND',
+    creatorId: creator.id,
+    creatorEmail: creator.email,
+    creatorHandle: creator.handle,
+    planTier: creator.planTier,
+  }, '[PUBLIC_CHAT] ✅ Creator found in database');
 
   // ✅ Approach B: block chat for everyone if creator trial ended + free plan
   const plan = await getUserPlan(creator.id);
@@ -631,10 +652,29 @@ export async function publicChat(req: any, res: Response) {
     : await chatMessageQueries.countBySession(sid);
 
   // Save user message (capture ID)
+  logger.info({
+    step: '5_SAVING_USER_MESSAGE',
+    sessionId: sid,
+    messageLength: message.length,
+    messagePreview: message.substring(0, 100),
+  }, '[PUBLIC_CHAT] 💾 Saving user message to database');
+
   const userMsgRow = await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
+
+  logger.info({
+    step: '6_USER_MESSAGE_SAVED',
+    messageId: userMsgRow.id,
+    sessionId: sid,
+  }, '[PUBLIC_CHAT] ✅ User message saved to chat_messages table');
 
   // ✅ Creator preview: own AI => unlimited, no paywall, no subscription needed
   if (isOwnAI) {
+    logger.info({
+      step: '7_OWNER_CHAT',
+      creatorId: creator.id,
+      sessionId: sid,
+    }, '[PUBLIC_CHAT] 👤 Owner chatting with own AI - unlimited access');
+
     const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
       platform: 'web',
       sessionId: sid,
@@ -642,8 +682,21 @@ export async function publicChat(req: any, res: Response) {
       persistChat: false, // ✅ Controller already saves messages
     });
 
+    logger.info({
+      step: '8_AI_RESPONSE_GENERATED',
+      mirrorRunId: result.mirrorRunId,
+      replyLength: result.reply?.length || 0,
+      replyPreview: result.reply?.substring(0, 150) || '',
+      fromCache: result.fromCache || false,
+    }, '[PUBLIC_CHAT] 🤖 AI response generated');
+
     if (result.reply) {
       await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      logger.info({
+        step: '9_AI_MESSAGE_SAVED',
+        sessionId: sid,
+        replyLength: result.reply.length,
+      }, '[PUBLIC_CHAT] ✅ AI response saved to chat_messages table');
     }
 
     return res.json({
@@ -724,6 +777,13 @@ export async function publicChat(req: any, res: Response) {
 
   if (paywallStage === 'none') {
     // 1-3 free messages => full
+    logger.info({
+      step: '10_FREE_MESSAGE',
+      messagesUsedBefore,
+      freeMessageLimit: FREE_MESSAGE_LIMIT,
+      sessionId: sid,
+    }, '[PUBLIC_CHAT] 🆓 Free message - generating full response');
+
     const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
       platform: 'web',
       sessionId: sid,
@@ -731,7 +791,22 @@ export async function publicChat(req: any, res: Response) {
       persistChat: false, // ✅ Controller already saves messages
     });
 
-    if (result.reply) await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+    logger.info({
+      step: '11_FREE_RESPONSE_GENERATED',
+      mirrorRunId: result.mirrorRunId,
+      replyLength: result.reply?.length || 0,
+      replyPreview: result.reply?.substring(0, 150) || '',
+      fromCache: result.fromCache || false,
+    }, '[PUBLIC_CHAT] 🤖 Free response generated');
+
+    if (result.reply) {
+      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      logger.info({
+        step: '12_FREE_RESPONSE_SAVED',
+        sessionId: sid,
+        totalDuration: Date.now() - chatStartTime,
+      }, '[PUBLIC_CHAT] ✅ Free response saved - request complete');
+    }
 
     return res.json({
       success: true,
