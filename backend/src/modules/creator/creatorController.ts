@@ -384,6 +384,14 @@ const MAX_TIER_CENTS = 10000;
 
 const tierAmountSchema = z.number().int().min(MIN_TIER_CENTS).max(MAX_TIER_CENTS);
 
+// New simplified pricing schema for Phase 1
+const newPricingSchema = z.object({
+  payPerChatPriceCents: z.number().int().min(500).max(10000).optional(), // $5-100
+  subscriptionPriceCents: z.number().int().min(1000).max(50000).optional(), // $10-500
+  freeMessageLimit: z.number().int().min(0).max(10).optional(),
+});
+
+// Legacy pricing schema (backward compatible)
 const pricingSchema = z.object({
   free: z.object({ enabled: z.boolean().default(true) }).passthrough().optional(),
   payPerChatTiers: z.array(tierAmountSchema).min(1).max(10).optional(),
@@ -396,6 +404,10 @@ const pricingSchema = z.object({
     enabled: z.boolean().default(true),
     amountCents: tierAmountSchema,
   }).passthrough().optional(),
+  // New fields
+  payPerChatPriceCents: z.number().int().min(500).max(10000).optional(),
+  subscriptionPriceCents: z.number().int().min(1000).max(50000).optional(),
+  freeMessageLimit: z.number().int().min(0).max(10).optional(),
 }).passthrough().superRefine((cfg, ctx) => {
   if (cfg.defaultTierCents && cfg.payPerChatTiers && !cfg.payPerChatTiers.includes(cfg.defaultTierCents)) {
     ctx.addIssue({
@@ -422,6 +434,92 @@ export async function setPricing(req: Request, res: Response) {
 
   const cfg = pricingSchema.parse(req.body);
 
+  // Phase 1: New pricing model - save to marketplace_listings
+  if (cfg.payPerChatPriceCents !== undefined || cfg.subscriptionPriceCents !== undefined || cfg.freeMessageLimit !== undefined) {
+    // Check if marketplace listing exists
+    const listingResult = await db.query(
+      `SELECT id FROM "marketplace_listings" WHERE "creatorId" = $1 LIMIT 1`,
+      [userId]
+    );
+
+    if (listingResult.rows.length > 0) {
+      // Update existing listing
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramIndex = 1;
+
+      if (cfg.payPerChatPriceCents !== undefined) {
+        updateFields.push(`"payPerChatPriceCents" = $${paramIndex}`);
+        updateValues.push(cfg.payPerChatPriceCents);
+        paramIndex++;
+      }
+      if (cfg.subscriptionPriceCents !== undefined) {
+        updateFields.push(`"subscriptionPriceCents" = $${paramIndex}`);
+        updateValues.push(cfg.subscriptionPriceCents);
+        paramIndex++;
+      }
+      if (cfg.freeMessageLimit !== undefined) {
+        updateFields.push(`"freeMessageLimit" = $${paramIndex}`);
+        updateValues.push(cfg.freeMessageLimit);
+        paramIndex++;
+      }
+
+      if (updateFields.length > 0) {
+        updateFields.push(`"updatedAt" = CURRENT_TIMESTAMP`);
+        updateValues.push(listingResult.rows[0].id);
+
+        await db.query(
+          `UPDATE "marketplace_listings" SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+          updateValues
+        );
+      }
+    } else {
+      // Create new listing if it doesn't exist
+      const user = await userQueries.findById(userId);
+      const baseSlug = user?.publicSlug || user?.handle || `creator-${userId}`;
+      const slug = `${baseSlug}-${String(Date.now()).slice(-6)}`;
+      const id = (await import('../../utils/idGenerator')).generateId.marketplaceListing();
+
+      await db.query(
+        `INSERT INTO "marketplace_listings"
+         ("id", "creatorId", "slug", "payPerChatPriceCents", "subscriptionPriceCents", "freeMessageLimit", "isPublic", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
+        [
+          id,
+          userId,
+          slug,
+          cfg.payPerChatPriceCents ?? 1000,
+          cfg.subscriptionPriceCents ?? 0,
+          cfg.freeMessageLimit ?? 3,
+          false, // Not public by default
+        ]
+      );
+    }
+
+    // Also update priceConfig for backward compatibility
+    const priceConfigUpdate: any = {};
+    if (cfg.payPerChatPriceCents !== undefined) {
+      priceConfigUpdate.defaultTierCents = cfg.payPerChatPriceCents;
+    }
+    if (cfg.freeMessageLimit !== undefined) {
+      priceConfigUpdate.freeMessageLimit = cfg.freeMessageLimit;
+    }
+
+    if (Object.keys(priceConfigUpdate).length > 0) {
+      const user = await userQueries.findById(userId);
+      const updatedConfig = { ...(user?.priceConfig || {}), ...priceConfigUpdate };
+      await userQueries.updatePricing(userId, updatedConfig);
+    }
+
+    return res.json({ 
+      success: true, 
+      payPerChatPriceCents: cfg.payPerChatPriceCents,
+      subscriptionPriceCents: cfg.subscriptionPriceCents,
+      freeMessageLimit: cfg.freeMessageLimit,
+    });
+  }
+
+  // Legacy pricing update (backward compatible)
   const payPerChatTiers = normalizeTierList(cfg.payPerChatTiers, DEFAULT_PAY_PER_CHAT_TIERS);
   const defaultTierCents = cfg.defaultTierCents && payPerChatTiers.includes(cfg.defaultTierCents)
     ? cfg.defaultTierCents
@@ -443,6 +541,36 @@ export async function setPricing(req: Request, res: Response) {
   return res.json({ success: true, priceConfig: u.priceConfig });
 }
 
+export async function getPricing(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Get pricing from marketplace_listings (preferred) or fallback to priceConfig
+  const listingResult = await db.query(
+    `SELECT "payPerChatPriceCents", "subscriptionPriceCents", "freeMessageLimit"
+     FROM "marketplace_listings" WHERE "creatorId" = $1 LIMIT 1`,
+    [userId]
+  );
+
+  if (listingResult.rows.length > 0 && listingResult.rows[0].payPerChatPriceCents) {
+    return res.json({
+      payPerChatPriceCents: listingResult.rows[0].payPerChatPriceCents,
+      subscriptionPriceCents: listingResult.rows[0].subscriptionPriceCents || 0,
+      freeMessageLimit: listingResult.rows[0].freeMessageLimit ?? 3,
+    });
+  }
+
+  // Fallback to priceConfig
+  const user = await userQueries.findById(userId);
+  const priceConfig = user?.priceConfig || {};
+  
+  return res.json({
+    payPerChatPriceCents: priceConfig.defaultTierCents || 1000,
+    subscriptionPriceCents: priceConfig.subscriptionPriceCents || 0,
+    freeMessageLimit: priceConfig.freeMessageLimit ?? 3,
+  });
+}
+
 export async function startTrial(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -459,6 +587,19 @@ export async function startTrial(req: Request, res: Response) {
  * Mark onboarding as complete
  * POST /api/creator/onboarding/complete
  */
+export async function updateOnboardingStep(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { step } = z.object({
+    step: z.enum(['quiz', 'content', 'pricing', 'voice', 'plan', 'stripe_connect', 'deploy', 'done']),
+  }).parse(req.body);
+
+  await userQueries.updateOnboardingStep(userId, step);
+
+  return res.json({ success: true, step });
+}
+
 export async function completeOnboarding(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -478,11 +619,16 @@ export async function connectStripeAccount(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const returnUrl = `${frontendUrl}/settings?tab=billing&stripe=success`;
-  const refreshUrl = `${frontendUrl}/settings?tab=billing&stripe=refresh`;
+  const { returnUrl, refreshUrl } = z.object({
+    returnUrl: z.string().url().optional(),
+    refreshUrl: z.string().url().optional(),
+  }).parse(req.body);
 
-  const url = await createConnectOnboardingLink(userId, returnUrl, refreshUrl);
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const finalReturnUrl = returnUrl || `${frontendUrl}/settings?tab=billing&stripe=success`;
+  const finalRefreshUrl = refreshUrl || `${frontendUrl}/settings?tab=billing&stripe=refresh`;
+
+  const url = await createConnectOnboardingLink(userId, finalReturnUrl, finalRefreshUrl);
   return res.json({ url });
 }
 

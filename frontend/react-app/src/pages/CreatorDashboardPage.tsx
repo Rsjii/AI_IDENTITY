@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { showToast } from '@/lib/toast';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/Skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   MessageSquare, DollarSign, Clock, Star, TrendingUp, TrendingDown,
   Settings, Database, BarChart3, Zap, 
-  FileText, AlertCircle, CheckCircle2
+  FileText, AlertCircle, CheckCircle2, ArrowUp
 } from 'lucide-react';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
@@ -67,6 +69,12 @@ interface DashboardData {
 
 export function CreatorDashboardPage() {
   const nav = useNavigate();
+  const { state } = useAuth();
+  const user = state.status === 'authenticated' ? state.user : null;
+  const planTier = (user as any)?.planTier || 'free';
+  const trialEndsAt = (user as any)?.trialEndsAt;
+  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
+  const isFreeTier = planTier === 'free' && !isTrialActive;
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -338,6 +346,28 @@ const handleGenerateInsightsReport = () => {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto space-y-6 px-6 py-8">
+        {/* Phase 2: Free tier upgrade banner */}
+        {isFreeTier && (
+          <Alert className="border-orange-500/30 bg-orange-500/10">
+            <AlertCircle className="h-4 w-4 text-orange-500" />
+            <AlertDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <strong>Upgrade to unlock marketplace & monetization</strong>
+                  <p className="text-sm mt-1">
+                    Free tier creators cannot list on marketplace or monetize. Upgrade to Starter plan ($49/month) 
+                    to make your AI discoverable and start earning from visitors.
+                  </p>
+                </div>
+                <Button onClick={() => nav('/pricing')} size="sm" className="ml-4">
+                  <ArrowUp className="h-4 w-4 mr-2" />
+                  Upgrade Now
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>

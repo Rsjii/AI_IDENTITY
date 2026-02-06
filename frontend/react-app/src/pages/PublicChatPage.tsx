@@ -19,6 +19,7 @@ import {
   Settings,
   Share2,
   Plus,
+  AlertCircle,
 } from 'lucide-react';
 
 import { PaymentPrompt } from '@/components/PaymentPrompt';
@@ -26,6 +27,7 @@ import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { MessageLimitWarning } from '@/components/MessageLimitWarning';
 import { NotFoundCreator } from '@/components/NotFoundCreator';
 import { CreatorProfileModal } from '@/components/CreatorProfileModal';
+import { ChatLimitModal } from '@/components/ChatLimitModal';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -49,6 +51,8 @@ type Creator = {
   listingId?: string | null;
   subscriptionPriceCents?: number;
   currency?: string;
+  payPerChatPriceCents?: number;
+  freeMessageLimit?: number;
 };
 
 type Msg = {
@@ -203,10 +207,24 @@ export function PublicChatPage() {
   const [paymentData, setPaymentData] = useState<{
     creatorId: string;
     sessionId: string;
-    paymentOptions: { tiers: { amount: number; label: string }[]; defaultAmount?: number };
+    paymentOptions: { payPerChatPriceCents?: number; tiers?: { amount: number; label: string }[]; defaultAmount?: number };
   } | null>(null);
 
   const [premiumExpiresAt, setPremiumExpiresAt] = useState<string | null>(null);
+  
+  // Phase 5: Chat limit modal state
+  const [showChatLimitModal, setShowChatLimitModal] = useState(false);
+  const [chatLimitData, setChatLimitData] = useState<{
+    tier: string;
+    used: number;
+    limit: number;
+    nextTier: string | null;
+    upgradeUrl?: string;
+    message?: string;
+  } | null>(null);
+  
+  // Phase 5: Creator unavailable state (for visitors)
+  const [creatorUnavailable, setCreatorUnavailable] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -258,7 +276,7 @@ export function PublicChatPage() {
         if (!r.ok || !d?.success) {
           throw new Error(d?.error || 'Failed to load creator');
         }
-        if (!cancelled) setCreator(d.creator || null);
+        if (!cancelled) setCreator(d.creator || d.user || null);
         return null;
       })
       .catch((e: any) => {
@@ -462,7 +480,7 @@ export function PublicChatPage() {
     run();
   }, [sessionId, visitorId, msgs.length]);
 
-  const freeLimit = publicLimit?.freeMessageLimit ?? 3;
+  const freeLimit = publicLimit?.freeMessageLimit ?? creator?.freeMessageLimit ?? 3;
   const remainingFree = publicLimit?.remainingFreeMessages ?? Math.max(0, freeLimit - msgs.filter((m) => m.role === 'user').length);
 
   const openPaymentModal = (creatorId: string, sid: string, paymentOptions: any) => {
@@ -502,6 +520,42 @@ export function PublicChatPage() {
           voiceEnabled: false,
         }),
       });
+
+      // Phase 5: Handle 402 error (chat limit reached)
+      if (r.status === 402) {
+        const errorData = await r.json().catch(() => ({}));
+        setTyping(false);
+        
+        if (errorData.errorCode === 'CREATOR_PLAN_LIMIT') {
+          // Creator viewing their own chat
+          if (isOwnAI) {
+            setChatLimitData({
+              tier: errorData.tier || 'free',
+              used: errorData.used || 0,
+              limit: errorData.limit || 0,
+              nextTier: errorData.nextTier || null,
+              upgradeUrl: errorData.upgradeUrl || '/pricing',
+              message: errorData.message,
+            });
+            setShowChatLimitModal(true);
+          } else {
+            // Visitor sees "Creator unavailable" message
+            setCreatorUnavailable(true);
+            const unavailableMsg: Msg = {
+              role: 'assistant',
+              content: 'This creator has reached their monthly chat limit. Please try again later.',
+              timestamp: new Date(),
+              id: `msg_unavailable_${Date.now()}`,
+            };
+            setMsgs((x) => [...x, unavailableMsg]);
+          }
+        }
+        return;
+      }
+
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status}`);
+      }
 
       const d = await r.json();
 
@@ -1249,26 +1303,38 @@ export function PublicChatPage() {
 
         {/* Input -- no sticky, sits at bottom of flex column naturally */}
         <div className="bg-bg-secondary border-t border-border-default px-4 py-4 flex-shrink-0">
+          {/* Phase 5: Creator unavailable message */}
+          {creatorUnavailable && (
+            <div className="max-w-5xl mx-auto mb-3 p-3 rounded-lg border border-orange-500/30 bg-orange-500/10">
+              <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-400">
+                <AlertCircle className="h-4 w-4" />
+                <span>This creator has reached their monthly chat limit. Please try again later.</span>
+              </div>
+            </div>
+          )}
+          
           <div className="max-w-5xl mx-auto flex gap-2">
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Type your message..."
+              placeholder={creatorUnavailable ? "Creator unavailable - chat limit reached" : "Type your message..."}
               rows={1}
-              disabled={typing}
+              disabled={typing || creatorUnavailable}
               className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '140px' }}
             />
             <button
               onClick={send}
-              disabled={!text.trim() || typing}
+              disabled={!text.trim() || typing || creatorUnavailable}
               className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 text-white rounded-lg font-medium min-h-[44px]"
             >
               {typing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
-          <p className="text-xs text-text-tertiary mt-2 text-center">Enter to send • Shift+Enter for new line</p>
+          {!creatorUnavailable && (
+            <p className="text-xs text-text-tertiary mt-2 text-center">Enter to send • Shift+Enter for new line</p>
+          )}
         </div>
       </div>
 
@@ -1327,16 +1393,12 @@ export function PublicChatPage() {
                       ✨ Any payment unlocks <strong>24h unlimited</strong> access for this session
                     </div>
 
-                    {Array.isArray(creator?.priceConfig?.payPerChatTiers) && creator.priceConfig.payPerChatTiers.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {creator.priceConfig.payPerChatTiers
-                          .slice(0, 4)
-                          .map((cents: number) => (
-                            <div key={cents} className="flex items-center justify-between">
-                              <span className="text-text-secondary">• Tier</span>
-                              <span className="font-semibold text-text-primary">${(cents / 100).toFixed(0)}</span>
-                            </div>
-                          ))}
+                    <div className="mt-2 text-sm text-text-secondary">
+                      Pay once: <strong>${(((creator?.payPerChatPriceCents ?? 1000) as number) / 100).toFixed(2)}</strong> (24h access)
+                    </div>
+                    {(creator?.subscriptionPriceCents || 0) > 0 && (
+                      <div className="text-sm text-text-secondary">
+                        Subscribe: <strong>${((creator?.subscriptionPriceCents || 0) / 100).toFixed(2)}/mo</strong>
                       </div>
                     )}
                   </div>
@@ -1467,6 +1529,20 @@ export function PublicChatPage() {
         <CreatorProfileModal creator={creator as any} onClose={() => setShowCreatorModal(false)} />
       )}
 
+      {/* Phase 5: Chat Limit Modal */}
+      {showChatLimitModal && chatLimitData && (
+        <ChatLimitModal
+          isOpen={showChatLimitModal}
+          onClose={() => setShowChatLimitModal(false)}
+          tier={chatLimitData.tier}
+          used={chatLimitData.used}
+          limit={chatLimitData.limit}
+          nextTier={chatLimitData.nextTier}
+          upgradeUrl={chatLimitData.upgradeUrl}
+          message={chatLimitData.message}
+        />
+      )}
+
       {/* Payment Modal */}
       {FLAGS.payPerChat && showPaymentModal && (paymentData || (creator?.id && sessionId)) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
@@ -1484,11 +1560,11 @@ export function PublicChatPage() {
               paymentOptions={
                 paymentData?.paymentOptions ||
                 {
-                  tiers: (creator?.priceConfig?.payPerChatTiers || [500, 1000, 2500]).map((a: number) => ({
-                    amount: a,
-                    label: `$${(a / 100).toFixed(2)}`,
-                  })),
-                  defaultAmount: creator?.priceConfig?.defaultTierCents || 500,
+                  payPerChatPriceCents:
+                    creator?.payPerChatPriceCents ??
+                    creator?.priceConfig?.payPerChatPriceCents ??
+                    creator?.priceConfig?.defaultTierCents ??
+                    1000,
                 }
               }
               subscriptionOption={

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "deletionScheduledAt" TIMESTAMPTZ,
     "trialEndsAt" TIMESTAMPTZ,
     "planTier" TEXT NOT NULL DEFAULT 'free' CHECK ("planTier" IN ('free','starter','growth','scale')),
-    "onboardingStep" TEXT NOT NULL DEFAULT 'quiz' CHECK ("onboardingStep" IN ('quiz','content','voice','plan','deploy','done')),
+    "onboardingStep" TEXT NOT NULL DEFAULT 'quiz' CHECK ("onboardingStep" IN ('quiz','content','pricing','voice','plan','stripe_connect','deploy','done')),
     "publicSlug" TEXT UNIQUE,
     "creatorTitle" TEXT,
     "creatorTags" JSONB,
@@ -605,6 +605,8 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletionScheduledAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "userType" TEXT;
 
+-- Phase 1: Add pricing columns to marketplace_listings (moved to after CREATE TABLE)
+
 -- Add missing columns to mirror_runs
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "sessionId" TEXT;
 ALTER TABLE "mirror_runs" ADD COLUMN IF NOT EXISTS "visitorId" TEXT;
@@ -732,6 +734,8 @@ CREATE TABLE IF NOT EXISTS "marketplace_listings" (
   "tags" TEXT[],
   "totalSubscribers" INTEGER NOT NULL DEFAULT 0,
   "rating" NUMERIC(2,1),
+  "payPerChatPriceCents" INTEGER,
+  "freeMessageLimit" INTEGER,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -746,6 +750,27 @@ CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_price" ON "marketplace_list
 ALTER TABLE "marketplace_listings" DROP CONSTRAINT IF EXISTS "marketplace_listings_creatorId_fkey";
 ALTER TABLE "marketplace_listings" ADD CONSTRAINT "marketplace_listings_creatorId_fkey"
   FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Phase 1: Add pricing columns to marketplace_listings (idempotent for existing DBs)
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "payPerChatPriceCents" INTEGER;
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "freeMessageLimit" INTEGER;
+
+-- Migrate existing priceConfig data to marketplace_listings (one-time, safe)
+UPDATE "marketplace_listings" ml
+SET
+  "payPerChatPriceCents" = COALESCE(
+    ml."payPerChatPriceCents",
+    (u."priceConfig"->>'defaultTierCents')::int,
+    1000
+  ),
+  "freeMessageLimit" = COALESCE(
+    ml."freeMessageLimit",
+    (u."priceConfig"->>'freeMessageLimit')::int,
+    3
+  )
+FROM "User" u
+WHERE ml."creatorId" = u.id
+  AND (ml."payPerChatPriceCents" IS NULL OR ml."freeMessageLimit" IS NULL);
 
 CREATE TABLE IF NOT EXISTS "marketplace_reviews" (
   "id" TEXT PRIMARY KEY,
@@ -1068,7 +1093,7 @@ export const userQueries = {
   // ✅ ADD: only ADVANCE step (never regress)
   updateOnboardingStep: async (
     userId: string,
-    step: 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'done'
+    step: 'quiz' | 'content' | 'pricing' | 'voice' | 'plan' | 'stripe_connect' | 'deploy' | 'done'
   ) => {
     await db.query(
       `
@@ -1080,20 +1105,24 @@ export const userQueries = {
           CASE "onboardingStep"
             WHEN 'quiz' THEN 0
             WHEN 'content' THEN 1
-            WHEN 'voice' THEN 2
-            WHEN 'plan' THEN 3
-            WHEN 'deploy' THEN 4
-            WHEN 'done' THEN 5
+            WHEN 'pricing' THEN 2
+            WHEN 'voice' THEN 3
+            WHEN 'plan' THEN 4
+            WHEN 'stripe_connect' THEN 5
+            WHEN 'deploy' THEN 6
+            WHEN 'done' THEN 7
             ELSE 0
           END
         ) < (
           CASE $1
             WHEN 'quiz' THEN 0
             WHEN 'content' THEN 1
-            WHEN 'voice' THEN 2
-            WHEN 'plan' THEN 3
-            WHEN 'deploy' THEN 4
-            WHEN 'done' THEN 5
+            WHEN 'pricing' THEN 2
+            WHEN 'voice' THEN 3
+            WHEN 'plan' THEN 4
+            WHEN 'stripe_connect' THEN 5
+            WHEN 'deploy' THEN 6
+            WHEN 'done' THEN 7
             ELSE 0
           END
         )

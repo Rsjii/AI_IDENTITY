@@ -27,7 +27,9 @@ import { ForbiddenPage } from './pages/ForbiddenPage';
 import { OnboardingGatePage } from './pages/OnboardingGatePage';
 import { OnboardingQuizPage } from './pages/OnboardingQuizPage';
 import { OnboardingContentPage } from './pages/OnboardingContentPage';
+import { OnboardingPricingPage } from './pages/OnboardingPricingPage';
 import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
+import { OnboardingStripeConnectPage } from './pages/OnboardingStripeConnectPage';
 import { OnboardingDeployPage } from './pages/OnboardingDeployPage';
 import { OnboardingTrainingPage } from './pages/OnboardingTrainingPage';
 import { PublicChatPage } from './pages/PublicChatPage';
@@ -109,9 +111,11 @@ function App() {
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingGatePage /></ProtectedRoute>} />
               <Route path="/onboarding/quiz" element={<ProtectedRoute><OnboardingQuizPage /></ProtectedRoute>} />
               <Route path="/onboarding/content" element={<ProtectedRoute><OnboardingContentPage /></ProtectedRoute>} />
+              <Route path="/onboarding/pricing" element={<ProtectedRoute><OnboardingPricingPage /></ProtectedRoute>} />
               <Route path="/onboarding/voice" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/training" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
+              <Route path="/onboarding/stripe-connect" element={<ProtectedRoute><OnboardingStripeConnectPage /></ProtectedRoute>} />
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
               <Route path="/knowledge" element={<Navigate to="/my-ai?tab=train" replace />} />

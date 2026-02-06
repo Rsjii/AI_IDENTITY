@@ -750,8 +750,8 @@ export function OnboardingContentPage() {
                       // ✅ STEP 2: Refresh auth state
                       await refreshAuth();
 
-                      // ✅ STEP 3: Navigate to plan page (onboarding NOT complete yet!)
-                      nav('/onboarding/plan');
+                      // ✅ STEP 3: Navigate to pricing page (onboarding NOT complete yet!)
+                      nav('/onboarding/pricing');
                     } catch (error) {
                       console.error('Failed during continue:', error);
                       showToast('Something went wrong. Please try again.', 'error');

@@ -10,7 +10,9 @@ import {
   exportChatsCSV,
   requestPayout,
   setPricing,
+  getPricing,
   startTrial,
+  updateOnboardingStep,
   completeOnboarding,
   connectStripeAccount,
   getStripeConnectStatus,
@@ -30,7 +32,9 @@ router.get('/chats/export', asyncHandler(exportChatsCSV));
 router.post('/earnings/payout', sanitizeInput, validateCSRF, asyncHandler(requestPayout));
 
 router.post('/pricing', sanitizeInput, validateCSRF, asyncHandler(setPricing));
+router.get('/pricing', asyncHandler(getPricing));
 router.post('/trial/start', sanitizeInput, validateCSRF, asyncHandler(startTrial));
+router.post('/onboarding/step', sanitizeInput, validateCSRF, asyncHandler(updateOnboardingStep));
 router.post('/onboarding/complete', sanitizeInput, validateCSRF, asyncHandler(completeOnboarding));
 router.post('/stripe/connect', validateCSRF, asyncHandler(connectStripeAccount));
 router.get('/stripe/status', asyncHandler(getStripeConnectStatus));

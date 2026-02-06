@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Globe, Lock, Settings2 } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Globe, Lock, Settings2, DollarSign, MessageSquare } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { SpendingDashboard } from '@/components/SpendingDashboard';
@@ -16,7 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
 import { IntegrationsPage } from './Integrations';
 
-type Tab = 'profile' | 'billing' | 'integrations' | 'notifications' | 'security' | 'preferences';
+type Tab = 'profile' | 'pricing' | 'billing' | 'integrations' | 'notifications' | 'security' | 'preferences';
 
 export function SettingsPage() {
   const { state, refresh } = useAuth();
@@ -28,7 +28,7 @@ export function SettingsPage() {
   // Determine valid tabs based on user type
   const getValidTabs = (): Tab[] => {
     if (state.status === 'authenticated' && state.user?.userType === 'creator') {
-      return ['profile', 'billing', 'integrations', 'notifications', 'security', 'preferences'];
+      return ['profile', 'pricing', 'billing', 'integrations', 'notifications', 'security', 'preferences'];
     }
     return ['profile', 'notifications', 'security', 'preferences'];
   };
@@ -72,6 +72,18 @@ export function SettingsPage() {
     youtube: '',
     website: '',
   });
+
+  // Pricing settings (Phase 1 - new pricing model)
+  const [payPerChatPriceCents, setPayPerChatPriceCents] = useState<number>(1000);
+  const [subscriptionPriceCents, setSubscriptionPriceCents] = useState<number>(2000);
+  const [freeMessageLimit, setFreeMessageLimit] = useState<number>(3);
+  const [savingPricing, setSavingPricing] = useState(false);
+  const [earningsSummary, setEarningsSummary] = useState<{
+    totalRevenueCents: number;
+    creatorEarningsCents: number;
+    platformFeeCents: number;
+    activeSubscribers: number;
+  } | null>(null);
 
   // Payment settings (in Billing tab - creators only)
   const [payPerChatTiers, setPayPerChatTiers] = useState<number[]>([100, 500, 1000, 2500, 5000]);
@@ -273,6 +285,95 @@ export function SettingsPage() {
     } catch (e: any) {
       console.error('Failed to load Stripe Connect status:', e);
       setStripeConnectStatus({ connected: false });
+    }
+  };
+
+  // Compute isCreator early (used in multiple places)
+  const isCreator = state.status === 'authenticated' && state.user?.userType === 'creator';
+
+  // Load pricing when pricing tab is opened
+  useEffect(() => {
+    if (state.status !== 'authenticated' || !isCreator) return;
+    if (activeTab !== 'pricing') return;
+
+    const loadPricing = async () => {
+      try {
+        const pricing = await apiFetch<{
+          payPerChatPriceCents?: number;
+          subscriptionPriceCents?: number;
+          freeMessageLimit?: number;
+        }>('/api/creator/pricing');
+        
+        if (pricing.payPerChatPriceCents) setPayPerChatPriceCents(pricing.payPerChatPriceCents);
+        if (pricing.subscriptionPriceCents) setSubscriptionPriceCents(pricing.subscriptionPriceCents);
+        if (pricing.freeMessageLimit !== undefined) setFreeMessageLimit(pricing.freeMessageLimit);
+
+        // Load earnings summary (this month)
+        try {
+          const earnings = await apiFetch<{ items: any[] }>('/api/creator/earnings');
+          const thisMonth = new Date();
+          thisMonth.setDate(1);
+          thisMonth.setHours(0, 0, 0, 0);
+          
+          const thisMonthPayments = (earnings.items || []).filter((item: any) => {
+            const itemDate = new Date(item.createdAt);
+            return itemDate >= thisMonth;
+          });
+
+          const totalRevenueCents = thisMonthPayments.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
+          const platformFeeCents = thisMonthPayments.reduce((sum: number, item: any) => sum + (item.platformFeeCents || 0), 0);
+          const creatorEarningsCents = totalRevenueCents - platformFeeCents;
+
+          // Count active subscribers (simplified - would need proper subscription count)
+          const subscriptionPayments = thisMonthPayments.filter((item: any) => item.type === 'subscription');
+          const activeSubscribers = new Set(subscriptionPayments.map((item: any) => item.payerUserId)).size;
+
+          setEarningsSummary({
+            totalRevenueCents,
+            creatorEarningsCents,
+            platformFeeCents,
+            activeSubscribers,
+          });
+        } catch (e) {
+          console.error('Failed to load earnings summary:', e);
+        }
+      } catch (e: any) {
+        console.error('Failed to load pricing:', e);
+      }
+    };
+
+    loadPricing();
+  }, [state.status, activeTab, isCreator]);
+
+  const handleSavePricing = async () => {
+    if (payPerChatPriceCents < 500 || payPerChatPriceCents > 10000) {
+      showToast('Pay-per-chat price must be between $5 and $100', 'error');
+      return;
+    }
+    if (subscriptionPriceCents < 1000 || subscriptionPriceCents > 50000) {
+      showToast('Subscription price must be between $10 and $500/month', 'error');
+      return;
+    }
+    if (freeMessageLimit < 0 || freeMessageLimit > 10) {
+      showToast('Free message limit must be between 0 and 10', 'error');
+      return;
+    }
+
+    setSavingPricing(true);
+    try {
+      await apiFetch('/api/creator/pricing', {
+        method: 'POST',
+        body: JSON.stringify({
+          payPerChatPriceCents,
+          subscriptionPriceCents,
+          freeMessageLimit,
+        }),
+      });
+      showToast('Pricing saved successfully!', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to save pricing', 'error');
+    } finally {
+      setSavingPricing(false);
     }
   };
 
@@ -699,8 +800,6 @@ export function SettingsPage() {
     scale: 'Unlimited',
   };
 
-  const isCreator = state.status === 'authenticated' && state.user?.userType === 'creator';
-
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -714,6 +813,7 @@ export function SettingsPage() {
           {(isCreator
             ? [
                 { id: 'profile' as Tab, label: 'Profile', icon: User },
+                { id: 'pricing' as Tab, label: 'Pricing', icon: DollarSign },
                 { id: 'billing' as Tab, label: 'Billing', icon: CreditCard },
                 { id: 'integrations' as Tab, label: 'Integrations', icon: Globe },
                 { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
@@ -956,6 +1056,164 @@ export function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* ===== PRICING TAB (CREATORS ONLY) ===== */}
+        {activeTab === 'pricing' && isCreator && (
+          <div className="space-y-6">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Monetization Settings</CardTitle>
+                <CardDescription>
+                  Set your prices. You keep 75% of all earnings, platform takes 25%.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Pay-per-chat */}
+                <div className="space-y-2">
+                  <Label htmlFor="settings-pay-per-chat" className="text-base font-semibold flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Pay-per-chat (24h access)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">$</span>
+                    <Input
+                      id="settings-pay-per-chat"
+                      type="number"
+                      min="5"
+                      max="100"
+                      step="1"
+                      value={payPerChatPriceCents / 100}
+                      onChange={(e) => {
+                        const value = Math.max(5, Math.min(100, Number(e.target.value) || 5));
+                        setPayPerChatPriceCents(value * 100);
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="text-muted-foreground text-sm">per 24h unlock</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recommended: $5-25. Visitors pay this once for 24 hours of unlimited access.
+                  </p>
+                </div>
+
+                {/* Monthly subscription */}
+                <div className="space-y-2">
+                  <Label htmlFor="settings-subscription" className="text-base font-semibold flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Monthly subscription
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">$</span>
+                    <Input
+                      id="settings-subscription"
+                      type="number"
+                      min="10"
+                      max="500"
+                      step="1"
+                      value={subscriptionPriceCents / 100}
+                      onChange={(e) => {
+                        const value = Math.max(10, Math.min(500, Number(e.target.value) || 10));
+                        setSubscriptionPriceCents(value * 100);
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="text-muted-foreground text-sm">/month</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recommended: $10-50. Visitors subscribe monthly for unlimited access.
+                  </p>
+                </div>
+
+                {/* Free message limit */}
+                <div className="space-y-2">
+                  <Label htmlFor="settings-free-limit" className="text-base font-semibold flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Free preview messages
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="settings-free-limit"
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={freeMessageLimit}
+                      onChange={(e) => {
+                        const value = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+                        setFreeMessageLimit(value);
+                      }}
+                      className="w-24"
+                    />
+                    <span className="text-muted-foreground text-sm">messages before paywall</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    How many free messages visitors get before hitting the paywall. Default: 3.
+                  </p>
+                </div>
+
+                {/* Revenue split info */}
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Revenue Split:</strong> You earn 75% of all payments, platform takes 25% as fee.
+                    <br />
+                    Example: If a visitor pays $10, you get $7.50 and platform gets $2.50.
+                  </AlertDescription>
+                </Alert>
+
+                {/* Save button */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleSavePricing}
+                    disabled={savingPricing}
+                    className="flex-1"
+                  >
+                    {savingPricing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Earnings Summary */}
+            {earningsSummary && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle>Earnings Summary (This Month)</CardTitle>
+                  <CardDescription>Your revenue breakdown for the current month</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">Total Revenue</div>
+                      <div className="text-2xl font-bold">{formatCurrency(earningsSummary.totalRevenueCents)}</div>
+                    </div>
+                    <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Your Earnings (75%)</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(earningsSummary.creatorEarningsCents)}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Platform Fee (25%)</div>
+                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(earningsSummary.platformFeeCents)}</div>
+                    </div>
+                    <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Active Subscribers</div>
+                      <div className="text-2xl font-bold text-blue-600">{earningsSummary.activeSubscribers}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

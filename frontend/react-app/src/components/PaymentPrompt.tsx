@@ -3,11 +3,10 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
-import { Loader2, CheckCircle2, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle2, Sparkles, CreditCard, Calendar } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -17,8 +16,9 @@ interface PaymentPromptProps {
   creatorId: string;
   sessionId: string;
   paymentOptions: {
-    tiers: { amount: number; label: string }[];
-    defaultAmount?: number;
+    payPerChatPriceCents?: number; // Phase 4: Single price instead of tiers
+    tiers?: { amount: number; label: string }[]; // Legacy support
+    defaultAmount?: number; // Legacy support
   };
   subscriptionOption?: {
     listingId: string;
@@ -36,13 +36,16 @@ interface PaymentPromptProps {
 export function PaymentPrompt(props: PaymentPromptProps) {
   const { state } = useAuth();
   const isAuthed = state.status === 'authenticated';
+  const [activeTab, setActiveTab] = React.useState<'pay-once' | 'subscribe'>('pay-once');
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
-  const [selectedAmount, setSelectedAmount] = React.useState<number>(() => {
-    const fallback = props.paymentOptions.tiers?.[0]?.amount || 500;
-    return props.paymentOptions.defaultAmount && props.paymentOptions.tiers.some((t) => t.amount === props.paymentOptions.defaultAmount)
-      ? props.paymentOptions.defaultAmount
-      : fallback;
-  });
+  
+  // Phase 4: Use single price from paymentOptions.payPerChatPriceCents
+  const payPerChatPriceCents = props.paymentOptions.payPerChatPriceCents || 
+    props.paymentOptions.defaultAmount || 
+    props.paymentOptions.tiers?.[0]?.amount || 
+    1000;
+  
+  const selectedAmount = payPerChatPriceCents;
   const [payerEmail, setPayerEmail] = React.useState<string>('');
   const [visitorId, setVisitorId] = React.useState<string>('');
   const [loading, setLoading] = React.useState(false);
@@ -65,7 +68,6 @@ export function PaymentPrompt(props: PaymentPromptProps) {
     setError(null);
     setClientSecret(null);
     try {
-      const selectedTier = props.paymentOptions.tiers.find((t) => t.amount === selectedAmount);
       const res = await apiFetch<{ clientSecret: string }>(
         '/api/payments/pay-per-chat/intent',
         {
@@ -73,7 +75,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
           body: JSON.stringify({
             creatorId: props.creatorId,
             amountCents: selectedAmount,
-            tierLabel: selectedTier?.label || `$${(selectedAmount / 100).toFixed(2)}`,
+            tierLabel: `$${(selectedAmount / 100).toFixed(2)}`,
             visitorId,
             sessionId: props.sessionId,
             payerEmail: payerEmail || undefined,
@@ -86,7 +88,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
     } finally {
       setLoading(false);
     }
-  }, [props.creatorId, selectedAmount, visitorId, props.sessionId, payerEmail, props.paymentOptions.tiers]);
+  }, [props.creatorId, selectedAmount, visitorId, props.sessionId, payerEmail]);
 
   const startSubscription = async () => {
     const opt = props.subscriptionOption;
@@ -160,22 +162,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {props.subscriptionOption?.priceCents ? (
-          <div className="mb-4 rounded-xl border border-border-default bg-bg-tertiary/30 p-4">
-            <div className="text-sm font-semibold text-text-primary">Better value</div>
-            <div className="text-sm text-text-secondary mt-1">
-              Subscribe for <strong>${(props.subscriptionOption.priceCents / 100).toFixed(2)}/month</strong> — unlimited chats.
-            </div>
-            <div className="mt-3">
-              <Button className="w-full h-12" onClick={startSubscription} disabled={subLoading}>
-                {subLoading ? 'Starting…' : 'Subscribe monthly'}
-              </Button>
-              <div className="text-xs text-muted-foreground mt-2">Requires account</div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Step 1: Collect email and tier BEFORE creating Elements */}
+        {/* Phase 4: 2-Tab Design */}
         {!clientSecret ? (
           <div className="space-y-4">
             {props.previewText ? (
@@ -186,65 +173,179 @@ export function PaymentPrompt(props: PaymentPromptProps) {
                 </div>
               </div>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="email-input" className="text-base font-semibold">Email (for receipt + full answer):</Label>
-              <Input
-                id="email-input"
-                type="email"
-                value={payerEmail}
-                onChange={(e) => setPayerEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="h-12"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tier-select" className="text-base font-semibold">Choose your tier:</Label>
-              <Select
-                value={String(selectedAmount)}
-                onValueChange={(value: string) => setSelectedAmount(Number(value))}
+
+            {/* Tab Selector */}
+            <div className="flex gap-2 border-b border-border-default">
+              <button
+                type="button"
+                onClick={() => setActiveTab('pay-once')}
+                className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
+                  activeTab === 'pay-once'
+                    ? 'border-b-2 border-accent-primary text-accent-primary'
+                    : 'text-muted-foreground hover:text-text-primary'
+                }`}
               >
-                <SelectTrigger id="tier-select" className="h-12">
-                  <SelectValue placeholder="Select a tier" />
-                </SelectTrigger>
-                <SelectContent>
-                  {props.paymentOptions.tiers.map((tier) => (
-                    <SelectItem key={tier.amount} value={String(tier.amount)} className="py-3">
-                      <div className="flex items-center justify-between w-full">
-                        <span>{tier.label}</span>
-                        <span className="font-semibold ml-4">${(tier.amount / 100).toFixed(2)}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <CreditCard className="h-4 w-4 inline mr-2" />
+                Pay Once
+              </button>
+              {props.subscriptionOption?.priceCents && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('subscribe')}
+                  className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
+                    activeTab === 'subscribe'
+                      ? 'border-b-2 border-accent-primary text-accent-primary'
+                      : 'text-muted-foreground hover:text-text-primary'
+                  }`}
+                >
+                  <Calendar className="h-4 w-4 inline mr-2" />
+                  Subscribe
+                </button>
+              )}
             </div>
-            {error && (
-              <div className="text-sm text-center p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
-                {error}
+
+            {/* Tab Content: Pay Once */}
+            {activeTab === 'pay-once' && (
+              <div className="space-y-4 pt-4">
+                <div className="space-y-3">
+                  <div className="text-center p-4 rounded-lg border border-border-default bg-bg-tertiary/30">
+                    <div className="text-3xl font-bold text-accent-primary">
+                      ${(payPerChatPriceCents / 100).toFixed(2)}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">24-hour unlimited access</div>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>Unlimited messages for 24 hours</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>One-time payment, no subscription</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>Full answer via email</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email-input" className="text-base font-semibold">Email (for receipt + full answer):</Label>
+                    <Input
+                      id="email-input"
+                      type="email"
+                      value={payerEmail}
+                      onChange={(e) => setPayerEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="h-12"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="text-sm text-center p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={fetchPaymentIntent}
+                      className="flex-1 h-12 bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-90 transition-all font-semibold"
+                      disabled={loading || !payerEmail}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Pay ${(payPerChatPriceCents / 100).toFixed(2)} - 24h Access
+                        </>
+                      )}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={props.onCancel} disabled={loading} className="h-12">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={fetchPaymentIntent}
-                className="flex-1 h-12 bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-90 transition-all font-semibold"
-                disabled={loading || !payerEmail}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Continue to Payment
-                  </>
-                )}
-              </Button>
-              <Button type="button" variant="outline" onClick={props.onCancel} disabled={loading} className="h-12">
-                Cancel
-              </Button>
-            </div>
+
+            {/* Tab Content: Subscribe */}
+            {activeTab === 'subscribe' && props.subscriptionOption?.priceCents && (
+              <div className="space-y-4 pt-4">
+                <div className="space-y-3">
+                  <div className="text-center p-4 rounded-lg border border-accent-primary/30 bg-accent-primary/10">
+                    <div className="text-sm font-semibold text-accent-primary mb-2">Best Value</div>
+                    <div className="text-3xl font-bold text-text-primary">
+                      ${(props.subscriptionOption.priceCents / 100).toFixed(2)}
+                      <span className="text-lg text-muted-foreground">/month</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">Unlimited access forever</div>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>Cancel anytime</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>Best value for regular users</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>Access all creator content</span>
+                    </div>
+                    {payPerChatPriceCents && (
+                      <div className="mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                        <div className="text-xs font-semibold text-green-700 dark:text-green-400">
+                          Save {Math.round((1 - props.subscriptionOption.priceCents / (payPerChatPriceCents * 30)) * 100)}% vs. daily payments
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isAuthed && (
+                    <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 text-sm">
+                      <strong>Account required:</strong> You need to log in to subscribe.
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="text-sm text-center p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={startSubscription}
+                      className="flex-1 h-12 bg-gradient-to-r from-accent-primary to-accent-secondary hover:opacity-90 transition-all font-semibold"
+                      disabled={subLoading || !isAuthed}
+                    >
+                      {subLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Starting...
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Subscribe - ${(props.subscriptionOption.priceCents / 100).toFixed(2)}/mo
+                        </>
+                      )}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={props.onCancel} disabled={subLoading} className="h-12">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Step 2: Only render Elements AFTER clientSecret is ready */

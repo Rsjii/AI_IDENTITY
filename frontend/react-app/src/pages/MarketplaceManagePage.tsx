@@ -3,9 +3,11 @@ import { Layout } from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowUp } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ListingForm {
   isPublic: boolean;
@@ -19,6 +21,14 @@ interface ListingForm {
 }
 
 export function MarketplaceManagePage() {
+  const { state } = useAuth();
+  const nav = useNavigate();
+  const user = state.status === 'authenticated' ? state.user : null;
+  const planTier = (user as any)?.planTier || 'free';
+  const trialEndsAt = (user as any)?.trialEndsAt;
+  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
+  const isFreeTier = planTier === 'free' && !isTrialActive;
+
   const [form, setForm] = useState<ListingForm>({
     isPublic: false,
     isFeatured: false,
@@ -68,7 +78,12 @@ export function MarketplaceManagePage() {
       });
       showToast('Listing saved', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to save listing', 'error');
+      if (err.status === 403) {
+        showToast('Upgrade to Starter plan to list on marketplace', 'error');
+        nav('/pricing');
+      } else {
+        showToast(err.message || 'Failed to save listing', 'error');
+      }
     } finally {
       setSaving(false);
     }
@@ -82,7 +97,29 @@ export function MarketplaceManagePage() {
           <p className="text-text-secondary">Manage your public listing and pricing.</p>
         </div>
 
-        {!form.isPublic && (
+        {/* Phase 2: Free tier upgrade banner */}
+        {isFreeTier && (
+          <Alert className="border-orange-500/30 bg-orange-500/10">
+            <AlertCircle className="h-4 w-4 text-orange-500" />
+            <AlertDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <strong>Upgrade to list on marketplace</strong>
+                  <p className="text-sm mt-1">
+                    Free tier creators cannot list on the marketplace. Upgrade to Starter plan ($49/month) 
+                    to make your AI discoverable and start earning from visitors.
+                  </p>
+                </div>
+                <Button onClick={() => nav('/pricing')} size="sm" className="ml-4">
+                  <ArrowUp className="h-4 w-4 mr-2" />
+                  Upgrade Now
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!form.isPublic && !isFreeTier && (
           <Alert className="border-yellow-500/30 bg-yellow-500/10">
             <AlertCircle className="h-4 w-4 text-yellow-500" />
             <AlertDescription>
@@ -99,8 +136,11 @@ export function MarketplaceManagePage() {
               type="checkbox"
               checked={form.isPublic}
               onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
+              disabled={isFreeTier}
             />
-            <span>Make listing public</span>
+            <span className={isFreeTier ? 'text-muted-foreground' : ''}>
+              Make listing public {isFreeTier && '(Upgrade required)'}
+            </span>
           </label>
           <label className="flex items-center gap-2">
             <input

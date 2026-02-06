@@ -130,6 +130,8 @@ export async function getPublicListings(req: Request, res: Response) {
       tags: r.tags || [],
       totalSubscribers: r.totalSubscribers,
       rating: r.rating ? Number(r.rating) : null,
+      payPerChatPriceCents: r.payPerChatPriceCents ?? null,
+      freeMessageLimit: r.freeMessageLimit ?? null,
       creator: {
         handle: r.handle,
         name: r.name,
@@ -168,6 +170,8 @@ export async function getListingBySlug(req: Request, res: Response) {
     tags: row.tags || [],
     totalSubscribers: row.totalSubscribers,
     rating: row.rating ? Number(row.rating) : null,
+    payPerChatPriceCents: row.payPerChatPriceCents ?? null,
+    freeMessageLimit: row.freeMessageLimit ?? null,
     creator: {
       id: row.creatorId,
       handle: row.handle,
@@ -195,7 +199,28 @@ export async function upsertListing(req: Request, res: Response) {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  // Phase 2: Block marketplace listing for free tier (unless on trial)
+  const user = await userQueries.findById(userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const isTrialActive = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+  if (user.planTier === 'free' && !isTrialActive) {
+    return res.status(403).json({
+      error: 'Upgrade to Starter plan to list on marketplace',
+      upgradeUrl: '/pricing',
+    });
+  }
+
   const data = upsertListingSchema.parse(req.body);
+  
+  // If trying to set isPublic=true on free tier, block it
+  if (data.isPublic === true && user.planTier === 'free' && !isTrialActive) {
+    return res.status(403).json({
+      error: 'Upgrade to Starter plan to list on marketplace',
+      upgradeUrl: '/pricing',
+    });
+  }
+
   const existing = await db.query(
     `SELECT * FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
     [userId]
@@ -233,7 +258,6 @@ export async function upsertListing(req: Request, res: Response) {
     return res.json({ item: r.rows[0] });
   }
 
-  const user = await userQueries.findById(userId);
   const baseSlug = data.slug
     ? slugify(data.slug)
     : slugify(user?.publicSlug || user?.handle || `creator-${userId}`);

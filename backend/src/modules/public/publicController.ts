@@ -79,9 +79,15 @@ async function getActivePremiumExpiry(sessionId: string): Promise<Date | null> {
 // Marketplace helpers (subscription -> chat access)
 async function getPublicListingForCreator(
   creatorId: string
-): Promise<{ id: string; subscriptionPriceCents: number; currency: string } | null> {
+): Promise<{
+  id: string;
+  subscriptionPriceCents: number;
+  payPerChatPriceCents: number | null;
+  freeMessageLimit: number | null;
+  currency: string;
+} | null> {
   const r = await db.query(
-    `SELECT id, "subscriptionPriceCents", currency
+    `SELECT id, "subscriptionPriceCents", "payPerChatPriceCents", "freeMessageLimit", currency
      FROM "marketplace_listings"
      WHERE "creatorId"=$1 AND "isPublic"=true
      ORDER BY "createdAt" DESC
@@ -93,6 +99,8 @@ async function getPublicListingForCreator(
   return {
     id: row.id,
     subscriptionPriceCents: Number(row.subscriptionPriceCents || 0),
+    payPerChatPriceCents: row.payPerChatPriceCents == null ? null : Number(row.payPerChatPriceCents),
+    freeMessageLimit: row.freeMessageLimit == null ? null : Number(row.freeMessageLimit),
     currency: row.currency || 'USD',
   };
 }
@@ -173,35 +181,41 @@ export async function getProfile(req: Request, res: Response) {
 
     const listing = await getPublicListingForCreator(u.id);
     
+    const creatorData = {
+      ...baseUserData,
+      slug: u.publicSlug || u.handle,
+      displayName: u.name || u.handle || 'Creator',
+      bio: identityJson?.defaults?.bio || u.bio || '',
+      expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
+      topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
+      priceConfig: u.priceConfig || null,
+      listingId: listing?.id || null,
+      subscriptionPriceCents: listing?.subscriptionPriceCents || 0,
+      currency: listing?.currency || 'USD',
+      payPerChatPriceCents: listing?.payPerChatPriceCents ?? (u.priceConfig as any)?.defaultTierCents ?? 1000,
+      freeMessageLimit: listing?.freeMessageLimit ?? (u.priceConfig as any)?.freeMessageLimit ?? 3,
+      creatorTitle: u.creatorTitle || null,
+      creatorTags: u.creatorTags || null,
+      welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
+      popularQuestions: (u.priceConfig as any)?.popularQuestions || [],
+      stats: {
+        totalChats: stats.totalChats || 0,
+        rating: parseFloat(stats.rating || '0') || 0,
+        totalRatings: stats.totalRatings || 0,
+      },
+      socialLinks: (u.socialLinks as any) || {
+        twitter: null,
+        instagram: null,
+        youtube: null,
+        website: null,
+      },
+    };
+    
     return res.json({
       success: true,
-      user: {
-        ...baseUserData,
-        slug: u.publicSlug || u.handle,
-        displayName: u.name || u.handle || 'Creator',
-        bio: identityJson?.defaults?.bio || u.bio || '',
-        expertise: identityJson?.defaults?.expertise || u.creatorTitle || '',
-        topics: identityJson?.defaults?.topics || u.creatorTags?.join(', ') || '',
-        priceConfig: u.priceConfig || null,
-        listingId: listing?.id || null,
-        subscriptionPriceCents: listing?.subscriptionPriceCents || 0,
-        currency: listing?.currency || 'USD',
-        creatorTitle: u.creatorTitle || null,
-        creatorTags: u.creatorTags || null,
-        welcomeMessage: (u.priceConfig as any)?.welcomeMessage || null,
-        popularQuestions: (u.priceConfig as any)?.popularQuestions || [],
-        stats: {
-          totalChats: stats.totalChats || 0,
-          rating: parseFloat(stats.rating || '0') || 0,
-          totalRatings: stats.totalRatings || 0,
-        },
-        socialLinks: (u.socialLinks as any) || {
-          twitter: null,
-          instagram: null,
-          youtube: null,
-          website: null,
-        },
-      },
+      user: creatorData,
+      // ✅ BACKWARD COMPAT: PublicChatPage expects `creator`
+      creator: creatorData,
     });
   } else {
     // End user profile
@@ -268,6 +282,31 @@ async function countCreatorChatsThisMonth(creatorId: string): Promise<number> {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function clampInt(n: any, min: number, max: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return min;
+  return Math.max(min, Math.min(max, Math.trunc(v)));
+}
+
+async function getCreatorFreeMessageLimit(creatorId: string): Promise<number> {
+  const r = await db.query(
+    `
+    SELECT COALESCE(
+      ml."freeMessageLimit",
+      NULLIF((u."priceConfig"->>'freeMessageLimit')::int, NULL),
+      3
+    )::int AS "freeLimit"
+    FROM "User" u
+    LEFT JOIN "marketplace_listings" ml ON ml."creatorId" = u.id
+    WHERE u.id = $1
+    ORDER BY ml."createdAt" DESC NULLS LAST
+    LIMIT 1
+    `,
+    [creatorId]
+  );
+  return clampInt(r.rows[0]?.freeLimit, 0, 10);
+}
+
 async function ensureDailyFreeReset(sessionId: string) {
   const r = await db.query(
     `SELECT "freeResetAt","createdAt" FROM "chat_sessions" WHERE id=$1 LIMIT 1`,
@@ -294,9 +333,9 @@ export async function publicMessageLimit(req: any, res: Response) {
     visitorId: req.query.visitorId,
   });
 
-  const FREE_MESSAGE_LIMIT = 3;
-
   if (!sessionId) {
+    // No session yet - use default limit
+    const FREE_MESSAGE_LIMIT = 3;
     return res.json({
       success: true,
       canSendMessage: true,
@@ -312,6 +351,9 @@ export async function publicMessageLimit(req: any, res: Response) {
 
   const session = await chatSessionQueries.findById(sessionId);
   if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  // Get creator's configured free message limit
+  const FREE_MESSAGE_LIMIT = await getCreatorFreeMessageLimit(session.creatorId);
 
   const viewerUserId = req.user?.id || null;
 
@@ -486,8 +528,11 @@ export async function publicChat(req: any, res: Response) {
     });
   }
 
-  // ✅ Check creator's plan limit (PHASE1 requirement) - only for logged-in creators
-  if (viewerUserId && viewerUserId === creator.id) {
+  // ✅ Check if viewer is the owner
+  const isOwnAI = Boolean(viewerUserId && viewerUserId === creator.id);
+
+  // ✅ Check creator's plan limit (PHASE1 requirement) - enforce for all visitors except owner
+  if (!isOwnAI) {
     const { tier, trialActive } = await getUserPlan(creator.id);
     const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
     const limit = PLAN_LIMITS[effectiveTier];
@@ -517,8 +562,15 @@ export async function publicChat(req: any, res: Response) {
         nextTier,
       });
     }
+  }
+  
+  // ✅ Warn owner when approaching limit (80% threshold)
+  if (isOwnAI) {
+    const { tier, trialActive } = await getUserPlan(creator.id);
+    const effectiveTier: PlanTier = trialActive ? 'growth' : tier;
+    const limit = PLAN_LIMITS[effectiveTier];
+    const used = await countCreatorChatsThisMonth(creator.id);
     
-    // ✅ Warn when approaching limit (80% threshold)
     if (used >= limit * 0.8) {
       res.setHeader('X-Plan-Warning', JSON.stringify({
         used,
@@ -567,7 +619,8 @@ export async function publicChat(req: any, res: Response) {
   const sessionRow = await chatSessionQueries.findById(sid);
 
   // Count BEFORE adding this message (counts user messages only, after reset if present)
-  const FREE_MESSAGE_LIMIT = 3;
+  // Get creator's configured free message limit
+  const FREE_MESSAGE_LIMIT = await getCreatorFreeMessageLimit(creator.id);
   const sinceIso =
     sessionRow?.freeResetAt && !Number.isNaN(new Date(sessionRow.freeResetAt).getTime())
       ? new Date(sessionRow.freeResetAt).toISOString()
@@ -581,7 +634,6 @@ export async function publicChat(req: any, res: Response) {
   const userMsgRow = await chatMessageQueries.add({ sessionId: sid, role: 'user', content: message });
 
   // ✅ Creator preview: own AI => unlimited, no paywall, no subscription needed
-  const isOwnAI = Boolean(viewerUserId && viewerUserId === creator.id);
   if (isOwnAI) {
     const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
       platform: 'web',
@@ -690,10 +742,19 @@ export async function publicChat(req: any, res: Response) {
     });
   }
 
-  // pricing tiers (use helper)
-  const tiers = getPayPerChatTiers(priceConfig);
-  const preferred = Number(priceConfig?.defaultTierCents || 0);
-  const defaultAmount = tiers.includes(preferred) ? preferred : tiers[0];
+  // Phase 4: Use single creator price from marketplace_listings
+  let payPerChatPriceCents: number | null = null;
+  const listingResult = await db.query(
+    `SELECT "payPerChatPriceCents" FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+    [creator.id]
+  );
+  if (listingResult.rows[0]?.payPerChatPriceCents) {
+    payPerChatPriceCents = listingResult.rows[0].payPerChatPriceCents;
+  } else {
+    // Fallback to priceConfig.defaultTierCents or first tier
+    const tiers = getPayPerChatTiers(priceConfig);
+    payPerChatPriceCents = priceConfig?.defaultTierCents || tiers[0] || 1000;
+  }
 
   // teaser stage -> generate teaser, STORE it as truncated, return teaserMessageId
   if (paywallStage === 'teaser') {
@@ -742,8 +803,7 @@ export async function publicChat(req: any, res: Response) {
       previewReply,
       isSubscribed,
       paymentOptions: {
-        tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
-        defaultAmount,
+        payPerChatPriceCents: payPerChatPriceCents,
       },
     });
   }
@@ -769,8 +829,7 @@ export async function publicChat(req: any, res: Response) {
     previewReply: '',
     isSubscribed,
     paymentOptions: {
-      tiers: tiers.map((amount: number) => ({ amount, label: `$${(amount / 100).toFixed(2)}` })),
-      defaultAmount,
+      payPerChatPriceCents: payPerChatPriceCents,
     },
   });
 }

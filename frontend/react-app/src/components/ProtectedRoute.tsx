@@ -14,8 +14,10 @@ function getRequiredOnboardingPath(user: any): string {
   const map: Record<string, string> = {
     quiz: '/onboarding/quiz',
     content: '/onboarding/content',
+    pricing: '/onboarding/pricing',
     voice: '/onboarding/voice',
     plan: '/onboarding/plan',
+    stripe_connect: '/onboarding/stripe-connect',
     deploy: '/onboarding/deploy',
     done: '/dashboard',
     // Backward compatibility: some older code might use 'training'

@@ -185,9 +185,70 @@ export async function stripeWebhook(req: Request, res: Response) {
       if (userId && normalizedTier) {
         await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [normalizedTier, userId]);
 
-        // ✅ FIX: Paid plan selected => next step is deploy (NOT done yet)
+        // Phase 2: Auto-create marketplace listing for paid plans
+        if (['starter', 'growth', 'scale'].includes(normalizedTier)) {
+          const user = await db.query(`SELECT id, "publicSlug", handle, "priceConfig" FROM "User" WHERE id=$1 LIMIT 1`, [userId]);
+          if (user.rows[0]) {
+            const existingListing = await db.query(
+              `SELECT id FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+              [userId]
+            );
+
+            if (!existingListing.rows[0]) {
+              // Create new listing with pricing from marketplace_listings (if exists) or priceConfig
+              // Check if pricing was set during onboarding (in marketplace_listings via setPricing)
+              const pricingCheck = await db.query(
+                `SELECT "payPerChatPriceCents", "subscriptionPriceCents", "freeMessageLimit" 
+                 FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+                [userId]
+              );
+              
+              let payPerChatPriceCents = 1000;
+              let subscriptionPriceCents = 0;
+              let freeMessageLimit = 3;
+              
+              if (pricingCheck.rows[0]?.payPerChatPriceCents) {
+                // Use pricing from marketplace_listings (set during onboarding)
+                payPerChatPriceCents = pricingCheck.rows[0].payPerChatPriceCents;
+                subscriptionPriceCents = pricingCheck.rows[0].subscriptionPriceCents || 0;
+                freeMessageLimit = pricingCheck.rows[0].freeMessageLimit ?? 3;
+              } else {
+                // Fallback to priceConfig
+                const priceConfig = user.rows[0].priceConfig || {};
+                payPerChatPriceCents = priceConfig.defaultTierCents || priceConfig.payPerChatPriceCents || 1000;
+                subscriptionPriceCents = priceConfig.subscriptionPriceCents || 0;
+                freeMessageLimit = priceConfig.freeMessageLimit ?? 3;
+              }
+              
+              const baseSlug = user.rows[0].publicSlug || user.rows[0].handle || `creator-${userId}`;
+              const slug = `${baseSlug}-${String(Date.now()).slice(-6)}`;
+              const { generateId } = await import('../../utils/idGenerator');
+              const id = generateId.marketplaceListing();
+
+              await db.query(
+                `INSERT INTO "marketplace_listings"
+                 ("id", "creatorId", "slug", "payPerChatPriceCents", "subscriptionPriceCents", "freeMessageLimit", "isPublic", "createdAt", "updatedAt")
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
+                [id, userId, slug, payPerChatPriceCents, subscriptionPriceCents, freeMessageLimit, true]
+              );
+
+              logger.info(`[Stripe] ✅ Auto-created marketplace listing for user ${userId} on ${normalizedTier} upgrade`);
+            }
+          }
+        }
+
+        // Phase 3: Paid plan selected => next step is stripe_connect (if not connected) or deploy
         const { userQueries } = await import('../../config/database');
-        await userQueries.updateOnboardingStep(userId, 'deploy');
+        const userCheck = await db.query(`SELECT "stripeConnectId" FROM "User" WHERE id=$1 LIMIT 1`, [userId]);
+        const hasStripeConnect = !!userCheck.rows[0]?.stripeConnectId;
+        
+        if (hasStripeConnect) {
+          // Already connected, go to deploy
+          await userQueries.updateOnboardingStep(userId, 'deploy');
+        } else {
+          // Need to connect Stripe, go to stripe_connect step
+          await userQueries.updateOnboardingStep(userId, 'stripe_connect');
+        }
 
         logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${normalizedTier} from checkout.session.completed`);
       } else if (sess?.metadata?.type === 'marketplace_subscription') {
@@ -365,7 +426,14 @@ export async function stripeWebhook(req: Request, res: Response) {
         if (customerResult.rows[0]?.userId) {
           const userId = customerResult.rows[0].userId;
           await db.query(`UPDATE "User" SET "planTier"='free' WHERE id=$1`, [userId]);
-          logger.info(`[Stripe] ✅ Downgraded user ${userId} to free tier after subscription cancellation`);
+          
+          // Phase 2: Hide marketplace listing when downgrading to free tier
+          await db.query(
+            `UPDATE "marketplace_listings" SET "isPublic"=false WHERE "creatorId"=$1`,
+            [userId]
+          );
+          
+          logger.info(`[Stripe] ✅ Downgraded user ${userId} to free tier, marketplace listing hidden`);
         } else {
           logger.warn(`[Stripe] Could not find user for customer ${customerId}`);
         }
@@ -382,63 +450,8 @@ export async function stripeWebhook(req: Request, res: Response) {
         );
       }
     }
-    // ✅ Handle payment_intent.succeeded for pay-per-chat
-    else if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent: any = event.data.object;
-      const creatorId = paymentIntent.metadata?.creatorId;
-      const sessionId = paymentIntent.metadata?.sessionId;
-      const amount = paymentIntent.amount;
-
-      logger.info(`[Stripe] Payment intent succeeded: ${paymentIntent.id}`, {
-        amount,
-        creatorId,
-        sessionId,
-        hasMetadata: !!(creatorId && sessionId),
-      });
-
-      if (creatorId && sessionId) {
-        try {
-          // Calculate platform fee (25%) and creator earnings (75%)
-          const PLATFORM_FEE_PERCENT = 0.25;
-          const platformFee = Math.floor(amount * PLATFORM_FEE_PERCENT);
-          const creatorEarnings = amount - platformFee;
-
-          // Record payment in database
-          const { stripePaymentQueries } = await import('../../config/database');
-          await stripePaymentQueries.create({
-            creatorId,
-            sessionId,
-            amount,
-            status: 'succeeded',
-            stripePaymentIntentId: paymentIntent.id,
-            platformFeeCents: platformFee,
-            creatorEarningsCents: creatorEarnings,
-            type: 'pay_per_chat',
-          });
-
-          // Mark chat session as paid (unlock AI response)
-          await db.query(
-            `UPDATE "chat_sessions" SET "hasPaid" = true WHERE id = $1`,
-            [sessionId]
-          );
-
-          logger.info(`[Stripe] ✅ Pay-per-chat payment completed: ${paymentIntent.id}, Creator: ${creatorId}, Session: ${sessionId}, Amount: ${amount} cents`);
-        } catch (err: any) {
-          logger.error(`[Stripe] Error processing pay-per-chat payment:`, {
-            error: err.message,
-            paymentIntentId: paymentIntent.id,
-            creatorId,
-            sessionId,
-          });
-        }
-      } else {
-        logger.warn(`[Stripe] Payment intent succeeded but missing metadata (test event?):`, {
-          paymentIntentId: paymentIntent.id,
-          amount,
-          metadata: paymentIntent.metadata,
-        });
-      }
-    }
+    // ✅ NOTE: payment_intent.succeeded handler removed - pay-per-chat unlock must be ONLY via /api/payments/pay-per-chat/confirm
+    // This prevents race conditions where webhook unlocks content before /confirm can process it
     else {
       logger.debug(`[Stripe Webhook] Unhandled event type: ${event.type}`);
     }

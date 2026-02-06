@@ -56,9 +56,15 @@ export async function createPaymentIntent(req: Request, res: Response) {
       return res.status(404).json({ error: 'Creator not found' });
     }
 
-    const tiers = getPayPerChatTiers(creator.priceConfig);
-    if (!tiers.includes(amountCents)) {
-      return res.status(400).json({ error: 'Invalid tier amount' });
+    // Phase 4: Validate against creator's single price from marketplace_listings
+    const listingResult = await db.query(
+      `SELECT "payPerChatPriceCents" FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+      [creatorId]
+    );
+    const creatorPriceCents = listingResult.rows[0]?.payPerChatPriceCents || creator.priceConfig?.defaultTierCents || 1000;
+    
+    if (amountCents !== creatorPriceCents) {
+      return res.status(400).json({ error: 'Amount does not match creator\'s price' });
     }
 
     const resolvedTierLabel = tierLabel || `$${(amountCents / 100).toFixed(2)}`;

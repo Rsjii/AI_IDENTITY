@@ -43,8 +43,8 @@ export function OnboardingGatePage() {
             // Not enough content → go to content upload
             nav('/onboarding/content', { replace: true });
           } else {
-            // Enough content → go to plan selection
-            nav('/onboarding/plan', { replace: true });
+            // Enough content → go to pricing (new step)
+            nav('/onboarding/pricing', { replace: true });
           }
         } catch (err: any) {
           // If content check fails, assume no content and go to content page
