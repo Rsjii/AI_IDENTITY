@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Palette, Zap, Globe, Lock, Settings2 } from 'lucide-react';
+import { AlertCircle, Loader2, CreditCard, User, Shield, Check, FileText, Info, Bell, Eye, EyeOff, Globe, Lock, Settings2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { SpendingDashboard } from '@/components/SpendingDashboard';
@@ -139,8 +139,6 @@ export function SettingsPage() {
 
   // A/B Testing (moved to Integrations tab - Scale plan only)
   const [variantGroups, setVariantGroups] = useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [variantMetrics, setVariantMetrics] = useState<any[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [newVariantName, setNewVariantName] = useState('');
   const [baseVersionId, setBaseVersionId] = useState('');

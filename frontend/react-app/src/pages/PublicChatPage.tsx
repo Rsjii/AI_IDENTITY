@@ -28,7 +28,6 @@ import { NotFoundCreator } from '@/components/NotFoundCreator';
 import { CreatorProfileModal } from '@/components/CreatorProfileModal';
 import { FLAGS } from '@/lib/flags';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { showToast } from '@/lib/toast';
 import { apiFetch, buildApiUrl } from '@/lib/api';
@@ -170,7 +169,6 @@ export function PublicChatPage() {
   const { slug = '' } = useParams();
   const [searchParams] = useSearchParams();
   const { state, logout } = useAuth();
-  const { theme } = useTheme();
   const isAuthed = state.status === 'authenticated';
   
   const sessionIdFromUrl = searchParams.get('sessionId') || '';
