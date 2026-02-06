@@ -20,6 +20,8 @@ export type MeUser = {
   isAdmin?: boolean;
   hasPassword?: boolean;
   hasGoogle?: boolean;
+  planTier?: 'free' | 'starter' | 'growth' | 'scale';
+  trialEndsAt?: string | null;
 };
 
 type AuthState =

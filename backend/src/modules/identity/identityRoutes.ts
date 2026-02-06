@@ -34,6 +34,7 @@ router.post('/', sanitizeInput, validateCSRF, identityCreateRateLimit, createIde
 
 // Get identity
 router.get('/me', getIdentity);
+router.get('/active', getIdentity);
 
 // Get training status (for onboarding)
 router.get('/training-status', getTrainingStatus);

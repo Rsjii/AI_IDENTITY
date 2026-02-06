@@ -15,14 +15,32 @@ function normalizeTier(input: string): 'starter' | 'growth' | 'scale' {
 }
 
 export async function createCheckoutSession(req: Request, res: Response) {
+  const checkoutStartTime = Date.now();
   const userId = (req as any).user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  logger.info({
+    step: 'STRIPE_CHECKOUT_1_START',
+    userId,
+    tier: req.body?.tier,
+  }, '[STRIPE_CHECKOUT] 🚀 Creating checkout session');
 
   const tierRaw = String(req.body?.tier || '');
   let tier: 'starter' | 'growth' | 'scale';
   try {
     tier = normalizeTier(tierRaw);
+    logger.info({
+      step: 'STRIPE_CHECKOUT_2_TIER_NORMALIZED',
+      userId,
+      tierRaw,
+      tier,
+    }, '[STRIPE_CHECKOUT] ✅ Tier normalized');
   } catch {
+    logger.warn({
+      step: 'STRIPE_CHECKOUT_2_TIER_INVALID',
+      userId,
+      tierRaw,
+    }, '[STRIPE_CHECKOUT] ❌ Invalid tier');
     return res.status(400).json({ error: 'Invalid tier' });
   }
 
@@ -32,14 +50,37 @@ export async function createCheckoutSession(req: Request, res: Response) {
   const stripe = getStripe();
 
   // Fetch user details for Stripe customer (required for India export regulations)
+  logger.info({
+    step: 'STRIPE_CHECKOUT_3_FETCHING_USER',
+    userId,
+  }, '[STRIPE_CHECKOUT] 📊 Fetching user details');
+
   const userResult = await db.query(
-    `SELECT id, email, name, phone FROM "User" WHERE id=$1 LIMIT 1`,
+    `SELECT id, email, name, phone, "planTier" FROM "User" WHERE id=$1 LIMIT 1`,
     [userId]
   );
   const user = userResult.rows[0];
-  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!user) {
+    logger.error({
+      step: 'STRIPE_CHECKOUT_3_USER_NOT_FOUND',
+      userId,
+    }, '[STRIPE_CHECKOUT] ❌ User not found');
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  logger.info({
+    step: 'STRIPE_CHECKOUT_4_USER_FOUND',
+    userId,
+    email: user.email,
+    currentPlanTier: user.planTier,
+  }, '[STRIPE_CHECKOUT] ✅ User found');
 
   // Check if customer already exists
+  logger.info({
+    step: 'STRIPE_CHECKOUT_5_CHECKING_CUSTOMER',
+    userId,
+  }, '[STRIPE_CHECKOUT] 🔍 Checking existing Stripe customer');
+
   const existing = await db.query(
     `SELECT "stripeCustomerId" FROM "stripe_customers" WHERE "userId"=$1 LIMIT 1`,
     [userId]
@@ -48,6 +89,11 @@ export async function createCheckoutSession(req: Request, res: Response) {
   let customerId: string;
   if (existing.rows[0]?.stripeCustomerId) {
     customerId = existing.rows[0].stripeCustomerId;
+    logger.info({
+      step: 'STRIPE_CHECKOUT_6_CUSTOMER_EXISTS',
+      userId,
+      customerId,
+    }, '[STRIPE_CHECKOUT] ✅ Existing customer found');
     
     // Update existing customer with name/email if missing (for India export compliance)
     try {
@@ -56,10 +102,24 @@ export async function createCheckoutSession(req: Request, res: Response) {
         email: user.email,
         metadata: { userId },
       });
+      logger.debug({
+        step: 'STRIPE_CHECKOUT_7_CUSTOMER_UPDATED',
+        userId,
+        customerId,
+      }, '[STRIPE_CHECKOUT] ✅ Customer updated in Stripe');
     } catch (err: any) {
-      logger.warn(`[Stripe] Failed to update customer ${customerId}:`, err.message);
+      logger.warn({
+        step: 'STRIPE_CHECKOUT_7_CUSTOMER_UPDATE_FAILED',
+        userId,
+        customerId,
+        error: err.message,
+      }, `[STRIPE_CHECKOUT] ⚠️ Failed to update customer ${customerId}:`, err.message);
     }
   } else {
+    logger.info({
+      step: 'STRIPE_CHECKOUT_6_CREATING_CUSTOMER',
+      userId,
+    }, '[STRIPE_CHECKOUT] 🆕 Creating new Stripe customer');
     // Create new customer with name and email (required for India export regulations)
     const customer = await stripe.customers.create({
       email: user.email,
@@ -68,16 +128,32 @@ export async function createCheckoutSession(req: Request, res: Response) {
       metadata: { userId },
     });
     customerId = customer.id;
+    logger.info({
+      step: 'STRIPE_CHECKOUT_7_CUSTOMER_CREATED',
+      userId,
+      customerId,
+    }, '[STRIPE_CHECKOUT] ✅ New customer created in Stripe');
+
     await db.query(
       `INSERT INTO "stripe_customers" ("id","userId","stripeCustomerId","createdAt")
        VALUES ($1,$2,$3,now())
        ON CONFLICT ("userId") DO UPDATE SET "stripeCustomerId"=EXCLUDED."stripeCustomerId"`,
       [`sc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, userId, customerId]
     );
+    logger.info({
+      step: 'STRIPE_CHECKOUT_8_CUSTOMER_SAVED',
+      userId,
+      customerId,
+    }, '[STRIPE_CHECKOUT] ✅ Customer saved to database');
   }
 
   try {
     // Check if user already has an active subscription (to avoid duplicate trials)
+    logger.info({
+      step: 'STRIPE_CHECKOUT_9_CHECKING_SUBSCRIPTION',
+      userId,
+    }, '[STRIPE_CHECKOUT] 🔍 Checking existing subscription');
+
     const existingSub = await db.query(
       `SELECT sc."stripeCustomerId" FROM "stripe_customers" sc
        JOIN "User" u ON u.id = sc."userId"
@@ -85,6 +161,16 @@ export async function createCheckoutSession(req: Request, res: Response) {
       [userId]
     );
     const hasActiveSubscription = existingSub.rows.length > 0;
+
+    logger.info({
+      step: 'STRIPE_CHECKOUT_10_CREATING_SESSION',
+      userId,
+      tier,
+      customerId,
+      hasActiveSubscription,
+      priceId: getStripePriceId(tier),
+      returnUrl,
+    }, '[STRIPE_CHECKOUT] 💳 Creating Stripe checkout session');
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -103,6 +189,16 @@ export async function createCheckoutSession(req: Request, res: Response) {
       // Also collect shipping address if needed (optional, but good for compliance)
       // shipping_address_collection: { allowed_countries: ['IN', 'US', 'GB', 'CA', 'AU'] },
     });
+
+    logger.info({
+      step: 'STRIPE_CHECKOUT_11_SESSION_CREATED',
+      userId,
+      tier,
+      sessionId: session.id,
+      checkoutUrl: session.url,
+      metadata: session.metadata,
+      totalDuration: Date.now() - checkoutStartTime,
+    }, '[STRIPE_CHECKOUT] ✅ Checkout session created - user should complete payment in Stripe');
 
     return res.json({ url: session.url });
   } catch (error: any) {
@@ -147,43 +243,116 @@ export async function createCheckoutSession(req: Request, res: Response) {
 }
 
 export async function stripeWebhook(req: Request, res: Response) {
+  const webhookStartTime = Date.now();
+  logger.info({
+    step: 'STRIPE_WEBHOOK_1_RECEIVED',
+    path: req.path,
+    method: req.method,
+    hasSignature: !!req.headers['stripe-signature'],
+  }, '[STRIPE_WEBHOOK] 📥 Webhook request received');
+
   const stripe = getStripe();
   const secret = mustGetStripeWebhookSecret();
 
   const sig = req.headers['stripe-signature'];
   if (!sig || typeof sig !== 'string') {
-    logger.error('[Stripe Webhook] Missing stripe-signature header');
+    logger.error({
+      step: 'STRIPE_WEBHOOK_2_MISSING_SIGNATURE',
+      headers: Object.keys(req.headers),
+    }, '[STRIPE_WEBHOOK] ❌ Missing stripe-signature header');
     return res.status(400).send('Missing stripe-signature');
   }
 
   let event;
   try {
     // req.body must be Buffer because express.raw
+    logger.info({
+      step: 'STRIPE_WEBHOOK_2_VERIFYING_SIGNATURE',
+      bodyLength: (req.body as Buffer)?.length || 0,
+    }, '[STRIPE_WEBHOOK] 🔐 Verifying webhook signature');
+
     event = stripe.webhooks.constructEvent(req.body as any, sig, secret);
-    logger.info(`[Stripe Webhook] Received event: ${event.type} (id: ${event.id})`);
+    
+    logger.info({
+      step: 'STRIPE_WEBHOOK_3_EVENT_VERIFIED',
+      eventType: event.type,
+      eventId: event.id,
+      livemode: event.livemode,
+    }, `[STRIPE_WEBHOOK] ✅ Received event: ${event.type} (id: ${event.id})`);
   } catch (err: any) {
-    logger.error('[Stripe Webhook] Signature verification failed:', {
+    logger.error({
+      step: 'STRIPE_WEBHOOK_2_SIGNATURE_FAILED',
       error: err.message,
       path: req.path,
-    });
+      stack: err.stack,
+    }, '[STRIPE_WEBHOOK] ❌ Signature verification failed');
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   try {
     // Handle checkout.session.completed - subscription created
     if (event.type === 'checkout.session.completed') {
+      logger.info({
+        step: 'STRIPE_WEBHOOK_4_CHECKOUT_COMPLETED',
+        eventId: event.id,
+        sessionId: (event.data.object as any)?.id,
+      }, '[STRIPE_WEBHOOK] 💳 Processing checkout.session.completed');
+
       const sess: any = event.data.object;
       const userId = sess?.metadata?.userId;
       const tier = sess?.metadata?.tier;
 
+      logger.info({
+        step: 'STRIPE_WEBHOOK_5_EXTRACTING_METADATA',
+        userId,
+        tier,
+        sessionId: sess?.id,
+        customerId: sess?.customer,
+        subscriptionId: sess?.subscription,
+        paymentStatus: sess?.payment_status,
+        metadata: sess?.metadata,
+      }, '[STRIPE_WEBHOOK] 📋 Extracted metadata from session');
+
       let normalizedTier: 'starter' | 'growth' | 'scale' | null = null;
       try {
         normalizedTier = tier ? normalizeTier(tier) : null;
-      } catch {
+        logger.info({
+          step: 'STRIPE_WEBHOOK_6_TIER_NORMALIZED',
+          tierRaw: tier,
+          normalizedTier,
+        }, '[STRIPE_WEBHOOK] ✅ Tier normalized');
+      } catch (err: any) {
         normalizedTier = null;
+        logger.error({
+          step: 'STRIPE_WEBHOOK_6_TIER_NORMALIZE_FAILED',
+          tierRaw: tier,
+          error: err.message,
+        }, '[STRIPE_WEBHOOK] ❌ Failed to normalize tier');
       }
+
       if (userId && normalizedTier) {
+        logger.info({
+          step: 'STRIPE_WEBHOOK_7_UPDATING_PLAN',
+          userId,
+          normalizedTier,
+          currentPlan: 'checking...',
+        }, '[STRIPE_WEBHOOK] 🔄 Updating user plan tier in database');
+
+        // Check current plan before update
+        const currentPlanResult = await db.query(
+          `SELECT "planTier" FROM "User" WHERE id=$1 LIMIT 1`,
+          [userId]
+        );
+        const currentPlan = currentPlanResult.rows[0]?.planTier || 'free';
+
         await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [normalizedTier, userId]);
+
+        logger.info({
+          step: 'STRIPE_WEBHOOK_8_PLAN_UPDATED',
+          userId,
+          oldPlan: currentPlan,
+          newPlan: normalizedTier,
+        }, `[STRIPE_WEBHOOK] ✅ Updated user ${userId} from ${currentPlan} to ${normalizedTier}`);
 
         // Phase 2: Auto-create marketplace listing for paid plans
         if (['starter', 'growth', 'scale'].includes(normalizedTier)) {
@@ -250,8 +419,18 @@ export async function stripeWebhook(req: Request, res: Response) {
           await userQueries.updateOnboardingStep(userId, 'stripe_connect');
         }
 
-        logger.info(`[Stripe] ✅ Updated user ${userId} to tier ${normalizedTier} from checkout.session.completed`);
+        logger.info({
+          step: 'STRIPE_WEBHOOK_9_PLAN_UPDATE_COMPLETE',
+          userId,
+          normalizedTier,
+          totalDuration: Date.now() - webhookStartTime,
+        }, `[STRIPE_WEBHOOK] ✅ Plan update complete for user ${userId}`);
       } else if (sess?.metadata?.type === 'marketplace_subscription') {
+        logger.info({
+          step: 'STRIPE_WEBHOOK_10_MARKETPLACE_SUBSCRIPTION',
+          userId,
+          listingId: sess?.metadata?.listingId,
+        }, '[STRIPE_WEBHOOK] 🛒 Processing marketplace subscription');
         const listingId = sess?.metadata?.listingId;
         const subscriptionId = sess?.subscription;
         if (listingId && userId && subscriptionId) {
@@ -269,11 +448,15 @@ export async function stripeWebhook(req: Request, res: Response) {
           logger.info(`[Stripe] ✅ Marketplace subscription activated: listing=${listingId} user=${userId}`);
         }
       } else {
-        logger.warn(`[Stripe] Invalid metadata in checkout.session.completed:`, {
+        logger.warn({
+          step: 'STRIPE_WEBHOOK_11_INVALID_METADATA',
           userId,
           tier,
           sessionId: sess?.id,
-        });
+          metadata: sess?.metadata,
+          hasUserId: !!userId,
+          hasTier: !!tier,
+        }, `[STRIPE_WEBHOOK] ⚠️ Invalid metadata in checkout.session.completed - cannot update plan`);
       }
     }
     // Handle customer.subscription.created - subscription created (alternative event)
@@ -456,14 +639,23 @@ export async function stripeWebhook(req: Request, res: Response) {
       logger.debug(`[Stripe Webhook] Unhandled event type: ${event.type}`);
     }
 
+    logger.info({
+      step: 'STRIPE_WEBHOOK_12_COMPLETE',
+      eventType: event.type,
+      eventId: event.id,
+      totalDuration: Date.now() - webhookStartTime,
+    }, `[STRIPE_WEBHOOK] ✅ Webhook processing complete for ${event.type}`);
+
     return res.json({ received: true });
   } catch (error: any) {
-    logger.error('[Stripe Webhook] Error processing event:', {
+    logger.error({
+      step: 'STRIPE_WEBHOOK_ERROR',
       eventType: event.type,
       eventId: event.id,
       error: error.message,
       stack: error.stack,
-    });
+      totalDuration: Date.now() - webhookStartTime,
+    }, '[STRIPE_WEBHOOK] ❌ Error processing event');
     // Still return 200 to prevent Stripe from retrying
     return res.status(200).json({ received: true, error: 'Processing failed' });
   }

@@ -57,6 +57,10 @@ export function SettingsPage() {
   const [allowAnalytics, setAllowAnalytics] = useState(true);
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'private' | 'unlisted'>('public');
 
+  // AI Clone Visibility (marketplace listing)
+  const [aiIsPublic, setAiIsPublic] = useState(false);
+  const [togglingAiVisibility, setTogglingAiVisibility] = useState(false);
+
   // Appearance settings (in Preferences tab)
   const [language, setLanguage] = useState('en');
   const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
@@ -214,9 +218,78 @@ export function SettingsPage() {
         if ((state.user as any).planTier === 'scale') {
           loadVariantGroups();
         }
+
+        // Load marketplace listing for AI visibility
+        loadMarketplaceListing();
       }
     }
   }, [state]);
+
+  // Load marketplace listing
+  const loadMarketplaceListing = async () => {
+    try {
+      const res = await apiFetch<{ item: { isPublic: boolean } | null }>('/api/marketplace/my-listing');
+      if (res.item) {
+        setAiIsPublic(res.item.isPublic ?? false);
+      } else {
+        setAiIsPublic(false);
+      }
+    } catch (e) {
+      console.error('Failed to load marketplace listing:', e);
+      setAiIsPublic(false);
+    }
+  };
+
+  // Load marketplace listing when profile tab is active (creators only)
+  useEffect(() => {
+    if (state.status !== 'authenticated') return;
+    if (state.user?.userType !== 'creator') return;
+    if (activeTab !== 'profile') return;
+
+    loadMarketplaceListing();
+  }, [state, activeTab]);
+
+  // Toggle AI visibility
+  const toggleAiVisibility = async (newValue: boolean) => {
+    const user = state.status === 'authenticated' ? state.user : null;
+    const currentPlanTier = (user as any)?.planTier || 'free';
+    const currentTrialEndsAt = (user as any)?.trialEndsAt;
+    const isTrialActive = currentTrialEndsAt && new Date(currentTrialEndsAt) > new Date();
+    const isFreeTier = currentPlanTier === 'free' && !isTrialActive;
+
+    if (newValue && isFreeTier) {
+      showToast('Upgrade to Starter plan to make your AI public', 'error');
+      nav('/pricing');
+      return;
+    }
+
+    setTogglingAiVisibility(true);
+    try {
+      await apiFetch('/api/marketplace/listings', {
+        method: 'POST',
+        body: JSON.stringify({
+          isPublic: newValue,
+        }),
+      });
+      
+      setAiIsPublic(newValue);
+      showToast(
+        newValue 
+          ? 'Your AI is now public and discoverable' 
+          : 'Your AI is now private',
+        'success'
+      );
+    } catch (err: any) {
+      if (err.status === 403) {
+        showToast('Upgrade to Starter plan to make your AI public', 'error');
+        nav('/pricing');
+      } else {
+        showToast(err.message || 'Failed to update AI visibility', 'error');
+      }
+    } finally {
+      setTogglingAiVisibility(false);
+    }
+  };
 
   const loadVariantGroups = async () => {
     setLoadingVariants(true);
@@ -996,6 +1069,39 @@ export function SettingsPage() {
                   </div>
                   <Switch checked={showInPublicDirectory} onCheckedChange={setShowInPublicDirectory} />
                 </div>
+
+                {/* AI Clone Visibility (creators only) */}
+                {state.status === 'authenticated' && state.user?.userType === 'creator' && (
+                  <div className="flex items-center justify-between pt-4 border-t">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium">AI Clone Visibility</label>
+                        {aiIsPublic ? (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400 rounded-full">
+                            Public
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 rounded-full">
+                            Private
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {aiIsPublic 
+                          ? 'Your AI clone is discoverable in marketplace'
+                          : 'Your AI clone is private - only accessible via direct link'}
+                        {planTier === 'free' && !(trialEndsAt && new Date(trialEndsAt) > new Date()) && (
+                          <span className="text-orange-500 ml-1">(Upgrade required to make public)</span>
+                        )}
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={aiIsPublic} 
+                      onCheckedChange={toggleAiVisibility}
+                      disabled={togglingAiVisibility || (planTier === 'free' && !(trialEndsAt && new Date(trialEndsAt) > new Date()))}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2 pt-2">
                   <label className="text-sm font-medium">Profile Visibility</label>

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Star } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Star, MessageSquare, Users, CheckCircle2, Zap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,10 @@ interface Listing {
   currency: string;
   rating: number | null;
   freeTrialQuestions: number;
+  totalSubscribers: number;
+  payPerChatPriceCents: number | null;
+  freeMessageLimit: number | null;
+  tags: string[];
   creator: {
     id: string;
     handle: string;
@@ -128,50 +133,229 @@ export function MarketplaceListingPage() {
     );
   }
 
+  const handleStartChat = () => {
+    window.location.href = `/chat/${listing?.slug}`;
+  };
+
+  const formatSubscribers = (count: number) => {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return count.toString();
+  };
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        {/* Hero Section */}
         <Card className="bg-bg-secondary border-border-default">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-4">
               {listing.creator.profileImage && (
                 <img
                   src={listing.creator.profileImage}
-                  className="w-12 h-12 rounded-full"
+                  className="w-16 h-16 rounded-full"
                   alt={listing.creator.name}
                 />
               )}
-              <div>
-                <div className="text-xl font-semibold text-text-primary">
-                  {listing.creator.name || listing.creator.handle}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-2xl font-semibold text-text-primary">
+                    {listing.creator.name || listing.creator.handle}
+                  </h1>
+                  {listing.creator.creatorTitle && (
+                    <Badge variant="outline">{listing.creator.creatorTitle}</Badge>
+                  )}
                 </div>
-                <div className="text-sm text-text-secondary">@{listing.creator.handle}</div>
+                <div className="text-sm text-text-secondary mb-2">@{listing.creator.handle}</div>
+                {listing.creator.bio && (
+                  <p className="text-sm text-text-secondary mb-3">{listing.creator.bio}</p>
+                )}
+                
+                {/* Stats Row */}
+                <div className="flex items-center gap-4 text-sm">
+                  {listing.rating && (
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{listing.rating.toFixed(1)}</span>
+                      <span className="text-text-secondary">({reviews.length} reviews)</span>
+                    </div>
+                  )}
+                  {listing.totalSubscribers > 0 && (
+                    <div className="flex items-center gap-1 text-text-secondary">
+                      <Users className="h-4 w-4" />
+                      <span>{formatSubscribers(listing.totalSubscribers)} subscribers</span>
+                    </div>
+                  )}
+                  <span className="text-text-secondary">{listing.category || 'General'}</span>
+                </div>
               </div>
             </div>
-            <div className="text-text-secondary">{listing.description || 'No description yet.'}</div>
+
+            {/* Description */}
+            <div className="text-text-secondary pt-2">
+              {listing.description || 'No description yet.'}
+            </div>
+
+            {/* Tags */}
             <div className="flex flex-wrap gap-2">
               {(listing.creator.creatorTags || []).map((tag) => (
-                <span key={tag} className="text-xs bg-bg-tertiary px-2 py-1 rounded-full">
+                <Badge key={tag} variant="secondary" className="text-xs">
                   {tag}
-                </span>
+                </Badge>
+              ))}
+              {listing.tags && listing.tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
               ))}
             </div>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-text-secondary">
-                {listing.category || 'General'} • Rating {listing.rating ?? 'N/A'}
+          </CardContent>
+        </Card>
+
+        {/* Pricing & Actions */}
+        <Card className="bg-bg-secondary border-border-default">
+          <CardHeader>
+            <CardTitle>Pricing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              {listing.subscriptionPriceCents > 0 && (
+                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                  <div>
+                    <div className="font-semibold">Subscription</div>
+                    <div className="text-sm text-text-secondary">Unlimited conversations</div>
+                  </div>
+                  <div className="text-lg font-bold text-text-primary">
+                    ${(listing.subscriptionPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
+                    <span className="text-sm font-normal text-text-secondary">/month</span>
+                  </div>
+                </div>
+              )}
+              
+              {listing.payPerChatPriceCents && listing.payPerChatPriceCents > 0 && (
+                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                  <div>
+                    <div className="font-semibold">Pay Per Chat</div>
+                    <div className="text-sm text-text-secondary">One-time payment, 24h access</div>
+                  </div>
+                  <div className="text-lg font-bold text-text-primary">
+                    ${(listing.payPerChatPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
+                  </div>
+                </div>
+              )}
+
+              {listing.freeMessageLimit !== null && listing.freeMessageLimit > 0 && (
+                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                  <div>
+                    <div className="font-semibold">Free Tier</div>
+                    <div className="text-sm text-text-secondary">
+                      {listing.freeMessageLimit} messages per day
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-green-500">Free</div>
+                </div>
+              )}
+
+              {listing.freeTrialQuestions > 0 && (
+                <div className="p-3 bg-accent-primary/10 border border-accent-primary/20 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-accent-primary" />
+                    <span className="text-sm font-medium">
+                      Free trial: {listing.freeTrialQuestions} questions included
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button 
+                onClick={handleStartChat} 
+                className="flex-1"
+                size="lg"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Start Chat Now
+              </Button>
+              {listing.subscriptionPriceCents > 0 && (
+                <Button 
+                  onClick={handleSubscribe} 
+                  disabled={subscribing}
+                  variant="outline"
+                  className="flex-1"
+                  size="lg"
+                >
+                  {subscribing ? 'Starting...' : 'Subscribe for Unlimited'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* What's Included */}
+        <Card className="bg-bg-secondary border-border-default">
+          <CardHeader>
+            <CardTitle>What's Included</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {listing.subscriptionPriceCents > 0 && (
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-medium">Unlimited Conversations</div>
+                    <div className="text-sm text-text-secondary">
+                      Chat as much as you want with your subscription
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {listing.freeMessageLimit !== null && listing.freeMessageLimit > 0 && (
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-medium">{listing.freeMessageLimit} Free Messages Daily</div>
+                    <div className="text-sm text-text-secondary">
+                      Start chatting without any payment
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {listing.payPerChatPriceCents && listing.payPerChatPriceCents > 0 && (
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-medium">Pay Per Chat Option</div>
+                    <div className="text-sm text-text-secondary">
+                      One-time payment for 24 hours of unlimited access
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-medium">Fast Response Time</div>
+                  <div className="text-sm text-text-secondary">
+                    Get instant AI-powered responses
+                  </div>
+                </div>
               </div>
-              <div className="text-lg font-semibold">
-                ${(listing.subscriptionPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
+
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-medium">Personalized AI Responses</div>
+                  <div className="text-sm text-text-secondary">
+                    Trained on creator's knowledge and style
+                  </div>
+                </div>
               </div>
             </div>
-            <Button onClick={handleSubscribe} disabled={subscribing}>
-              {subscribing ? 'Starting...' : 'Subscribe'}
-            </Button>
-            {listing.freeTrialQuestions > 0 && (
-              <div className="text-xs text-text-tertiary">
-                Includes {listing.freeTrialQuestions} free trial questions.
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -234,17 +418,59 @@ export function MarketplaceListingPage() {
           </Card>
         )}
 
+        {/* Reviews Section */}
         <Card className="bg-bg-secondary border-border-default">
-          <CardContent className="pt-6 space-y-3">
-            <h3 className="text-lg font-semibold">Reviews</h3>
-            {reviews.length === 0 && <div className="text-text-secondary text-sm">No reviews yet.</div>}
-            {reviews.map((r) => (
-              <div key={r.id} className="border-b border-border-default pb-3">
-                <div className="text-sm font-semibold">{r.user.name || r.user.handle}</div>
-                <div className="text-xs text-text-tertiary">Rating: {r.rating}/5</div>
-                {r.comment && <div className="text-sm text-text-secondary mt-1">{r.comment}</div>}
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Reviews
+              {reviews.length > 0 && (
+                <Badge variant="secondary">({reviews.length})</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {reviews.length === 0 ? (
+              <div className="text-text-secondary text-sm text-center py-4">
+                No reviews yet. Be the first to review!
               </div>
-            ))}
+            ) : (
+              reviews.map((r) => (
+                <div key={r.id} className="border-b border-border-default pb-4 last:border-0">
+                  <div className="flex items-start gap-3">
+                    {r.user.profileImage && (
+                      <img
+                        src={r.user.profileImage}
+                        className="w-8 h-8 rounded-full"
+                        alt={r.user.name}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="font-semibold text-sm">{r.user.name || r.user.handle}</div>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-3 w-3 ${
+                                star <= r.rating
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-text-tertiary'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-xs text-text-tertiary">
+                          {new Date(r.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {r.comment && (
+                        <div className="text-sm text-text-secondary mt-1">{r.comment}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

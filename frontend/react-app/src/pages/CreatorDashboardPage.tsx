@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   MessageSquare, DollarSign, Clock, Star, TrendingUp, TrendingDown,
   Settings, Database, BarChart3, Zap, 
-  FileText, AlertCircle, CheckCircle2, ArrowUp
+  FileText, AlertCircle, CheckCircle2, ArrowUp, Globe, Lock
 } from 'lucide-react';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
@@ -29,6 +29,8 @@ type RecentConversation = {
 };
 
 interface DashboardData {
+  planTier?: 'free' | 'starter' | 'growth' | 'scale';
+  trialEndsAt?: string | null;
   chats: {
     total: number;
     today: number;
@@ -69,13 +71,9 @@ interface DashboardData {
 
 export function CreatorDashboardPage() {
   const nav = useNavigate();
-  const { state } = useAuth();
+  const { state, refresh } = useAuth();
   const user = state.status === 'authenticated' ? state.user : null;
-  const planTier = (user as any)?.planTier || 'free';
-  const trialEndsAt = (user as any)?.trialEndsAt;
-  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
-  const isFreeTier = planTier === 'free' && !isTrialActive;
-
+  
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] =
@@ -88,6 +86,10 @@ export function CreatorDashboardPage() {
   // NEW: real recent chats (no more hardcoded demo)
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
 
+  // Marketplace listing state for public/private toggle
+  const [listingData, setListingData] = useState<{ isPublic: boolean; id?: string } | null>(null);
+  const [togglingPublic, setTogglingPublic] = useState(false);
+
   // FIX: polling closure stale state (use refs)
   const lastChatCountRef = useRef(0);
   const lastRevenueRef = useRef(0);
@@ -95,11 +97,12 @@ export function CreatorDashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardRes, earningsRes, identityRes, recentRes] = await Promise.all([
+        const [dashboardRes, earningsRes, identityRes, recentRes, listingRes] = await Promise.all([
           apiFetch('/api/creator/dashboard'),
           apiFetch('/api/creator/earnings').catch(() => ({ items: [] })),
           apiFetch('/api/identity/active').catch(() => ({ identity: null })),
           apiFetch('/api/creator/chats/recent?limit=3').catch(() => ({ items: [] })), // NEW
+          apiFetch('/api/marketplace/my-listing').catch(() => ({ item: null })), // Marketplace listing
         ]);
 
         setData({
@@ -109,12 +112,27 @@ export function CreatorDashboardPage() {
 
         const todayChats = dashboardRes?.chats?.today || 0;
         const monthRevenue = dashboardRes?.revenue?.thisMonthCents || 0;
+        
+        // ✅ Refresh auth state if dashboard shows updated planTier
+        if (dashboardRes?.planTier && dashboardRes.planTier !== (user as any)?.planTier) {
+          refresh();
+        }
 
         setMessagesToday(todayChats);
         lastChatCountRef.current = todayChats;
         lastRevenueRef.current = monthRevenue;
 
         setRecentConversations((recentRes as any)?.items || []);
+
+        // Set marketplace listing data
+        if ((listingRes as any)?.item) {
+          setListingData({
+            isPublic: (listingRes as any).item.isPublic ?? false,
+            id: (listingRes as any).item.id,
+          });
+        } else {
+          setListingData(null);
+        }
 
         if (identityRes?.identity?.activeVersionId) setAiStatus('active');
         else if (identityRes?.identity) setAiStatus('training');
@@ -178,6 +196,53 @@ export function CreatorDashboardPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);  
+
+  // ✅ Use dashboard API planTier as primary source, auth state as fallback
+  const planTier = data?.planTier || (user as any)?.planTier || 'free';
+  const trialEndsAt = data?.trialEndsAt || (user as any)?.trialEndsAt;
+  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
+  const isFreeTier = planTier === 'free' && !isTrialActive;
+
+  // Toggle public/private
+  const togglePublic = async () => {
+    if (isFreeTier) {
+      showToast('Upgrade to Starter plan to make your AI public', 'error');
+      nav('/pricing');
+      return;
+    }
+
+    setTogglingPublic(true);
+    try {
+      const newIsPublic = !listingData?.isPublic;
+      await apiFetch('/api/marketplace/listings', {
+        method: 'POST',
+        body: JSON.stringify({
+          isPublic: newIsPublic,
+        }),
+      });
+      
+      setListingData((prev) => ({
+        ...prev,
+        isPublic: newIsPublic,
+      } as any));
+      
+      showToast(
+        newIsPublic 
+          ? 'Your AI is now public and discoverable' 
+          : 'Your AI is now private',
+        'success'
+      );
+    } catch (err: any) {
+      if (err.status === 403) {
+        showToast('Upgrade to Starter plan to make your AI public', 'error');
+        nav('/pricing');
+      } else {
+        showToast(err.message || 'Failed to update visibility', 'error');
+      }
+    } finally {
+      setTogglingPublic(false);
+    }
+  };
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -427,6 +492,75 @@ const handleGenerateInsightsReport = () => {
               Set up My AI
             </Button>
           </div>
+        )}
+
+        {/* Quick Public/Private Toggle - Only show when AI is active */}
+        {aiStatus === 'active' && (
+          <Card className="glass border-accent-primary/20">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6">
+              <div className="flex items-start gap-3">
+                {listingData?.isPublic ? (
+                  <Globe className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                ) : (
+                  <Lock className="h-5 w-5 text-gray-500 mt-0.5 shrink-0" />
+                )}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-text-primary">AI Visibility</h3>
+                    {listingData?.isPublic ? (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-600 dark:text-green-400 rounded-full">
+                        Public
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 rounded-full">
+                        Private
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-text-secondary">
+                    {listingData?.isPublic 
+                      ? 'Your AI is public and discoverable in marketplace. Anyone can find and chat with it.'
+                      : 'Your AI is private. Only people with your direct link can access it.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant={listingData?.isPublic ? "outline" : "default"}
+                  onClick={togglePublic}
+                  disabled={togglingPublic || isFreeTier}
+                  className="min-w-[140px]"
+                >
+                  {togglingPublic ? (
+                    <>
+                      <Settings className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : listingData?.isPublic ? (
+                    <>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Make Private
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4 mr-2" />
+                      Make Public
+                    </>
+                  )}
+                </Button>
+                {isFreeTier && (
+                  <Button
+                    variant="outline"
+                    onClick={() => nav('/pricing')}
+                    className="min-w-[120px]"
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Upgrade
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Top Row: 4 Large Metric Cards */}

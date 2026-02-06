@@ -1613,6 +1613,8 @@ export const me = async (req: Request, res: Response) => {
       hasPassword: Boolean(user.passwordHash),
       hasGoogle: Boolean(user.googleId),
       timeZone: (user as any).timeZone || null,
+      planTier: (user as any).planTier || 'free',
+      trialEndsAt: (user as any).trialEndsAt || null,
     },
   });
 };
