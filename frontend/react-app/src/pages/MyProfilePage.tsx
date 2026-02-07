@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,6 @@ type SubItem = {
 type Tab = 'profile' | 'subscriptions' | 'privacy';
 
 export function MyProfilePage() {
-  const nav = useNavigate();
   const { state, refresh } = useAuth();
   const [tab, setTab] = useState<Tab>('profile');
   const [subs, setSubs] = useState<SubItem[]>([]);
