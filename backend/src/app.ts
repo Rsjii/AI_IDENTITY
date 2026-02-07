@@ -242,6 +242,7 @@ app.set('trust proxy', 1);
 // Session middleware
 const forceInsecureCookies = process.env.FORCE_INSECURE_COOKIES === 'true';
 const sessionCookieSecure = isProd && !forceInsecureCookies;
+const sessionCookieSameSite = isProd ? 'none' : 'lax'; // ✅ Production needs 'none' for cross-origin, dev uses 'lax'
 
 // ✅ Use separate session pool with more lenient timeout settings
 // This prevents session operations from blocking the main database pool
@@ -262,7 +263,7 @@ app.use(session({
   cookie: {
     secure: sessionCookieSecure,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: sessionCookieSameSite, // ✅ Dynamic: 'none' in prod (cross-origin), 'lax' in dev
     path: '/',
     maxAge: 24 * 60 * 60 * 1000,
   },
