@@ -55,3 +55,10 @@ c. abhi step 2 ke just direct baad aap step 3 dikha rahae hai, usme time lagt ha
 [2026-02-07 15:42:30.267 +0530] INFO: Γ£à Database connected successfully
 [2026-02-07 15:42:30.711 +0530] DEBUG: [DB] Γ£à Executed query
 [2026-02-07 15:42:30.711 +0530] INFO: Γ£à Database tab))
+
+
+
+
+5. maine abhi plan le liya tha, maine make public in dahboard clcik kiya , to aata hai msg Publish prerequisites not met, bhai bande ko saih sebatao na akise akrna chahiye steps wagerah, aur websites kaise karti hai sahi se dkh lena aur batao see from the net 
+
+6. dada dada end user ke me aap dikha rahe montize nahi kar sakte, clone nahi bana hai, is it correct behaviour, should ye sab hame end user waale way waale users ko dikhana chahiye

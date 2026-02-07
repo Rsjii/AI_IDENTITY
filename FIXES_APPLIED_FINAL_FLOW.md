@@ -1,13 +1,13 @@
 # Fixes Applied - Final Flow Documentation
 
-**Date:** 2026-02-07  
-**Status:** ✅ All 5 issues fixed and tested
+**Date:** 2026-02-07 (Updated: 2026-02-07)  
+**Status:** ✅ All 10 issues fixed and tested
 
 ---
 
 ## Summary of Changes
 
-This document outlines all fixes applied to resolve 5 critical UX/flow issues in the application.
+This document outlines all fixes applied to resolve 10 critical UX/flow issues in the application, including back navigation prevention, logout security, and enhanced publish error handling.
 
 ---
 
@@ -289,7 +289,7 @@ Sidebar collapses
 
 ### 5. Make Public Flow
 ```
-User toggles "Make listing public" in Settings
+User toggles "Make listing public" in Settings/Dashboard
   ↓
 Backend validates prerequisites
   ├─ Success → AI becomes public
@@ -300,10 +300,29 @@ Backend validates prerequisites
       Redirect to /marketplace/manage (where user can fix)
 ```
 
+### 6. Signup Flow - Back Navigation Blocked
+```
+Signup → OTP Verify (back blocked) → Profile (back blocked) → Select Way (back blocked)
+  ↓
+Choose Creator/Visitor → Onboarding starts
+```
+
+### 7. Logout Flow - History Cleared
+```
+User clicks logout (anywhere)
+  ↓
+window.location.replace('/auth?reason=logout')
+  ↓
+History cleared (no back to previous pages)
+  ↓
+AuthPage shows with back navigation blocked
+```
+
 ---
 
 ## Testing Checklist
 
+### Round 1
 - [x] Profile card click → Navigate to Settings/Profile
 - [x] Sidebar collapse on navigation
 - [x] Sidebar state persists in localStorage
@@ -312,6 +331,20 @@ Backend validates prerequisites
 - [x] Onboarding preview → Training gate works
 - [x] Make public → Clear prerequisite errors
 - [x] Direct link to preview → Training gate still works
+
+### Round 2
+- [x] Publish prerequisites show exact missing items
+- [x] Profile/Choose Type no duplicate submissions
+- [x] Profile page blocked after completion
+
+### Round 3
+- [x] Back button blocked in OTP verify page
+- [x] Back button blocked in Profile page
+- [x] Back button blocked in Select Way page
+- [x] Back button blocked after logout (all logout handlers)
+- [x] Dashboard "Make Public" shows exact missing prerequisites
+- [x] Dashboard "Make Public" redirects to marketplace/manage
+- [x] Error labels consistent across SettingsPage, MarketplaceManagePage, CreatorDashboardPage
 
 ---
 
@@ -352,6 +385,7 @@ Backend validates prerequisites
 
 ## Files Modified Summary
 
+### Round 1 (Initial Fixes)
 1. `frontend/react-app/src/components/Layout.tsx` - Sidebar state management
 2. `frontend/react-app/src/components/Sidebar.tsx` - Profile click + navigation collapse
 3. `frontend/react-app/src/pages/SignupProfilePage.tsx` - Auth refresh fix
@@ -361,7 +395,21 @@ Backend validates prerequisites
 7. `frontend/react-app/src/pages/ChooseTypePage.tsx` - Duplicate submission guard
 8. `frontend/react-app/src/components/ProtectedRoute.tsx` - Profile page block logic
 
-**Total:** 8 files modified, 0 breaking changes, all backward compatible.
+### Round 2 (Additional Fixes)
+9. `frontend/react-app/src/lib/api.ts` - ApiError interface extended (missing, upgradeUrl)
+
+### Round 3 (Back Navigation & Publish UX)
+10. `frontend/react-app/src/hooks/useOnboardingGuard.ts` - Conditional usePreventBack
+11. `frontend/react-app/src/pages/AuthPage.tsx` - Logout back prevention
+12. `frontend/react-app/src/pages/ChooseTypePage.tsx` - Back prevention in select way
+13. `frontend/react-app/src/components/Navbar.tsx` - Logout replace redirect
+14. `frontend/react-app/src/components/Sidebar.tsx` - Logout replace redirect
+15. `frontend/react-app/src/components/MobileNav.tsx` - Logout replace redirect
+16. `frontend/react-app/src/components/AuthShell.tsx` - Logout replace redirect
+17. `frontend/react-app/src/pages/CreatorDashboardPage.tsx` - Publish prerequisites error handling
+18. `frontend/react-app/src/pages/MarketplaceManagePage.tsx` - Consistent error labels
+
+**Total:** 18 files modified, 0 breaking changes, all backward compatible.
 
 ---
 
@@ -407,14 +455,117 @@ Backend validates prerequisites
 
 ---
 
+## Additional Fixes (Round 3 - Back Navigation & Publish UX)
+
+### 8. ✅ Back Navigation Prevention in Signup Flow
+
+**Problem:** User signup flow me back button se previous pages pe ja sakta tha:
+- OTP verify → back to signup
+- Profile → back to OTP
+- Select Way → back to Profile
+- Standard websites me aisa nahi hota - critical flows me back block hota hai
+
+**Solution:**
+- `usePreventBack` hook ko **conditional** banaya (`enabled` parameter)
+- `SignupVerifyPage` - Already had `usePreventBack()` ✅
+- `SignupProfilePage` - Already had `usePreventBack()` ✅
+- `ChooseTypePage` - **Added** `usePreventBack(true)` ✅
+- `AuthPage` - **Added** `usePreventBack(reason === 'logout')` when coming from logout ✅
+
+**Files Changed:**
+- `frontend/react-app/src/hooks/useOnboardingGuard.ts`
+  - `usePreventBack()` function me `enabled: boolean = true` parameter add kiya
+  - Conditional logic: `if (!enabled) return;`
+
+- `frontend/react-app/src/pages/AuthPage.tsx`
+  - `usePreventBack` import add kiya
+  - `reason === 'logout'` check karke back block enable kiya
+
+- `frontend/react-app/src/pages/ChooseTypePage.tsx`
+  - `usePreventBack` import add kiya
+  - `usePreventBack(true)` call add kiya (select way step me back block)
+
+### 9. ✅ Logout Back Navigation Prevention
+
+**Problem:** Logout ke baad user back button se authenticated pages pe wapas ja sakta tha. Standard websites me logout ke baad history clear hoti hai.
+
+**Solution:**
+- All logout handlers me `window.location.replace('/auth?reason=logout')` use kiya
+- `replace` se history me previous page nahi rehta
+- `reason=logout` query param se `AuthPage` me back block enable hota hai
+
+**Files Changed:**
+- `frontend/react-app/src/components/Navbar.tsx`
+  - `onLogout()` me `window.location.replace('/auth?reason=logout')` use kiya
+
+- `frontend/react-app/src/components/Sidebar.tsx`
+  - `handleLogout()` me `window.location.replace('/auth?reason=logout')` use kiya
+
+- `frontend/react-app/src/components/MobileNav.tsx`
+  - `handleLogout()` me `window.location.replace('/auth?reason=logout')` use kiya
+
+- `frontend/react-app/src/components/AuthShell.tsx`
+  - `handleLogout()` me `window.location.replace('/auth?reason=logout')` use kiya (OTP/Profile screens ke top-right logout button)
+
+### 10. ✅ Dashboard "Make Public" - Enhanced Error Handling
+
+**Problem:** Dashboard me "Make Public" toggle pe error aata: "Publish prerequisites not met" - but user ko **exact missing items** nahi dikh rahe the. User confuse ho jaata tha.
+
+**Solution:**
+- `CreatorDashboardPage.togglePublic()` me `PUBLISH_PREREQ_FAILED` error handling add kiya
+- Exact missing prerequisites show kiya (Title, Thumbnail, Category, Description, Monetization, Pricing, Stripe Connect)
+- User ko `/marketplace/manage` pe redirect kiya (where they can fix)
+- Toast message 7000ms duration (better readability)
+
+**Files Changed:**
+- `frontend/react-app/src/pages/CreatorDashboardPage.tsx`
+  - `togglePublic()` catch block me `PUBLISH_PREREQ_FAILED` handling add kiya
+  - `missingLabels` mapping add kiya (consistent with SettingsPage)
+  - Missing items join karke toast message show kiya
+  - Redirect to `/marketplace/manage` add kiya
+
+- `frontend/react-app/src/pages/MarketplaceManagePage.tsx`
+  - Error labels update kiya (consistent with CreatorDashboardPage)
+  - `choose_monetization`: "Enable monetization (Subscription or Pay-per-chat)"
+  - `stripe_connect_verified`: "Stripe Connect (details + payouts enabled)"
+  - Toast duration 5000ms → 7000ms
+
+**Code Changes:**
+```tsx
+// CreatorDashboardPage.tsx
+if (err.status === 400 && err.errorCode === 'PUBLISH_PREREQ_FAILED') {
+  const missingLabels: Record<string, string> = {
+    title: 'Title',
+    thumbnail: 'Thumbnail',
+    category: 'Category',
+    description: 'Description',
+    choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
+    subscription_price: 'Subscription price',
+    pay_per_chat_price: 'Pay-per-chat price',
+    stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+  };
+  const missing: string[] = Array.isArray(err.missing) ? err.missing : [];
+  const msg = missing.length
+    ? missing.map((m) => missingLabels[m] || m).join(', ')
+    : 'Complete listing basics + pricing + Stripe to publish.';
+  showToast(`Cannot make public yet. Missing: ${msg}`, 'error', 7000);
+  nav('/marketplace/manage');
+  return;
+}
+```
+
+---
+
 ## Conclusion
 
-All 7 issues have been resolved with proper error handling, user guidance, state management, and duplicate submission prevention. The application now provides a smooth, predictable user experience with clear feedback at every step.
+All 10 issues have been resolved with proper error handling, user guidance, state management, duplicate submission prevention, and **back navigation blocking** (standard website behavior). The application now provides a smooth, predictable user experience with clear feedback at every step.
 
 **Status:** ✅ Ready for production
 
-**Latest Updates:**
-- Publish prerequisites now show exact missing items
-- Profile/Choose Type flow no longer has duplicate submissions
-- Profile page blocked after first completion
+**Latest Updates (Round 3):**
+- Back navigation blocked in signup flow (OTP → Profile → Select Way)
+- Back navigation blocked after logout (standard security practice)
+- Dashboard "Make Public" shows exact missing prerequisites
+- Consistent error labels across all publish error handlers
+- All logout handlers use `window.location.replace()` to prevent history access
 
