@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS "User" (
 );
 
 -- ✅ MIGRATION: existing/old prod DBs -> add missing columns (idempotent)
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'emailVerified' AND is_nullable = 'YES') THEN
+    ALTER TABLE "User" ALTER COLUMN "emailVerified" SET DEFAULT false;
+    ALTER TABLE "User" ALTER COLUMN "emailVerified" SET NOT NULL;
+    UPDATE "User" SET "emailVerified" = false WHERE "emailVerified" IS NULL;
+  END IF;
+END $$;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleEmail" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleEmailVerified" BOOLEAN;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profileImage" TEXT;
