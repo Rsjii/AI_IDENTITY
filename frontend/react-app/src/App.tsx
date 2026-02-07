@@ -32,6 +32,11 @@ import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
 import { OnboardingStripeConnectPage } from './pages/OnboardingStripeConnectPage';
 import { OnboardingDeployPage } from './pages/OnboardingDeployPage';
 import { OnboardingTrainingPage } from './pages/OnboardingTrainingPage';
+// New onboarding flow pages
+import { OnboardingStartPage } from './pages/OnboardingStartPage';
+import { OnboardingUploadPageNew } from './pages/OnboardingUploadPageNew';
+import { OnboardingPreviewPage } from './pages/OnboardingPreviewPage';
+import { OnboardingCompletePage } from './pages/OnboardingCompletePage';
 import { PublicChatPage } from './pages/PublicChatPage';
 import { Layout } from './components/Layout';
 import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
@@ -48,6 +53,11 @@ import { CreatorConversationDetailPage } from './pages/CreatorConversationDetail
 import { ChooseTypePage } from './pages/ChooseTypePage';
 import { MyChatsPage } from './pages/MyChatsPage';
 import { MyAIPage } from './pages/MyAIPage';
+import { SetupChecklistPage } from './pages/setup/SetupChecklistPage';
+import { SetupPricingPage } from './pages/setup/SetupPricingPage';
+import { SetupPlanPage } from './pages/setup/SetupPlanPage';
+import { SetupStripePage } from './pages/setup/SetupStripePage';
+import { SetupSharePage } from './pages/setup/SetupSharePage';
 import { FLAGS } from './lib/flags';
 
 
@@ -101,6 +111,7 @@ function App() {
               <Route path="/forgot-password/reset" element={<ForgotPasswordResetPage />} />
               <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              {/* ✅ Pricing page public (standard SaaS) */}
               <Route path="/pricing" element={<PricingPage />} />
 
               <Route path="/privacy" element={<PrivacyPage />} />
@@ -109,6 +120,14 @@ function App() {
               <Route path="/403" element={<ForbiddenPage />} />
 
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingGatePage /></ProtectedRoute>} />
+              
+              {/* New Onboarding Flow (Industry Standard) */}
+              <Route path="/onboarding/start" element={<ProtectedRoute><OnboardingStartPage /></ProtectedRoute>} />
+              <Route path="/onboarding/upload" element={<ProtectedRoute><OnboardingUploadPageNew /></ProtectedRoute>} />
+              <Route path="/onboarding/preview" element={<ProtectedRoute><OnboardingPreviewPage /></ProtectedRoute>} />
+              <Route path="/onboarding/complete" element={<ProtectedRoute><OnboardingCompletePage /></ProtectedRoute>} />
+              
+              {/* Legacy Onboarding Flow (Backward Compatibility) */}
               <Route path="/onboarding/quiz" element={<ProtectedRoute><OnboardingQuizPage /></ProtectedRoute>} />
               <Route path="/onboarding/content" element={<ProtectedRoute><OnboardingContentPage /></ProtectedRoute>} />
               <Route path="/onboarding/pricing" element={<ProtectedRoute><OnboardingPricingPage /></ProtectedRoute>} />
@@ -117,8 +136,17 @@ function App() {
               <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
               <Route path="/onboarding/stripe-connect" element={<ProtectedRoute><OnboardingStripeConnectPage /></ProtectedRoute>} />
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
+              
+              {/* Setup Flow Routes */}
+              <Route path="/setup" element={<ProtectedRoute><SetupChecklistPage /></ProtectedRoute>} />
+              <Route path="/setup/pricing" element={<ProtectedRoute><SetupPricingPage /></ProtectedRoute>} />
+              <Route path="/setup/plan" element={<ProtectedRoute><SetupPlanPage /></ProtectedRoute>} />
+              <Route path="/setup/stripe" element={<ProtectedRoute><SetupStripePage /></ProtectedRoute>} />
+              <Route path="/setup/share" element={<ProtectedRoute><SetupSharePage /></ProtectedRoute>} />
+              
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
               <Route path="/knowledge" element={<Navigate to="/my-ai?tab=train" replace />} />
+              {/* ✅ Chat route PUBLIC but locked inside PublicChatPage (login gate) */}
               <Route
                 path="/chat/:slug"
                 element={
@@ -127,14 +155,15 @@ function App() {
                   </Layout>
                 }
               />
-              <Route path="/u/:handle" element={<CreatorPublicProfile />} />
-              <Route path="/explore" element={<MarketplacePage />} />
+              {/* ✅ Protect previously-public pages (login required) */}
+              <Route path="/u/:handle" element={<ProtectedRoute><CreatorPublicProfile /></ProtectedRoute>} />
+              <Route path="/explore" element={<ProtectedRoute><MarketplacePage /></ProtectedRoute>} />
               <Route path="/my-chats" element={<ProtectedRoute><MyChatsPage /></ProtectedRoute>} />
               <Route path="/my-profile" element={<Navigate to="/settings" replace />} />
               {FLAGS.marketplace && (
                 <>
-                  <Route path="/marketplace" element={<MarketplacePage />} />
-                  <Route path="/marketplace/:slug" element={<MarketplaceListingPage />} />
+                  <Route path="/marketplace" element={<ProtectedRoute><MarketplacePage /></ProtectedRoute>} />
+                  <Route path="/marketplace/:slug" element={<ProtectedRoute><MarketplaceListingPage /></ProtectedRoute>} />
                   <Route path="/marketplace/manage" element={<ProtectedRoute><MarketplaceManagePage /></ProtectedRoute>} />
                 </>
               )}

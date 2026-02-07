@@ -13,6 +13,7 @@ export interface LLMResponse {
   tokensUsed?: number;
   inputTokens?: number;  // ✅ ADD
   outputTokens?: number; // ✅ ADD
+  cost?: number; // ✅ ADD: Cost in USD
 }
 
 export class LLMClient {

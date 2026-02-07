@@ -85,8 +85,9 @@ export function OnboardingContentPage() {
   const estimatedMinutes = Math.max(2, Math.ceil(2 + totalSizeMB * 2));
   const estimatedHours = estimatedMinutes >= 60 ? (estimatedMinutes / 60).toFixed(1) : null;
 
-  const minimumItemsRequired = 3;
-  const hasMinimumItems = totalFiles >= minimumItemsRequired;
+  // ✅ Phase-1 requirement: enforce words (not "3 files")
+  const minimumWordsRequired = 500;
+  const hasMinimumWords = totalWords >= minimumWordsRequired;
 
   // Quality score calculation
   const getQualityTier = () => {
@@ -747,10 +748,16 @@ export function OnboardingContentPage() {
                         showToast('All files uploaded successfully!', 'success', 2000);
                       }
 
-                      // ✅ STEP 2: Refresh auth state
+                      // ✅ STEP 2: mark onboarding step = pricing (prevents ProtectedRoute redirect back to /content)
+                      await apiFetch('/api/creator/onboarding/step', {
+                        method: 'POST',
+                        body: JSON.stringify({ step: 'pricing' }),
+                      });
+
+                      // ✅ STEP 3: Refresh auth state
                       await refreshAuth();
 
-                      // ✅ STEP 3: Navigate to pricing page (onboarding NOT complete yet!)
+                      // ✅ STEP 4: Navigate to pricing page
                       nav('/onboarding/pricing');
                     } catch (error) {
                       console.error('Failed during continue:', error);
@@ -760,7 +767,7 @@ export function OnboardingContentPage() {
                     }
                   }}
                   className="bg-accent-gradient hover:opacity-90 text-white px-8"
-                  disabled={!hasMinimumItems || loading}
+                  disabled={!hasMinimumWords || loading}
                 >
                   {loading ? (
                     <>
@@ -778,9 +785,9 @@ export function OnboardingContentPage() {
                     </>
                   )}
                 </Button>
-                {!hasMinimumItems && (
+                {!hasMinimumWords && (
                   <span className="text-xs text-text-tertiary">
-                    Add at least {minimumItemsRequired} items to continue
+                    Add at least {minimumWordsRequired} words to continue
                   </span>
                 )}
                 {stagedFiles.length > 0 && (

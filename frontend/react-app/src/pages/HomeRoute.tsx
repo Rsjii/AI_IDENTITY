@@ -25,7 +25,7 @@ function getSubdomainHandle(): string | null {
 /**
  * Standard SaaS behavior:
  * - Subdomain: treat as standalone chat link => /chat/:handle
- * - Logged out: show marketing landing
+ * - Logged out: show marketing landing page
  * - Logged in: send user to dashboard (product home)
  */
 export function HomeRoute() {
@@ -42,6 +42,7 @@ export function HomeRoute() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // ✅ Logged-out: show marketing landing (standard SaaS)
   return <LandingPage />;
 }
 

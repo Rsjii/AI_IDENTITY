@@ -67,7 +67,10 @@ export function AuthPage() {
   // OPTIONAL: avoid flicker
   if (state.status === 'authenticated') return null;
 
-  const [activeTab, setActiveTab] = useState<TabType>('login');
+  // ✅ Support mode=signup query param (for chat page login gate)
+  const mode = q.get('mode');
+  const initialTab: TabType = mode === 'signup' ? 'signup' : 'login';
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState<string>(() => {

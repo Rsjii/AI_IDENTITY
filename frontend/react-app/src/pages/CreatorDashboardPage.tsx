@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { showToast } from '@/lib/toast';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/Skeleton';
@@ -90,9 +91,27 @@ export function CreatorDashboardPage() {
   const [listingData, setListingData] = useState<{ isPublic: boolean; id?: string } | null>(null);
   const [togglingPublic, setTogglingPublic] = useState(false);
 
+  // Setup status banner state
+  const [setupStatus, setSetupStatus] = useState<any>(null);
+  const [showSetupBanner, setShowSetupBanner] = useState(true);
+
   // FIX: polling closure stale state (use refs)
   const lastChatCountRef = useRef(0);
   const lastRevenueRef = useRef(0);
+
+  // Fetch setup status for banner
+  useEffect(() => {
+    const fetchSetupStatus = async () => {
+      try {
+        const data = await apiFetch('/api/creator/setup/status');
+        setSetupStatus(data);
+        setShowSetupBanner(!data.setupDismissed && data.completionPercentage < 100);
+      } catch (error) {
+        console.error('Failed to fetch setup status', error);
+      }
+    };
+    fetchSetupStatus();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -412,6 +431,37 @@ const handleGenerateInsightsReport = () => {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto space-y-6 px-6 py-8">
+        {/* Setup completion banner */}
+        {showSetupBanner && setupStatus && setupStatus.completionPercentage < 100 && (
+          <Alert className="mb-6 border-accent-primary/30 bg-accent-primary/10">
+            <AlertCircle className="h-4 w-4 text-accent-primary" />
+            <AlertDescription>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <strong>Complete your setup to start earning</strong>
+                    <span className="text-sm">{setupStatus.completionPercentage}% done</span>
+                  </div>
+                  <Progress value={setupStatus.completionPercentage} className="h-2" />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => nav('/setup')} size="sm">Continue Setup</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      await apiFetch('/api/creator/setup/dismiss', { method: 'POST' });
+                      setShowSetupBanner(false);
+                    }}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Phase 2: Free tier upgrade banner */}
         {isFreeTier && (
           <Alert className="border-orange-500/30 bg-orange-500/10">

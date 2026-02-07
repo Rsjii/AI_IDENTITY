@@ -34,8 +34,9 @@ const updateIdentitySchema = z.object({
 
 // Contexts where the AI clone can be tested/used.
 // 'web' is used by the dashboard Test AI tab (MirrorPage).
+// 'onboarding-preview' is used by the onboarding preview page.
 const mirrorSchema = z.object({
-  context: z.enum(['linkedin_dm', 'email', 'sales', 'intro', 'support', 'personal', 'web']),
+  context: z.enum(['linkedin_dm', 'email', 'sales', 'intro', 'support', 'personal', 'web', 'onboarding-preview']),
   incomingMessage: z.string().min(1),
 });
 
@@ -100,6 +101,105 @@ export const createIdentity = async (req: AuthenticatedRequest, res: Response, n
     }
 
     handleErrorWithResponse(error, res, 'Failed to create identity.');
+  }
+};
+
+/**
+ * POST /api/identity/setup
+ * Simplified endpoint for onboarding start page
+ * Takes { name, category, purpose } and creates/updates identity
+ */
+const setupIdentitySchema = z.object({
+  name: z.string().min(1),
+  category: z.string().min(1),
+  purpose: z.string().min(20),
+});
+
+export const setupIdentity = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        errorCode: ErrorCodes.UNAUTHORIZED,
+      });
+    }
+
+    const { name, category, purpose } = setupIdentitySchema.parse(req.body);
+
+    // Convert to identityJson format
+    const identityJson = {
+      displayName: name.trim(),
+      primaryUse: purpose.trim(),
+      category: category,
+      defaults: {
+        language: 'en',
+        formality: 'professional',
+      },
+      hardRules: {
+        always: [],
+        never: [],
+      },
+      boundaries: {
+        noTopics: [],
+        noCommitments: [],
+      },
+      decisionPolicy: {},
+      styleAnchors: {},
+    };
+
+    // Import identityQueries dynamically
+    const { identityQueries } = await import('../../config/database');
+    
+    // Check if identity already exists
+    const existing = await identityQueries.findByUserId(req.user.id);
+    
+    if (existing) {
+      // Update existing identity (creates new version)
+      const result = await updateIdentityVersionService(existing.activeVersionId || '', req.user.id, identityJson as any);
+      
+      // Update onboarding step to 'upload'
+      try {
+        const { userQueries } = await import('../../config/database');
+        await userQueries.updateOnboardingStep(req.user.id, 'upload');
+      } catch {}
+
+      return res.json({
+        success: true,
+        identity: {
+          id: existing.id,
+          activeVersionId: result.version.id,
+        },
+      });
+    } else {
+      // Create new identity
+      const { identity, version } = await createIdentityService(req.user.id, identityJson as any);
+      
+      // Update onboarding step to 'upload' (not 'content' like createIdentity does)
+      try {
+        const { userQueries } = await import('../../config/database');
+        await userQueries.updateOnboardingStep(req.user.id, 'upload');
+      } catch {}
+
+      return res.json({
+        success: true,
+        identity: {
+          id: identity.id,
+          activeVersionId: version.id,
+        },
+      });
+    }
+  } catch (error: any) {
+    logger.error('Setup identity error:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        errorCode: ErrorCodes.VALIDATION_ERROR,
+        details: error.errors,
+      });
+    }
+
+    handleErrorWithResponse(error, res, 'Failed to setup identity.');
   }
 };
 

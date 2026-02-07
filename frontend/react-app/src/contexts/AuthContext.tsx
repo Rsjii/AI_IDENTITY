@@ -15,7 +15,7 @@ export type MeUser = {
   profileImage?: string;
   profileCompleted?: boolean;
   active?: boolean;
-  onboardingStep?: 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'done';
+  onboardingStep?: 'start' | 'upload' | 'preview' | 'complete' | 'done' | 'quiz' | 'content' | 'voice' | 'plan' | 'deploy' | 'pricing' | 'stripe_connect' | 'training';
   userType?: 'creator' | 'visitor';
   isAdmin?: boolean;
   hasPassword?: boolean;

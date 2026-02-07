@@ -9,6 +9,7 @@ import {
   activateIdentityVersion,
   listIdentityVersions,
   getTrainingStatus,
+  setupIdentity,
 } from './identityController';
 import { mirrorVoice } from './voiceMirrorController';
 import {
@@ -31,6 +32,9 @@ router.use(requireJWTFromCookie);
 
 // Create identity
 router.post('/', sanitizeInput, validateCSRF, identityCreateRateLimit, createIdentity);
+
+// Setup identity (for onboarding start page)
+router.post('/setup', sanitizeInput, validateCSRF, identityCreateRateLimit, setupIdentity);
 
 // Get identity
 router.get('/me', getIdentity);

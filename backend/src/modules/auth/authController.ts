@@ -1067,12 +1067,16 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       } else if (userType === 'visitor') {
         nextRedirect = '/explore';
       } else {
-        // creator path (existing)
+        // creator path - NEW FLOW: use 'start' as default, handle legacy steps
         const isOnboardingDone = user.onboardingStep === 'done';
         if (isOnboardingDone) {
           nextRedirect = '/dashboard';
         } else {
-          nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+          // ✅ NEW FLOW: Default to 'start', but allow legacy steps for backward compatibility
+          const raw = String((user as any).onboardingStep || '');
+          const newFlowSteps = ['start', 'upload', 'preview', 'complete'];
+          const step = newFlowSteps.includes(raw) ? raw : 'start';
+          nextRedirect = `/onboarding/${step}`;
         }
       }
     }
@@ -1253,12 +1257,16 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
       } else if (userType === 'visitor') {
         nextRedirect = '/explore';
       } else {
-        // creator path (existing)
+        // creator path - NEW FLOW: use 'start' as default, handle legacy steps
         const isOnboardingDone = user.onboardingStep === 'done';
         if (isOnboardingDone) {
           nextRedirect = '/dashboard';
         } else {
-          nextRedirect = `/onboarding/${user.onboardingStep || 'quiz'}`;
+          // ✅ NEW FLOW: Default to 'start', but allow legacy steps for backward compatibility
+          const raw = String((user as any).onboardingStep || '');
+          const newFlowSteps = ['start', 'upload', 'preview', 'complete'];
+          const step = newFlowSteps.includes(raw) ? raw : 'start';
+          nextRedirect = `/onboarding/${step}`;
         }
       }
     }
@@ -1640,13 +1648,13 @@ export const setUserType = async (req: any, res: Response) => {
     return res.status(400).json({ error: 'Creators cannot downgrade to visitor.' });
   }
 
-  // ✅ Visitor -> Creator upgrade should restart onboarding
+  // ✅ Visitor -> Creator upgrade should restart onboarding (NEW FLOW: 'start' not 'quiz')
   const r = await db.query(
     `
     UPDATE "User"
     SET
       "userType" = $1,
-      "onboardingStep" = CASE WHEN $1 = 'creator' THEN 'quiz' ELSE "onboardingStep" END,
+      "onboardingStep" = CASE WHEN $1 = 'creator' THEN 'start' ELSE "onboardingStep" END,
       "onboardingCompleted" = CASE WHEN $1 = 'creator' THEN false ELSE "onboardingCompleted" END,
       "updatedAt" = CURRENT_TIMESTAMP
     WHERE id = $2

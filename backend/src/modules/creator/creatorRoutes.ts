@@ -20,6 +20,9 @@ import {
   listChats,
   chatDetails,
   listSubscribers,
+  getSetupStatus,
+  updateSetupStep,
+  dismissSetupBanner,
 } from './creatorController';
 
 const router = Router();
@@ -43,5 +46,10 @@ router.get('/chats/recent', asyncHandler(recentChats));
 router.get('/chats', asyncHandler(listChats));
 router.get('/chats/:sessionId', asyncHandler(chatDetails));
 router.get('/subscribers', asyncHandler(listSubscribers));
+
+// Setup tracking routes
+router.get('/setup/status', asyncHandler(getSetupStatus));
+router.post('/setup/step', sanitizeInput, validateCSRF, asyncHandler(updateSetupStep));
+router.post('/setup/dismiss', validateCSRF, asyncHandler(dismissSetupBanner));
 
 export default router;

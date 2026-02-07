@@ -592,10 +592,21 @@ export async function updateOnboardingStep(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const { step } = z.object({
-    step: z.enum(['quiz', 'content', 'pricing', 'voice', 'plan', 'stripe_connect', 'deploy', 'done']),
+    // Support both old and new flow values for backward compatibility
+    step: z.enum(['quiz', 'content', 'pricing', 'voice', 'plan', 'stripe_connect', 'deploy', 'done', 'start', 'upload', 'preview', 'complete']),
   }).parse(req.body);
 
   await userQueries.updateOnboardingStep(userId, step);
+
+  // ✅ NEW: Core onboarding is Step 1 + Step 2.
+  // When user reaches 'preview' (Step 3), mark onboardingCompleted=true
+  // so they can access dashboard after this point.
+  if (step === 'preview') {
+    await db.query(
+      'UPDATE "User" SET "onboardingCompleted" = true WHERE id = $1',
+      [userId]
+    );
+  }
 
   return res.json({ success: true, step });
 }
@@ -880,4 +891,94 @@ export async function listSubscribers(req: Request, res: Response) {
       },
     })),
   });
+}
+
+/**
+ * Get setup completion status
+ * GET /api/creator/setup/status
+ */
+export async function getSetupStatus(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const user = await userQueries.findById(userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const setupCompleted = (user as any).setupCompleted || {};
+  const setupDismissed = (user as any).setupDismissed || false;
+
+  // Calculate completion percentage
+  const steps = ['pricing', 'plan', 'stripe', 'share'];
+  const completedSteps = steps.filter(step => setupCompleted[step] === true);
+  const completionPercentage = Math.round((completedSteps.length / steps.length) * 100);
+
+  return res.json({
+    setupCompleted,
+    setupDismissed,
+    completionPercentage,
+    completedSteps: completedSteps.length,
+    totalSteps: steps.length,
+    nextStep: completedSteps.length < steps.length ?
+      steps.find(s => !setupCompleted[s]) : null,
+  });
+}
+
+/**
+ * Update setup step completion
+ * POST /api/creator/setup/step
+ */
+export async function updateSetupStep(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const schema = z.object({
+    step: z.enum(['pricing', 'plan', 'stripe', 'share']),
+    completed: z.boolean(),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid request', details: parsed.error });
+  }
+
+  const { step, completed } = parsed.data;
+
+  // Get current setup state
+  const user = await userQueries.findById(userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const currentSetup = (user as any).setupCompleted || {};
+  const updatedSetup = { ...currentSetup, [step]: completed };
+
+  // Check if all steps completed
+  const allSteps = ['pricing', 'plan', 'stripe', 'share'];
+  const allCompleted = allSteps.every(s => updatedSetup[s] === true);
+
+  if (allCompleted && !updatedSetup.completedAt) {
+    updatedSetup.completedAt = new Date().toISOString();
+  }
+
+  // Update database
+  await db.query(
+    `UPDATE "User" SET "setupCompleted" = $1 WHERE "id" = $2`,
+    [JSON.stringify(updatedSetup), userId]
+  );
+
+  return res.json({ success: true, setupCompleted: updatedSetup });
+}
+
+/**
+ * Dismiss setup banner
+ * POST /api/creator/setup/dismiss
+ */
+export async function dismissSetupBanner(req: Request, res: Response) {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  await db.query(
+    `UPDATE "User" SET "setupDismissed" = true WHERE "id" = $1`,
+    [userId]
+  );
+
+  return res.json({ success: true });
 }

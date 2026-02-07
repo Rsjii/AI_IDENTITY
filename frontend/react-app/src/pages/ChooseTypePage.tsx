@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AuthShell } from '@/components/AuthShell';
@@ -12,7 +12,6 @@ function useQuery() {
 }
 
 export function ChooseTypePage() {
-  const navigate = useNavigate();
   const q = useQuery();
   const { refresh } = useAuth();
 
@@ -32,13 +31,15 @@ export function ChooseTypePage() {
         method: 'POST',
         body: JSON.stringify({ userType }),
       });
+
+      // Best-effort refresh (keeps state correct if user stays on page)
       await refresh();
 
-      if (userType === 'creator') {
-        navigate('/onboarding/quiz', { replace: true });
-      } else {
-        navigate(safeNext || '/explore', { replace: true });
-      }
+      // ✅ NEW FLOW: Creator goes to new onboarding start
+      const target = userType === 'creator' ? '/onboarding/start' : (safeNext || '/explore');
+
+      // ✅ FIX: hard redirect so ProtectedRoute can't see stale state
+      window.location.replace(target);
     } catch (e: any) {
       setError(e?.message || 'Failed to set user type');
     } finally {

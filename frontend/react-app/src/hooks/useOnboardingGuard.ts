@@ -1,26 +1,41 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Hook to prevent access to onboarding pages after onboarding is complete
- * Redirects to dashboard if onboarding is marked as done
+ * Allows Step 3/4 (preview/complete) only while "post-step2 window" is active
+ * Window is cleared when user leaves onboarding (dashboard/setup/etc.) or kills app
  */
 export function useOnboardingGuard() {
   const { state } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // Wait for auth to load
     if (state.status === 'loading') return;
 
     const user = state.status === 'authenticated' ? state.user : null;
-    // If onboarding is done (check both flags for safety), redirect to dashboard
-    if (user?.onboardingStep === 'done' || (user as any)?.onboardingCompleted === true) {
-      console.log('[useOnboardingGuard] Onboarding complete, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [state, navigate]);
+    const completed =
+      (user as any)?.onboardingCompleted === true || user?.onboardingStep === 'done';
+
+    if (!completed) return;
+
+    const path = location.pathname;
+    const isOnboarding = path.startsWith('/onboarding');
+
+    if (!isOnboarding) return;
+
+    // After core onboarding is complete, only allow Step 3/4 *if* the window is active.
+    const windowActive = sessionStorage.getItem('selflyx_post_step2_window') === '1';
+    const isPreviewOrComplete =
+      path.startsWith('/onboarding/preview') || path.startsWith('/onboarding/complete');
+
+    if (windowActive && isPreviewOrComplete) return;
+
+    // Otherwise, never show onboarding again
+    navigate('/dashboard', { replace: true });
+  }, [state, navigate, location.pathname]);
 }
 
 /**

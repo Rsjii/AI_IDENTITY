@@ -100,6 +100,21 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "userType" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletionScheduledAt" TIMESTAMPTZ;
 
+-- ✅ PHASE 1: Setup completion tracking (progressive setup)
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "setupCompleted" JSONB DEFAULT '{}';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "setupDismissed" BOOLEAN DEFAULT false;
+
+-- ✅ Create index for faster queries on setup completion
+CREATE INDEX IF NOT EXISTS idx_user_setup_completed ON "User" USING gin ("setupCompleted");
+
+-- ✅ Update onboardingStep constraint for new flow (supports both old and new enum values)
+DO $$
+BEGIN
+  ALTER TABLE "User" DROP CONSTRAINT IF EXISTS "User_onboardingStep_check";
+  ALTER TABLE "User" ADD CONSTRAINT "User_onboardingStep_check"
+    CHECK ("onboardingStep" IN ('quiz','content','pricing','voice','plan','stripe_connect','deploy','done','start','upload','preview','complete'));
+END $$;
+
 -- CreateTable: OTP
 CREATE TABLE IF NOT EXISTS "OTP" (
     "id" TEXT NOT NULL,
@@ -1169,9 +1184,11 @@ export const userQueries = {
   },
 
   // ✅ ADD: only ADVANCE step (never regress)
+  // Supports both old flow (quiz, content, pricing, voice, plan, stripe_connect, deploy, done)
+  // and new flow (start, upload, preview, complete, done)
   updateOnboardingStep: async (
     userId: string,
-    step: 'quiz' | 'content' | 'pricing' | 'voice' | 'plan' | 'stripe_connect' | 'deploy' | 'done'
+    step: 'quiz' | 'content' | 'pricing' | 'voice' | 'plan' | 'stripe_connect' | 'deploy' | 'done' | 'start' | 'upload' | 'preview' | 'complete'
   ) => {
     await db.query(
       `
@@ -1181,6 +1198,7 @@ export const userQueries = {
       WHERE id = $2
         AND (
           CASE "onboardingStep"
+            -- Old flow
             WHEN 'quiz' THEN 0
             WHEN 'content' THEN 1
             WHEN 'pricing' THEN 2
@@ -1188,11 +1206,17 @@ export const userQueries = {
             WHEN 'plan' THEN 4
             WHEN 'stripe_connect' THEN 5
             WHEN 'deploy' THEN 6
+            -- New flow
+            WHEN 'start' THEN 0
+            WHEN 'upload' THEN 1
+            WHEN 'preview' THEN 2
+            WHEN 'complete' THEN 3
             WHEN 'done' THEN 7
             ELSE 0
           END
         ) < (
           CASE $1
+            -- Old flow
             WHEN 'quiz' THEN 0
             WHEN 'content' THEN 1
             WHEN 'pricing' THEN 2
@@ -1200,6 +1224,11 @@ export const userQueries = {
             WHEN 'plan' THEN 4
             WHEN 'stripe_connect' THEN 5
             WHEN 'deploy' THEN 6
+            -- New flow
+            WHEN 'start' THEN 0
+            WHEN 'upload' THEN 1
+            WHEN 'preview' THEN 2
+            WHEN 'complete' THEN 3
             WHEN 'done' THEN 7
             ELSE 0
           END

@@ -67,7 +67,8 @@ export function MyProfilePage() {
         body: JSON.stringify({ userType: 'creator' }),
       });
       await refresh();
-      nav('/onboarding/quiz');
+      // ✅ NEW FLOW: Redirect to new onboarding start
+      window.location.replace('/onboarding/start');
     } finally {
       setUpgradeLoading(false);
     }

@@ -15,7 +15,6 @@ import {
   Zap,
   Menu,
   Info,
-  LogOut,
   Settings,
   Share2,
   Plus,
@@ -172,22 +171,19 @@ function ShareButtons({ slug, creatorName }: { slug: string; creatorName?: strin
 export function PublicChatPage() {
   const { slug = '' } = useParams();
   const [searchParams] = useSearchParams();
-  const { state, logout } = useAuth();
+  const { state } = useAuth();
   const isAuthed = state.status === 'authenticated';
   
   const sessionIdFromUrl = searchParams.get('sessionId') || '';
   const subscribedFromUrl = searchParams.get('subscribed') === '1';
 
-  const onLogout = async () => {
-    try {
-      await logout();
-      showToast('Logged out', 'success');
-    } catch {
-      showToast('Logout failed', 'error');
-    }
-  };
+  // ✅ Login gate URLs
+  const nextPath = `/chat/${slug}`;
+  const loginHref = `/auth?reason=unauthorized&next=${encodeURIComponent(nextPath)}`;
+  const signupHref = `/auth?reason=unauthorized&next=${encodeURIComponent(nextPath)}&mode=signup`;
 
-  const visitorId = useMemo(() => getOrCreateVisitorId(), []);
+  // ✅ Only create visitorId when authenticated (login-first mode)
+  const visitorId = useMemo(() => (isAuthed ? getOrCreateVisitorId() : ''), [isAuthed]);
   const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
   const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
 
@@ -398,6 +394,7 @@ export function PublicChatPage() {
 
   // Load history (guest + authed)
   useEffect(() => {
+    if (!isAuthed) return; // ✅ Block API calls when logged out
     if (!sessionId) return;
     if (skipNextHistoryRef.current) {
       skipNextHistoryRef.current = false;
@@ -421,7 +418,7 @@ export function PublicChatPage() {
         setMsgs(historyMsgs);
       })
       .catch(() => {});
-  }, [sessionId, visitorId, sessionTsKey]);
+  }, [isAuthed, sessionId, visitorId, sessionTsKey]);
 
   // After login: claim guest session so it appears in ConversationSidebar
   useEffect(() => {
@@ -463,9 +460,10 @@ export function PublicChatPage() {
     checkLimit();
   }, [isAuthed, sessionId, msgs.length]);
 
-  // Public message-limit (guest + authed) for premium countdown
+  // Public message-limit (authed only - login-first mode)
   useEffect(() => {
     const run = async () => {
+      if (!isAuthed) return; // ✅ Block API calls when logged out
       if (!sessionId) return;
       try {
         const res = await apiFetch(
@@ -478,7 +476,7 @@ export function PublicChatPage() {
       } catch {}
     };
     run();
-  }, [sessionId, visitorId, msgs.length]);
+  }, [isAuthed, sessionId, visitorId, msgs.length]);
 
   const freeLimit = publicLimit?.freeMessageLimit ?? creator?.freeMessageLimit ?? 3;
   const remainingFree = publicLimit?.remainingFreeMessages ?? Math.max(0, freeLimit - msgs.filter((m) => m.role === 'user').length);
@@ -493,6 +491,12 @@ export function PublicChatPage() {
   };
 
   const send = async () => {
+    // ✅ Block send when not authenticated (login-first mode)
+    if (!isAuthed) {
+      window.location.href = loginHref;
+      return;
+    }
+    
     const m = text.trim();
     if (!m || typing || sendingRef.current) return;
     sendingRef.current = true;
@@ -987,12 +991,20 @@ export function PublicChatPage() {
               </button>
 
               {!isAuthed ? (
-                <Link
-                  to={`/auth?next=${encodeURIComponent(`/chat/${slug}`)}`}
-                  className="ml-1 px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
-                >
-                  Login to Save
-                </Link>
+                <div className="ml-1 flex items-center gap-2">
+                  <Link
+                    to={loginHref}
+                    className="px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    to={signupHref}
+                    className="px-3 py-2 text-sm font-medium bg-accent-gradient text-white rounded-lg hover:opacity-90"
+                  >
+                    Sign up
+                  </Link>
+                </div>
               ) : (
                 <>
                   <Link
@@ -1002,13 +1014,6 @@ export function PublicChatPage() {
                   >
                     <Settings className="h-5 w-5 text-text-primary" />
                   </Link>
-                  <button
-                    onClick={onLogout}
-                    className="ml-1 px-3 py-2 text-sm font-medium bg-bg-tertiary border border-border-default rounded-lg hover:bg-bg-elevated inline-flex items-center gap-2"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </button>
                 </>
               )}
 
@@ -1303,6 +1308,14 @@ export function PublicChatPage() {
 
         {/* Input -- no sticky, sits at bottom of flex column naturally */}
         <div className="bg-bg-secondary border-t border-border-default px-4 py-4 flex-shrink-0">
+          {/* ✅ Login gate message (login-first mode) */}
+          {!isAuthed && (
+            <div className="max-w-5xl mx-auto mb-3 p-3 rounded-lg border border-border-default bg-bg-tertiary text-sm">
+              <div className="font-medium text-text-primary mb-1">Login required</div>
+              <div className="text-text-secondary">To chat with this AI, please log in or create an account.</div>
+            </div>
+          )}
+          
           {/* Phase 5: Creator unavailable message */}
           {creatorUnavailable && (
             <div className="max-w-5xl mx-auto mb-3 p-3 rounded-lg border border-orange-500/30 bg-orange-500/10">
@@ -1318,21 +1331,21 @@ export function PublicChatPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={creatorUnavailable ? "Creator unavailable - chat limit reached" : "Type your message..."}
+              placeholder={!isAuthed ? "Login to continue chatting…" : (creatorUnavailable ? "Creator unavailable - chat limit reached" : "Type your message...")}
               rows={1}
-              disabled={typing || creatorUnavailable}
+              disabled={!isAuthed || typing || creatorUnavailable}
               className="flex-1 resize-none rounded-lg border border-border-default bg-bg-primary px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '140px' }}
             />
             <button
-              onClick={send}
-              disabled={!text.trim() || typing || creatorUnavailable}
+              onClick={!isAuthed ? (() => { window.location.href = loginHref; }) : send}
+              disabled={!isAuthed || !text.trim() || typing || creatorUnavailable}
               className="px-6 py-3 bg-accent-gradient hover:opacity-90 disabled:opacity-50 text-white rounded-lg font-medium min-h-[44px]"
             >
               {typing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
-          {!creatorUnavailable && (
+          {!creatorUnavailable && isAuthed && (
             <p className="text-xs text-text-tertiary mt-2 text-center">Enter to send • Shift+Enter for new line</p>
           )}
         </div>

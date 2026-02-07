@@ -9,6 +9,29 @@ function getUserId(req: Request): string | null {
   return u?.id || u?.userId || null;
 }
 
+// ✅ Phase-1: Word count requirement (500 words minimum)
+const MIN_WORDS_FOR_PRICING = 500;
+
+function countWords(t: string): number {
+  const s = (t || '').trim();
+  if (!s) return 0;
+  return s.split(/\s+/).filter(Boolean).length;
+}
+
+async function tryAdvanceToPricing(userId: string) {
+  try {
+    const { userQueries } = await import('../../config/database');
+    const items = await knowledgeSourceQueries.listByUserId(userId);
+    const totalWords = (items || []).reduce((sum: number, it: any) => sum + countWords(it.rawText || ''), 0);
+
+    if (totalWords >= MIN_WORDS_FOR_PRICING) {
+      await userQueries.updateOnboardingStep(userId, 'pricing');
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, 'Failed to advance to pricing step');
+  }
+}
+
 const pasteSchema = z.object({
   title: z.string().optional(),
   text: z.string().min(10),
@@ -39,12 +62,11 @@ export async function paste(req: Request, res: Response) {
   const { title, text } = pasteSchema.parse(req.body);
   const source = await createPasteSource(userId, title, text);
 
-  // ✅ ADD: advance step safely
+  // ✅ Phase-1: Update step to 'content', then check if >=500 words to advance to 'pricing'
   try {
     const { userQueries } = await import('../../config/database');
     await userQueries.updateOnboardingStep(userId, 'content');
-    const items = await knowledgeSourceQueries.listByUserId(userId);
-    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+    await tryAdvanceToPricing(userId);
   } catch {}
 
   return res.json({ success: true, source });
@@ -57,12 +79,11 @@ export async function youtube(req: Request, res: Response) {
   const { url, title } = youtubeSchema.parse(req.body);
   const source = await createYoutubeSource(userId, url, title);
 
-  // ✅ ADD: advance step safely
+  // ✅ Phase-1: Update step to 'content', then check if >=500 words to advance to 'pricing'
   try {
     const { userQueries } = await import('../../config/database');
     await userQueries.updateOnboardingStep(userId, 'content');
-    const items = await knowledgeSourceQueries.listByUserId(userId);
-    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+    await tryAdvanceToPricing(userId);
   } catch {}
 
   return res.json({ success: true, source });
@@ -75,12 +96,11 @@ export async function url(req: Request, res: Response) {
   const { url: inputUrl, title } = urlSchema.parse(req.body);
   const source = await createUrlSource(userId, inputUrl, title);
 
-  // ✅ ADD: advance step safely
+  // ✅ Phase-1: Update step to 'content', then check if >=500 words to advance to 'pricing'
   try {
     const { userQueries } = await import('../../config/database');
     await userQueries.updateOnboardingStep(userId, 'content');
-    const items = await knowledgeSourceQueries.listByUserId(userId);
-    if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
+    await tryAdvanceToPricing(userId);
   } catch {}
 
   return res.json({ success: true, source });
@@ -511,12 +531,11 @@ export async function upload(req: Request, res: Response) {
     });
 
     // ✅ Fire-and-forget: onboarding step updates (non-blocking)
+    // Phase-1: Only set to 'content', word-based advancement happens when user clicks Continue
     setImmediate(async () => {
       try {
         const { userQueries } = await import('../../config/database');
         await userQueries.updateOnboardingStep(userId, 'content');
-        const items = await knowledgeSourceQueries.listByUserId(userId);
-        if ((items?.length || 0) >= 3) await userQueries.updateOnboardingStep(userId, 'plan');
       } catch (err) {
         logger.warn({ err, userId }, 'Failed to update onboarding step in background');
       }
