@@ -18,10 +18,17 @@ interface Message {
 export function OnboardingPreviewPage() {
   const nav = useNavigate();
   const { refresh } = useAuth();
+
+  const [trainingStatus, setTrainingStatus] = useState<'not_started' | 'training' | 'ready' | 'error'>('training');
+  const [trainingProgress, setTrainingProgress] = useState(0);
+  const [trainingMessage, setTrainingMessage] = useState('Preparing your AI…');
+
+  const isReady = trainingStatus === 'ready';
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hi! I\'m your AI clone. Ask me anything to test how I respond!',
+      content: isReady ? 'Your AI is ready. Ask me anything to test!' : 'Hi! I\'m setting up. One moment…',
     },
   ]);
   const [input, setInput] = useState('');
@@ -35,6 +42,34 @@ export function OnboardingPreviewPage() {
   // ✅ After core onboarding (Step2), back should take user to dashboard
   useRedirectBack('/dashboard');
 
+  // ✅ Gate: poll training-status, only enable testing when ready
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const s = await apiFetch<{ status: any; progress?: number; message?: string }>('/api/identity/training-status');
+        if (!alive) return;
+        setTrainingStatus(s.status || 'training');
+        setTrainingProgress(Number(s.progress || 0));
+        setTrainingMessage(String(s.message || 'Preparing…'));
+
+        if (s.status === 'ready') {
+          setMessages([{ role: 'assistant', content: 'Your AI is ready. Ask me anything to test!' }]);
+        }
+      } catch {
+        if (!alive) return;
+        setTrainingStatus('training');
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 3000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -44,6 +79,10 @@ export function OnboardingPreviewPage() {
   }, [messages]);
 
   const handleSend = async () => {
+    if (!isReady) {
+      showToast('Your AI is still building. Please wait a moment…', 'info');
+      return;
+    }
     if (!input.trim() || loading) return;
 
     const userMessage: Message = { role: 'user', content: input.trim() };
@@ -119,10 +158,12 @@ export function OnboardingPreviewPage() {
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-accent-primary" />
-              Test Your AI Clone
+              {isReady ? 'Test Your AI Clone' : 'Building your AI…'}
             </CardTitle>
             <CardDescription>
-              Your AI is ready! Test it out by asking questions. See how it responds based on your content.
+              {isReady
+                ? 'Your AI is ready. Test it out by asking questions.'
+                : `${trainingMessage} (${Math.round(trainingProgress)}%)`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -137,6 +178,57 @@ export function OnboardingPreviewPage() {
                 />
               ))}
             </div>
+
+            {!isReady ? (
+              <div className="rounded-lg border border-border-default bg-bg-secondary p-4">
+                <div className="h-2 w-full bg-bg-tertiary rounded-full overflow-hidden mb-2">
+                  <div
+                    className="h-full bg-accent-primary transition-all"
+                    style={{ width: `${Math.min(trainingProgress, 100)}%` }}
+                  />
+                </div>
+                <div className="text-xs text-text-tertiary mt-2">
+                  You can continue setup while this finishes. Testing will unlock automatically.
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <Button
+                    onClick={async () => {
+                      setNavigating(true);
+                      try {
+                        await apiFetch('/api/creator/onboarding/step', {
+                          method: 'POST',
+                          body: JSON.stringify({ step: 'complete' }),
+                        });
+                        await refresh();
+                        nav('/onboarding/complete', { replace: true });
+                      } finally {
+                        setNavigating(false);
+                      }
+                    }}
+                    className="bg-accent-gradient hover:opacity-90 text-white"
+                    disabled={navigating}
+                  >
+                    {navigating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Continue to Setup <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+
+                  <Button variant="outline" onClick={() => nav('/dashboard', { replace: true })}>
+                    Go to Dashboard
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-accent-primary/10 border border-accent-primary/20 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-accent-primary mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm">Your AI is working!</p>
+                    <p className="text-xs text-text-secondary">Ask a few questions to validate responses.</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Chat Interface */}
             <div className="border border-border-default rounded-xl overflow-hidden bg-bg-secondary">
@@ -186,13 +278,13 @@ export function OnboardingPreviewPage() {
                         handleSend();
                       }
                     }}
-                    placeholder="Ask your AI a question..."
+                    placeholder={isReady ? 'Ask your AI a question…' : 'AI is still building…'}
                     className="flex-1 bg-bg-secondary border-border-default"
-                    disabled={loading}
+                    disabled={!isReady || loading}
                   />
                   <Button
                     onClick={handleSend}
-                    disabled={!input.trim() || loading}
+                    disabled={!isReady || !input.trim() || loading}
                     className="bg-accent-gradient hover:opacity-90 text-white"
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -201,41 +293,32 @@ export function OnboardingPreviewPage() {
               </div>
             </div>
 
-            {/* Sample Questions */}
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-text-secondary">Try these sample questions:</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  'What can you help me with?',
-                  'Tell me about your expertise',
-                  'How do you approach problem-solving?',
-                  'What makes your advice unique?',
-                ].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => setInput(q)}
-                    className="text-left p-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border-default text-sm transition-colors"
-                    disabled={loading}
-                  >
-                    <MessageSquare className="h-3 w-3 inline mr-2 text-accent-primary" />
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Info Box */}
-            <div className="rounded-lg bg-accent-primary/10 border border-accent-primary/20 p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-accent-primary mt-0.5 flex-shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-semibold text-sm">Your AI is working!</p>
-                  <p className="text-xs text-text-secondary">
-                    This is how visitors will interact with your AI. You can improve responses by adding more content anytime.
-                  </p>
+            {isReady && (
+              <>
+                {/* Sample Questions */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-text-secondary">Try these sample questions:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      'What can you help me with?',
+                      'Tell me about your expertise',
+                      'How do you approach problem-solving?',
+                      'What makes your advice unique?',
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => setInput(q)}
+                        className="text-left p-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border-default text-sm transition-colors"
+                        disabled={loading}
+                      >
+                        <MessageSquare className="h-3 w-3 inline mr-2 text-accent-primary" />
+                        {q}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-4 pt-4">

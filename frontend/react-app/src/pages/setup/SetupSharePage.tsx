@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Copy, Check, Instagram, Twitter, Linkedin } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,20 +13,7 @@ export function SetupSharePage() {
   const { state } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    markComplete();
-  }, []);
-
-  const markComplete = async () => {
-    try {
-      await apiFetch('/api/creator/setup/step', {
-        method: 'POST',
-        body: JSON.stringify({ step: 'share', completed: true }),
-      });
-    } catch (error) {
-      console.error('Failed to mark complete', error);
-    }
-  };
+  // ✅ REMOVED: auto markComplete on mount (share is optional)
 
   const chatLink = `${window.location.origin}/chat/${state.user?.handle || 'your-name'}`;
   const embedCode = `<script src="${window.location.origin}/widget.js"></script>`;
@@ -56,7 +42,7 @@ export function SetupSharePage() {
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <Card className="glass">
           <CardHeader>
-            <CardTitle className="text-3xl gradient-text">Your AI is Live! 🎉</CardTitle>
+            <CardTitle className="text-3xl gradient-text">Share (Optional)</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-6">

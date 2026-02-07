@@ -907,19 +907,71 @@ export async function getSetupStatus(req: Request, res: Response) {
   const setupCompleted = (user as any).setupCompleted || {};
   const setupDismissed = (user as any).setupDismissed || false;
 
-  // Calculate completion percentage
-  const steps = ['pricing', 'plan', 'stripe', 'share'];
-  const completedSteps = steps.filter(step => setupCompleted[step] === true);
+  // ✅ Steps: share optional, publish mandatory (for monetization/publish flows)
+  const steps = ['pricing', 'plan', 'stripe', 'publish'];
+
+  // ✅ Compute requirements from REAL data
+  const listingR = await db.query(
+    `SELECT
+       "isPublic","publishStatus","title","thumbnailUrl","category","description",
+       "enableSubscriptions","enablePayPerChat",
+       "subscriptionPriceCents","payPerChatPriceCents"
+     FROM "marketplace_listings"
+     WHERE "creatorId"=$1
+     ORDER BY "createdAt" DESC
+     LIMIT 1`,
+    [userId]
+  );
+  const listing = listingR.rows[0] || null;
+
+  const trialActive = user.trialEndsAt && new Date(user.trialEndsAt) > new Date();
+  const planEligible = user.planTier !== 'free' || !!trialActive;
+
+  const listingBasicsOk =
+    !!listing &&
+    String(listing.title || '').trim() &&
+    String(listing.thumbnailUrl || '').trim() &&
+    String(listing.category || '').trim() &&
+    String(listing.description || '').trim();
+
+  const pricingOk =
+    !!listing &&
+    ((listing.enableSubscriptions === true && Number(listing.subscriptionPriceCents || 0) > 0) ||
+     (listing.enablePayPerChat === true && Number(listing.payPerChatPriceCents || 0) > 0));
+
+  const connect = await getConnectAccountStatus(userId);
+  const stripeVerified = !!(connect && connect.details_submitted && connect.payouts_enabled);
+
+  const publishReady = planEligible && listingBasicsOk && pricingOk && stripeVerified;
+  const published = !!(listing && listing.isPublic === true && listing.publishStatus === 'published');
+
+  // ✅ Auto-mark steps based on real data (effective completion)
+  const effectiveSetupCompleted = {
+    ...setupCompleted,
+    stripe: stripeVerified ? true : setupCompleted.stripe,
+    publish: published ? true : setupCompleted.publish,
+  };
+
+  const completedSteps = steps.filter(step => effectiveSetupCompleted[step] === true);
   const completionPercentage = Math.round((completedSteps.length / steps.length) * 100);
 
   return res.json({
-    setupCompleted,
+    setupCompleted: effectiveSetupCompleted, // ✅ Return effective (real data) completion
     setupDismissed,
     completionPercentage,
     completedSteps: completedSteps.length,
     totalSteps: steps.length,
     nextStep: completedSteps.length < steps.length ?
-      steps.find(s => !setupCompleted[s]) : null,
+      steps.find(s => !effectiveSetupCompleted[s]) : null,
+    // ✅ New: backend truth
+    setupRequirements: {
+      planEligible,
+      listingBasicsOk,
+      pricingOk,
+      stripeVerified,
+      publishReady,
+      published,
+    },
   });
 }
 
@@ -932,7 +984,7 @@ export async function updateSetupStep(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const schema = z.object({
-    step: z.enum(['pricing', 'plan', 'stripe', 'share']),
+    step: z.enum(['pricing', 'plan', 'stripe', 'publish', 'share']),
     completed: z.boolean(),
   });
 
@@ -950,8 +1002,8 @@ export async function updateSetupStep(req: Request, res: Response) {
   const currentSetup = (user as any).setupCompleted || {};
   const updatedSetup = { ...currentSetup, [step]: completed };
 
-  // Check if all steps completed
-  const allSteps = ['pricing', 'plan', 'stripe', 'share'];
+  // Check if all steps completed (share is optional, don't count it)
+  const allSteps = ['pricing', 'plan', 'stripe', 'publish'];
   const allCompleted = allSteps.every(s => updatedSetup[s] === true);
 
   if (allCompleted && !updatedSetup.completedAt) {

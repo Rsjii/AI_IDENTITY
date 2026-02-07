@@ -41,9 +41,12 @@ export function useOnboardingGuard() {
 /**
  * Hook to prevent back navigation
  * Use this on pages where back button should be blocked
+ * @param enabled - Whether to enable back prevention (default: true)
  */
-export function usePreventBack() {
+export function usePreventBack(enabled: boolean = true) {
   useEffect(() => {
+    if (!enabled) return;
+
     const handlePopState = (e: PopStateEvent) => {
       e.preventDefault();
       window.history.pushState(null, '', window.location.href);
@@ -55,7 +58,7 @@ export function usePreventBack() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [enabled]);
 }
 
 /**

@@ -7,9 +7,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { AuthShell } from '@/components/AuthShell';
-import { useAuth } from '@/contexts/AuthContext';
 import { usePreventBack } from '@/hooks/useOnboardingGuard';
 import { getUserFriendlyError } from '@/lib/errorMessages';
+import { useAuth } from '@/contexts/AuthContext';
 
 function useQuery() {
   const { search } = useLocation();
@@ -18,8 +18,8 @@ function useQuery() {
 
 export function SignupProfilePage() {
   const navigate = useNavigate();
-  const q = useQuery();
   const { refresh } = useAuth();
+  const q = useQuery();
 
   const email = q.get('email') || '';
   const nextParam = q.get('next') || '';
@@ -88,8 +88,10 @@ export function SignupProfilePage() {
           }),
         }
       );
-      // ✅ Refresh auth state to update profileCompleted status
+
+      // ✅ IMPORTANT: Update auth state so ProtectedRoute stops forcing /signup/profile
       await refresh();
+
       // ✅ Redirect to choose-type (fork screen)
       const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
       navigate(`/choose-type${next}`, { replace: true });

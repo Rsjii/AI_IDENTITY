@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { useOnboardingGuard, useRedirectBack } from '@/hooks/useOnboardingGuard';
 import {
   Loader2,
   DollarSign,
@@ -25,8 +25,8 @@ export function OnboardingCompletePage() {
   // Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
 
-  // Prevent back navigation
-  usePreventBack();
+  // ✅ Back should go to dashboard (not Step2)
+  useRedirectBack('/dashboard');
 
   const handleSetupMonetization = async () => {
     setLoading(true);

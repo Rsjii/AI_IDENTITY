@@ -7,6 +7,7 @@ import { EmailService } from '../auth/authService';
 import { generateMirrorReplyWithLogging } from '../identity/identityService';
 import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES } from '../../config/constants';
+import { getConnectAccountStatus } from '../../services/stripeConnectService';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecret) {
@@ -44,6 +45,11 @@ const confirmPaymentSchema = z.object({
   messageId: z.string().optional(), // NEW: teaser message ID to update
 });
 
+async function isStripeConnectVerified(creatorId: string): Promise<boolean> {
+  const acc = await getConnectAccountStatus(creatorId);
+  return !!(acc && acc.details_submitted === true && acc.payouts_enabled === true);
+}
+
 export async function createPaymentIntent(req: Request, res: Response) {
   try {
     if (!stripe) {
@@ -56,13 +62,38 @@ export async function createPaymentIntent(req: Request, res: Response) {
       return res.status(404).json({ error: 'Creator not found' });
     }
 
-    // Phase 4: Validate against creator's single price from marketplace_listings
+    // ✅ Gate: creator must be eligible (Starter+ or trial)
+    const isTrialActive = creator.trialEndsAt && new Date(creator.trialEndsAt) > new Date();
+    if (creator.planTier === 'free' && !isTrialActive) {
+      return res.status(402).json({
+        error: 'Creator unavailable',
+        errorCode: 'CREATOR_UNAVAILABLE_TRIAL_ENDED',
+        upgradeUrl: '/pricing',
+      });
+    }
+
+    // ✅ Gate: listing must be published + pay-per-chat enabled + connect verified
     const listingResult = await db.query(
-      `SELECT "payPerChatPriceCents" FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+      `SELECT "isPublic","publishStatus","enablePayPerChat","payPerChatPriceCents"
+       FROM "marketplace_listings"
+       WHERE "creatorId"=$1
+       ORDER BY "createdAt" DESC
+       LIMIT 1`,
       [creatorId]
     );
-    const creatorPriceCents = listingResult.rows[0]?.payPerChatPriceCents || creator.priceConfig?.defaultTierCents || 1000;
-    
+    const listing = listingResult.rows[0];
+    if (!listing || listing.isPublic !== true || listing.publishStatus !== 'published') {
+      return res.status(403).json({ error: 'Creator is not published', errorCode: 'CREATOR_NOT_PUBLISHED' });
+    }
+    if (listing.enablePayPerChat !== true) {
+      return res.status(403).json({ error: 'Pay-per-chat not enabled', errorCode: 'PAY_PER_CHAT_DISABLED' });
+    }
+    if (!(await isStripeConnectVerified(creatorId))) {
+      return res.status(403).json({ error: 'Creator payouts not enabled', errorCode: 'STRIPE_CONNECT_REQUIRED' });
+    }
+
+    // ✅ Validate amount matches listing price (existing)
+    const creatorPriceCents = listing.payPerChatPriceCents || creator.priceConfig?.defaultTierCents || 1000;
     if (amountCents !== creatorPriceCents) {
       return res.status(400).json({ error: 'Amount does not match creator\'s price' });
     }

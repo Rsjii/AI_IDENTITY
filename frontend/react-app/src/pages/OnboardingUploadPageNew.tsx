@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Upload, FileText, X, Loader2, CheckCircle2, File, AlertCircle
 } from 'lucide-react';
-import { useOnboardingGuard, usePreventBack } from '@/hooks/useOnboardingGuard';
+import { useOnboardingGuard, useRedirectBack } from '@/hooks/useOnboardingGuard';
 
 interface ContentItem {
   id: string;
@@ -49,8 +49,8 @@ export function OnboardingUploadPageNew() {
   // Redirect to dashboard if onboarding is already complete
   useOnboardingGuard();
 
-  // Prevent back navigation
-  usePreventBack();
+  // ✅ Step2 ke baad back दबाने पर dashboard भेजो (Step2 repeat नहीं)
+  useRedirectBack('/dashboard');
 
   const refresh = async () => {
     const r = await apiFetch<{ items: ContentItem[] }>('/api/content/list');

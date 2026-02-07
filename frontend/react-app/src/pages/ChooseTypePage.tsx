@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AuthShell } from '@/components/AuthShell';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePreventBack } from '@/hooks/useOnboardingGuard';
 
 function useQuery() {
   const { search } = useLocation();
@@ -15,15 +16,23 @@ export function ChooseTypePage() {
   const q = useQuery();
   const { refresh } = useAuth();
 
+  // ✅ Prevent back navigation - select way is a critical step
+  usePreventBack(true);
+
   const nextParam = q.get('next') || '';
   const safeNext = nextParam.startsWith('/') ? nextParam : '';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const didSubmit = useRef(false); // ✅ Guard: prevent duplicate submissions
 
   const autoVisitor = safeNext.startsWith('/chat/');
 
   const setTypeAndGo = async (userType: 'creator' | 'visitor') => {
+    // ✅ Guard: prevent duplicate submissions (React StrictMode / double-click)
+    if (didSubmit.current) return;
+    didSubmit.current = true;
+
     setLoading(true);
     setError('');
     try {
@@ -41,6 +50,7 @@ export function ChooseTypePage() {
       // ✅ FIX: hard redirect so ProtectedRoute can't see stale state
       window.location.replace(target);
     } catch (e: any) {
+      didSubmit.current = false; // ✅ Unlock on failure so user can retry
       setError(e?.message || 'Failed to set user type');
     } finally {
       setLoading(false);

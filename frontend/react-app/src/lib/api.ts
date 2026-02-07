@@ -6,6 +6,8 @@ export interface ApiError {
   details?: any;
   redirect?: string;
   fieldErrors?: Record<string, string>;
+  missing?: string[];
+  upgradeUrl?: string;
 }
 
 // Get API base URL from environment variable
@@ -78,12 +80,16 @@ export async function apiFetch<T = any>(
 
         if (!retryResponse.ok) {
           const retryError = await retryResponse.json().catch(() => ({}));
-          throw new ApiError(
+          const apiErr = new ApiError(
             retryError.error || 'Request failed',
             retryError.errorCode,
             retryError,
             retryError.fieldErrors
           );
+          (apiErr as any).missing = retryError.missing;
+          (apiErr as any).upgradeUrl = retryError.upgradeUrl;
+          (apiErr as any).status = retryResponse.status;
+          throw apiErr;
         }
 
         return retryResponse.json();
@@ -151,6 +157,9 @@ if (response.status === 401) {
     apiError.details = errorData.details;
     apiError.redirect = errorData.redirect;
     apiError.fieldErrors = errorData.fieldErrors;
+    // ✅ ADD: preserve backend extra fields (for publish prerequisites, etc.)
+    (apiError as any).missing = errorData.missing;
+    (apiError as any).upgradeUrl = errorData.upgradeUrl;
     (apiError as any).status = response.status; // Add status for 404 checks
     throw apiError;
   }
@@ -170,6 +179,8 @@ export class ApiError extends Error {
   details?: any;
   redirect?: string;
   fieldErrors?: Record<string, string>;
+  missing?: string[];
+  upgradeUrl?: string;
 
   constructor(message: string, errorCode?: string, details?: any, fieldErrors?: Record<string, string>) {
     super(message);
@@ -216,6 +227,10 @@ export async function apiFetchForm<T = any>(
     apiError.details = errorData.details;
     apiError.redirect = errorData.redirect;
     apiError.fieldErrors = errorData.fieldErrors;
+    // ✅ ADD: preserve backend extra fields
+    (apiError as any).missing = errorData.missing;
+    (apiError as any).upgradeUrl = errorData.upgradeUrl;
+    (apiError as any).status = response.status;
     throw apiError;
   }
 

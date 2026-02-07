@@ -21,7 +21,7 @@ export function AuthShell({
   const handleLogout = async () => {
     try {
       await logout();
-      window.location.href = '/';
+      window.location.replace('/auth?reason=logout');
     } catch (error) {
       console.error('Logout failed:', error);
     }

@@ -12,12 +12,20 @@ import { useNavigate } from 'react-router-dom';
 interface ListingForm {
   isPublic: boolean;
   isFeatured: boolean;
+  title: string;
+  shortPitch: string;
+  thumbnailUrl: string;
   category: string;
   subscriptionPriceCents: number;
   currency: string;
   freeTrialQuestions: number;
   description: string;
   tags: string;
+  enableSubscriptions: boolean;
+  enablePayPerChat: boolean;
+  enableFreeChat: boolean;
+  payPerChatPriceCents: number;
+  freeMessageLimit: number;
 }
 
 export function MarketplaceManagePage() {
@@ -32,12 +40,20 @@ export function MarketplaceManagePage() {
   const [form, setForm] = useState<ListingForm>({
     isPublic: false,
     isFeatured: false,
+    title: '',
+    shortPitch: '',
+    thumbnailUrl: '',
     category: '',
     subscriptionPriceCents: 999,
     currency: 'USD',
     freeTrialQuestions: 0,
     description: '',
     tags: '',
+    enableSubscriptions: false,
+    enablePayPerChat: false,
+    enableFreeChat: true,
+    payPerChatPriceCents: 1000,
+    freeMessageLimit: 3,
   });
   const [saving, setSaving] = useState(false);
 
@@ -48,12 +64,20 @@ export function MarketplaceManagePage() {
           setForm({
             isPublic: data.item.isPublic ?? false,
             isFeatured: data.item.isFeatured ?? false,
+            title: data.item.title || '',
+            shortPitch: data.item.shortPitch || '',
+            thumbnailUrl: data.item.thumbnailUrl || '',
             category: data.item.category || '',
             subscriptionPriceCents: data.item.subscriptionPriceCents || 999,
             currency: data.item.currency || 'USD',
             freeTrialQuestions: data.item.freeTrialQuestions || 0,
             description: data.item.description || '',
             tags: (data.item.tags || []).join(','),
+            enableSubscriptions: data.item.enableSubscriptions ?? false,
+            enablePayPerChat: data.item.enablePayPerChat ?? false,
+            enableFreeChat: data.item.enableFreeChat ?? true,
+            payPerChatPriceCents: data.item.payPerChatPriceCents || 1000,
+            freeMessageLimit: data.item.freeMessageLimit || 3,
           });
         }
       })
@@ -68,19 +92,42 @@ export function MarketplaceManagePage() {
         body: JSON.stringify({
           isPublic: form.isPublic,
           isFeatured: form.isFeatured,
+          title: form.title,
+          shortPitch: form.shortPitch,
+          thumbnailUrl: form.thumbnailUrl,
           category: form.category,
           subscriptionPriceCents: form.subscriptionPriceCents,
           currency: form.currency,
           freeTrialQuestions: form.freeTrialQuestions,
           description: form.description,
           tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+          enableSubscriptions: form.enableSubscriptions,
+          enablePayPerChat: form.enablePayPerChat,
+          enableFreeChat: form.enableFreeChat,
+          payPerChatPriceCents: form.payPerChatPriceCents,
+          freeMessageLimit: form.freeMessageLimit,
+          publishStatus: form.isPublic ? 'published' : 'draft',
         }),
       });
       showToast('Listing saved', 'success');
     } catch (err: any) {
-      if (err.status === 403) {
-        showToast('Upgrade to Starter plan to list on marketplace', 'error');
+      if (err.status === 403 && err.errorCode === 'UPGRADE_REQUIRED') {
+        showToast('Upgrade to Starter plan to publish on marketplace', 'error');
         nav('/pricing');
+      } else if (err.status === 400 && err.errorCode === 'PUBLISH_PREREQ_FAILED') {
+        const missing = err.missing || [];
+        const missingLabels: Record<string, string> = {
+          title: 'Title',
+          thumbnail: 'Thumbnail',
+          category: 'Category',
+          description: 'Description',
+          choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
+          subscription_price: 'Subscription price',
+          pay_per_chat_price: 'Pay-per-chat price',
+          stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+        };
+        const errorMsg = missing.map((m: string) => missingLabels[m] || m).join(', ');
+        showToast(`Cannot publish. Missing: ${errorMsg}`, 'error', 7000);
       } else {
         showToast(err.message || 'Failed to save listing', 'error');
       }
@@ -152,36 +199,89 @@ export function MarketplaceManagePage() {
           </label>
 
           <Input
-            placeholder="Category"
+            placeholder="Title *"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            required
+          />
+          <Input
+            placeholder="Thumbnail URL *"
+            value={form.thumbnailUrl}
+            onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })}
+            required
+          />
+          <Input
+            placeholder="Short pitch (optional)"
+            value={form.shortPitch}
+            onChange={(e) => setForm({ ...form, shortPitch: e.target.value })}
+          />
+          <Input
+            placeholder="Category *"
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
-          />
-          <Input
-            placeholder="Price (cents)"
-            value={String(form.subscriptionPriceCents)}
-            onChange={(e) => setForm({ ...form, subscriptionPriceCents: Number(e.target.value || 0) })}
-          />
-          <Input
-            placeholder="Currency"
-            value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value })}
-          />
-          <Input
-            placeholder="Free trial questions"
-            value={String(form.freeTrialQuestions)}
-            onChange={(e) => setForm({ ...form, freeTrialQuestions: Number(e.target.value || 0) })}
+            required
           />
           <textarea
             className="w-full min-h-[120px] border rounded-md px-3 py-2 bg-background"
-            placeholder="Description"
+            placeholder="Description *"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+            required
           />
           <Input
             placeholder="Tags (comma separated)"
             value={form.tags}
             onChange={(e) => setForm({ ...form, tags: e.target.value })}
           />
+
+          <div className="border-t pt-4 space-y-3">
+            <h3 className="font-semibold">Monetization</h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.enableSubscriptions}
+                onChange={(e) => setForm({ ...form, enableSubscriptions: e.target.checked })}
+              />
+              <span>Enable Subscriptions</span>
+            </label>
+            {form.enableSubscriptions && (
+              <Input
+                placeholder="Subscription price (cents)"
+                value={String(form.subscriptionPriceCents)}
+                onChange={(e) => setForm({ ...form, subscriptionPriceCents: Number(e.target.value || 0) })}
+              />
+            )}
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.enablePayPerChat}
+                onChange={(e) => setForm({ ...form, enablePayPerChat: e.target.checked })}
+              />
+              <span>Enable Pay-per-chat</span>
+            </label>
+            {form.enablePayPerChat && (
+              <>
+                <Input
+                  placeholder="Pay-per-chat price (cents)"
+                  value={String(form.payPerChatPriceCents)}
+                  onChange={(e) => setForm({ ...form, payPerChatPriceCents: Number(e.target.value || 0) })}
+                />
+                <Input
+                  placeholder="Free message limit"
+                  value={String(form.freeMessageLimit)}
+                  onChange={(e) => setForm({ ...form, freeMessageLimit: Number(e.target.value || 0) })}
+                />
+              </>
+            )}
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.enableFreeChat}
+                onChange={(e) => setForm({ ...form, enableFreeChat: e.target.checked })}
+              />
+              <span>Enable Free Chat Preview</span>
+            </label>
+          </div>
         </div>
 
         <Button onClick={save} disabled={saving}>

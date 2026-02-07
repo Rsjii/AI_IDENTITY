@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface LayoutProps {
@@ -13,6 +13,8 @@ interface LayoutProps {
   mainClassName?: string;
 }
 
+const SIDEBAR_KEY = 'selflyx_sidebar_expanded';
+
 export function Layout({
   children,
   showNavbar = true,
@@ -21,13 +23,43 @@ export function Layout({
   mainClassName = '',
 }: LayoutProps) {
   const { state } = useAuth();
+  const location = useLocation();
   const isAuthed = state.status === 'authenticated';
   const showNav = showNavbar && isAuthed;
 
-  // Start expanded if viewport >= 1400px, collapsed otherwise (desktop only)
+  // ✅ Default collapsed; never auto-expand based on viewport
   const [sidebarExpanded, setSidebarExpanded] = useState(() => {
-    return typeof window !== 'undefined' && window.innerWidth >= 1400;
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1';
+    } catch {
+      return false;
+    }
   });
+
+  // ✅ Requirement: after any navigation, sidebar should be minimized
+  useEffect(() => {
+    setSidebarExpanded(false);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, '0');
+    } catch {}
+  }, [location.pathname]);
+
+  const toggleSidebar = () => {
+    setSidebarExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleSidebarNavigate = () => {
+    setSidebarExpanded(false);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, '0');
+    } catch {}
+  };
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
@@ -46,7 +78,11 @@ export function Layout({
             />
           )}
 
-          <Sidebar expanded={sidebarExpanded} onToggle={() => setSidebarExpanded((e) => !e)} />
+          <Sidebar
+            expanded={sidebarExpanded}
+            onToggle={toggleSidebar}
+            onNavigate={handleSidebarNavigate}
+          />
         </div>
       )}
 

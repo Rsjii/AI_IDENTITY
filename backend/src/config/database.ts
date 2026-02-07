@@ -807,6 +807,14 @@ CREATE TABLE IF NOT EXISTS "marketplace_listings" (
   "rating" NUMERIC(2,1),
   "payPerChatPriceCents" INTEGER,
   "freeMessageLimit" INTEGER,
+  "title" TEXT,
+  "shortPitch" TEXT,
+  "thumbnailUrl" TEXT,
+  "enableSubscriptions" BOOLEAN NOT NULL DEFAULT false,
+  "enablePayPerChat" BOOLEAN NOT NULL DEFAULT false,
+  "enableFreeChat" BOOLEAN NOT NULL DEFAULT true,
+  "publishStatus" TEXT NOT NULL DEFAULT 'draft' CHECK ("publishStatus" IN ('draft','ready','published','suspended')),
+  "publishedAt" TIMESTAMPTZ,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -847,6 +855,65 @@ ALTER TABLE "marketplace_listings" ADD CONSTRAINT "marketplace_listings_creatorI
 -- Phase 1: Add pricing columns to marketplace_listings (idempotent for existing DBs)
 ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "payPerChatPriceCents" INTEGER;
 ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "freeMessageLimit" INTEGER;
+
+-- ✅ NEW: Add listing basics columns (publish requirements)
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "title" TEXT;
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "shortPitch" TEXT;
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "thumbnailUrl" TEXT;
+
+-- ✅ NEW: Add monetization toggles
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "enableSubscriptions" BOOLEAN;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'enableSubscriptions' AND is_nullable = 'YES') THEN
+    UPDATE "marketplace_listings" SET "enableSubscriptions" = false WHERE "enableSubscriptions" IS NULL;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enableSubscriptions" SET DEFAULT false;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enableSubscriptions" SET NOT NULL;
+  END IF;
+END $$;
+
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "enablePayPerChat" BOOLEAN;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'enablePayPerChat' AND is_nullable = 'YES') THEN
+    UPDATE "marketplace_listings" SET "enablePayPerChat" = false WHERE "enablePayPerChat" IS NULL;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enablePayPerChat" SET DEFAULT false;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enablePayPerChat" SET NOT NULL;
+  END IF;
+END $$;
+
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "enableFreeChat" BOOLEAN;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'enableFreeChat' AND is_nullable = 'YES') THEN
+    UPDATE "marketplace_listings" SET "enableFreeChat" = true WHERE "enableFreeChat" IS NULL;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enableFreeChat" SET DEFAULT true;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "enableFreeChat" SET NOT NULL;
+  END IF;
+END $$;
+
+-- ✅ NEW: Add publish state
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "publishStatus" TEXT;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'publishStatus' AND is_nullable = 'YES') THEN
+    UPDATE "marketplace_listings" SET "publishStatus" = 'draft' WHERE "publishStatus" IS NULL;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "publishStatus" SET DEFAULT 'draft';
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "publishStatus" SET NOT NULL;
+    -- ✅ Fix: Postgres doesn't support ADD CONSTRAINT IF NOT EXISTS, use DO block
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint
+      WHERE conname = 'marketplace_listings_publishStatus_check'
+    ) THEN
+      ALTER TABLE "marketplace_listings"
+        ADD CONSTRAINT "marketplace_listings_publishStatus_check"
+        CHECK ("publishStatus" IN ('draft','ready','published','suspended'));
+    END IF;
+  END IF;
+END $$;
+
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMPTZ;
 
 -- Migrate existing priceConfig data to marketplace_listings (one-time, safe)
 UPDATE "marketplace_listings" ml
@@ -1042,7 +1109,7 @@ export const userQueries = {
 
   findByEmail: async (email: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt" FROM "User" WHERE email = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "lastHandleChangeAt", "profileCompleted", "timeZone", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt", "setupCompleted", "setupDismissed" FROM "User" WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -1058,7 +1125,7 @@ export const userQueries = {
 
   findById: async (id: string) => {
     const result = await db.query(
-      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt" FROM "User" WHERE id = $1',
+      'SELECT id, email, "passwordHash", "googleId", "googleEmail", "googleEmailVerified", handle, name, dob, phone, bio, active, "referralCode", "createdAt", "profileImage", "trialEndsAt", "planTier", "onboardingStep", "publicSlug", "creatorTitle", "creatorTags", "priceConfig", "userType", "deletedAt", "deletionScheduledAt", "setupCompleted", "setupDismissed" FROM "User" WHERE id = $1',
       [id]
     );
     return result.rows[0];

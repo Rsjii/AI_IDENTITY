@@ -4,7 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Check, ChevronRight, DollarSign, CreditCard, Zap, Share2 } from 'lucide-react';
+import { Check, ChevronRight, DollarSign, CreditCard, Zap, Globe, Share2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export function SetupChecklistPage() {
@@ -50,11 +50,11 @@ export function SetupChecklistPage() {
       route: '/setup/stripe',
     },
     {
-      key: 'share',
-      title: 'Share Your AI',
-      description: 'Get your link and start sharing',
-      icon: Share2,
-      route: '/setup/share',
+      key: 'publish',
+      title: 'Publish Your Listing',
+      description: 'Make your AI discoverable on marketplace',
+      icon: Globe,
+      route: '/marketplace/manage',
     },
   ];
 
@@ -133,6 +133,22 @@ export function SetupChecklistPage() {
             );
           })}
         </div>
+
+        {/* Optional Share Link */}
+        <Card className="glass border-dashed">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <Share2 className="h-6 w-6 text-muted-foreground" />
+              <div className="flex-1">
+                <CardTitle className="text-lg">Share Your AI (Optional)</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Get your link and start sharing</p>
+              </div>
+              <Button variant="outline" onClick={() => navigate('/setup/share')}>
+                Share →
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Actions */}
         <div className="flex gap-4">

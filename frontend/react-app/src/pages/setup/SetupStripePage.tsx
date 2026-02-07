@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,30 +9,40 @@ import { showToast } from '@/lib/toast';
 
 export function SetupStripePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
 
+  // ✅ Verify real status from backend
   useEffect(() => {
-    const success = searchParams.get('success');
-    if (success === '1') {
-      markComplete();
-    }
-  }, [searchParams]);
+    apiFetch('/api/creator/stripe/status')
+      .then((s: any) => {
+        const ok = s?.connected === true && s?.detailsSubmitted === true && s?.payoutsEnabled === true;
+        if (ok) {
+          setConnected(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
 
   const markComplete = async () => {
-    try {
-      await apiFetch('/api/creator/setup/step', {
-        method: 'POST',
-        body: JSON.stringify({ step: 'stripe', completed: true }),
-      });
-      setConnected(true);
-      showToast('Stripe connected successfully!', 'success');
-      setTimeout(() => navigate('/setup'), 2000);
-    } catch (error) {
-      console.error('Failed to mark complete', error);
-    }
+    await apiFetch('/api/creator/setup/step', {
+      method: 'POST',
+      body: JSON.stringify({ step: 'stripe', completed: true }),
+    });
   };
+
+  // ✅ If verified, mark complete once (best-effort)
+  useEffect(() => {
+    if (!connected || checking) return;
+    markComplete()
+      .then(() => {
+        showToast('Stripe connected & verified!', 'success');
+        setTimeout(() => navigate('/setup'), 1200);
+      })
+      .catch(() => {});
+  }, [connected, checking]);
 
   const handleConnect = async () => {
     setLoading(true);

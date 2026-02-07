@@ -15,7 +15,7 @@ export function Navbar() {
 
   const onLogout = async () => {
     await logout();
-    nav('/auth');
+    window.location.replace('/auth?reason=logout');
   };
 
   const upgradeToCreator = async () => {

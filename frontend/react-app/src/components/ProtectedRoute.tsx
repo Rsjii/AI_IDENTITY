@@ -77,6 +77,26 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   const isVisitor = user?.userType === 'visitor';
 
+  // ✅ 2.0) Block profile page if already completed (prevent repeat submissions)
+  if (location.pathname.startsWith('/signup/profile') && user?.profileCompleted === true) {
+    const sp = new URLSearchParams(location.search);
+    const nextQ = sp.get('next') || '';
+    const safeNextQ =
+      nextQ.startsWith('/') && !nextQ.startsWith('/auth') && !nextQ.startsWith('/signup')
+        ? nextQ
+        : '';
+
+    // If type not chosen, go choose-type
+    if (!user.userType) {
+      const q = safeNextQ ? `?next=${encodeURIComponent(safeNextQ)}` : '';
+      return <Navigate to={`/choose-type${q}`} replace />;
+    }
+
+    // Else go to next/fallback
+    const fallback = user.userType === 'creator' ? '/dashboard' : '/explore';
+    return <Navigate to={safeNextQ || fallback} replace />;
+  }
+
   // 2) Profile incomplete => force /signup/profile, preserve next
   // ✅ CHANGE: redirect ONLY when profileCompleted is explicitly false
   // (don't skip on /choose-type; profile must still be completed first)

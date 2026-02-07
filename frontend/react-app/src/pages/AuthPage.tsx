@@ -11,6 +11,7 @@ import { AlertCircle, Chrome, Loader2, Eye, EyeOff } from 'lucide-react';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserFriendlyError } from '@/lib/errorMessages';
+import { usePreventBack } from '@/hooks/useOnboardingGuard';
 
 type TabType = 'login' | 'signup';
 
@@ -37,6 +38,10 @@ export function AuthPage() {
     // only allow internal paths
     return nextParam.startsWith('/') ? nextParam : '';
   }, [nextParam]);
+
+  // ✅ Prevent back navigation when coming from logout
+  const reason = q.get('reason') || '';
+  usePreventBack(reason === 'logout');
 
   // ADD: if already logged in, never show auth page (handles Back button too)
   useEffect(() => {

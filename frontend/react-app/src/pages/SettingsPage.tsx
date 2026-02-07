@@ -285,9 +285,31 @@ export function SettingsPage() {
       if (err.status === 403) {
         showToast('Upgrade to Starter plan to make your AI public', 'error');
         nav('/pricing');
-      } else {
-        showToast(err.message || 'Failed to update AI visibility', 'error');
+        return;
       }
+
+      // ✅ Show EXACT missing prereqs + send user to the right page
+      if (err.status === 400 && err.errorCode === 'PUBLISH_PREREQ_FAILED') {
+        const missingLabels: Record<string, string> = {
+          title: 'Title',
+          thumbnail: 'Thumbnail',
+          category: 'Category',
+          description: 'Description',
+          choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
+          subscription_price: 'Subscription price',
+          pay_per_chat_price: 'Pay-per-chat price',
+          stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+        };
+        const missing: string[] = Array.isArray(err.missing) ? err.missing : [];
+        const msg = missing.length
+          ? missing.map((m) => missingLabels[m] || m).join(', ')
+          : 'Complete listing basics + pricing + Stripe to publish.';
+        showToast(`Cannot make public yet. Missing: ${msg}`, 'error', 7000);
+        nav('/marketplace/manage');
+        return;
+      }
+
+      showToast(err.message || 'Failed to update AI visibility', 'error');
     } finally {
       setTogglingAiVisibility(false);
     }

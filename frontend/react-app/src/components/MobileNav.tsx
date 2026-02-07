@@ -49,7 +49,7 @@ export function MobileNav() {
 
   const handleLogout = async () => {
     await logout();
-    nav('/auth');
+    window.location.replace('/auth?reason=logout');
   };
 
   if (state.status !== 'authenticated') return null;
