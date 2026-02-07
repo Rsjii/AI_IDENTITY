@@ -44,6 +44,48 @@ CREATE TABLE IF NOT EXISTS "User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
+-- ✅ MIGRATION: existing/old prod DBs -> add missing columns (idempotent)
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleEmail" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleEmailVerified" BOOLEAN;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profileImage" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastHandleChangeAt" TIMESTAMPTZ NULL;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profileCompleted" BOOLEAN;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'profileCompleted' AND is_nullable = 'YES') THEN
+    ALTER TABLE "User" ALTER COLUMN "profileCompleted" SET DEFAULT false;
+    ALTER TABLE "User" ALTER COLUMN "profileCompleted" SET NOT NULL;
+    UPDATE "User" SET "profileCompleted" = false WHERE "profileCompleted" IS NULL;
+  END IF;
+END $$;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "timeZone" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMPTZ;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "planTier" TEXT;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'planTier' AND is_nullable = 'YES') THEN
+    ALTER TABLE "User" ALTER COLUMN "planTier" SET DEFAULT 'free';
+    ALTER TABLE "User" ALTER COLUMN "planTier" SET NOT NULL;
+    UPDATE "User" SET "planTier" = 'free' WHERE "planTier" IS NULL;
+  END IF;
+END $$;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "onboardingStep" TEXT;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'onboardingStep' AND is_nullable = 'YES') THEN
+    ALTER TABLE "User" ALTER COLUMN "onboardingStep" SET DEFAULT 'quiz';
+    ALTER TABLE "User" ALTER COLUMN "onboardingStep" SET NOT NULL;
+    UPDATE "User" SET "onboardingStep" = 'quiz' WHERE "onboardingStep" IS NULL;
+  END IF;
+END $$;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "publicSlug" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "creatorTitle" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "creatorTags" JSONB;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "priceConfig" JSONB;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "userType" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletionScheduledAt" TIMESTAMPTZ;
+
 -- CreateTable: OTP
 CREATE TABLE IF NOT EXISTS "OTP" (
     "id" TEXT NOT NULL,
@@ -739,6 +781,26 @@ CREATE TABLE IF NOT EXISTS "marketplace_listings" (
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ✅ MIGRATION: older DBs may have marketplace_listings without these columns
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "isPublic" BOOLEAN;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'isPublic' AND is_nullable = 'YES') THEN
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "isPublic" SET DEFAULT false;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "isPublic" SET NOT NULL;
+    UPDATE "marketplace_listings" SET "isPublic" = false WHERE "isPublic" IS NULL;
+  END IF;
+END $$;
+ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'isFeatured' AND is_nullable = 'YES') THEN
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "isFeatured" SET DEFAULT false;
+    ALTER TABLE "marketplace_listings" ALTER COLUMN "isFeatured" SET NOT NULL;
+    UPDATE "marketplace_listings" SET "isFeatured" = false WHERE "isFeatured" IS NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_creatorId" ON "marketplace_listings"("creatorId");
 CREATE INDEX IF NOT EXISTS "idx_marketplace_listings_isPublic" ON "marketplace_listings"("isPublic");

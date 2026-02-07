@@ -18,6 +18,7 @@ interface MarketplaceItem {
   tags: string[];
   freeTrialQuestions: number;
   isFeatured?: boolean;
+  payPerChatPriceCents?: number | null;
   creator: {
     handle: string;
     name: string;
@@ -87,36 +88,86 @@ export function MarketplacePage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {items.map((item) => (
-              <Card key={item.id} className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all relative">
-                {item.isFeatured && (
-                  <div className="absolute top-2 right-2 z-10">
-                    <Badge className="bg-accent-primary text-white">Featured</Badge>
+              <Card key={item.id} className="bg-bg-secondary border-border-default hover:border-accent-primary/50 transition-all relative overflow-hidden">
+                {/* Price Badge - Top Right (Prominent) */}
+                {item.subscriptionPriceCents > 0 ? (
+                  <div className="absolute top-3 right-3 z-10">
+                    <Badge className="bg-accent-primary text-white text-base font-bold px-3 py-1.5 shadow-lg">
+                      ${(item.subscriptionPriceCents / 100).toFixed(2)}/mo
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="absolute top-3 right-3 z-10">
+                    <Badge variant="outline" className="text-text-secondary border-border-default text-sm px-2 py-1">
+                      Free
+                    </Badge>
                   </div>
                 )}
+                
+                {/* Featured Badge - Top Left */}
+                {item.isFeatured && (
+                  <div className="absolute top-3 left-3 z-10">
+                    <Badge className="bg-yellow-500 text-white">⭐ Featured</Badge>
+                  </div>
+                )}
+                
                 <CardContent className="pt-6 space-y-3">
+                  {/* Creator Info */}
                   <div className="flex items-center gap-3">
                     {item.creator.profileImage && (
                       <img
                         src={item.creator.profileImage}
-                        className="w-10 h-10 rounded-full"
+                        className="w-12 h-12 rounded-full border-2 border-accent-primary/20"
                         alt={item.creator.name}
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-text-primary truncate">
+                      <div className="font-semibold text-text-primary truncate text-lg">
                         {item.creator.name || item.creator.handle}
                       </div>
                       <div className="text-xs text-text-secondary">@{item.creator.handle}</div>
                     </div>
                   </div>
                   
+                  {/* Description */}
                   <div className="text-sm text-text-secondary line-clamp-3">
                     {item.description || 'No description yet.'}
                   </div>
 
-                  {/* Stats Row: Rating + Subscribers */}
+                  {/* Pricing Options - More Prominent */}
+                  <div className="bg-bg-tertiary rounded-lg p-3 border border-border-default">
+                    {item.subscriptionPriceCents > 0 ? (
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-text-tertiary">Subscription</span>
+                        <span className="font-bold text-lg text-text-primary">
+                          ${(item.subscriptionPriceCents / 100).toFixed(2)}/{item.currency || 'USD'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-text-tertiary mb-2 text-center py-1">
+                        Subscription pricing not set
+                      </div>
+                    )}
+                    {item.payPerChatPriceCents && item.payPerChatPriceCents > 0 && (
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-border-default">
+                        <span className="text-text-tertiary">Pay-per-chat</span>
+                        <span className="font-semibold text-text-primary">
+                          ${(item.payPerChatPriceCents / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {item.freeTrialQuestions > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border-default">
+                        <Badge variant="outline" className="text-green-600 border-green-600 bg-green-500/10 text-xs">
+                          🆓 {item.freeTrialQuestions} free questions
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stats Row */}
                   <div className="flex items-center gap-3 text-sm">
-                    {item.rating && (
+                    {item.rating && item.rating > 0 && (
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                         <span className="font-medium">{item.rating.toFixed(1)}</span>
@@ -128,11 +179,6 @@ export function MarketplacePage() {
                           ? `${(item.totalSubscribers / 1000).toFixed(1)}k` 
                           : item.totalSubscribers} subscribers
                       </span>
-                    )}
-                    {item.freeTrialQuestions > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        Free Trial
-                      </Badge>
                     )}
                   </div>
 
@@ -150,20 +196,18 @@ export function MarketplacePage() {
                     </div>
                   )}
 
-                  {/* Category + Price */}
-                  <div className="flex items-center justify-between text-sm pt-1 border-t border-border-default">
-                    <span className="text-text-secondary">{item.category || 'General'}</span>
-                    <span className="font-semibold text-text-primary">
-                      ${(item.subscriptionPriceCents / 100).toFixed(2)}/{item.currency || 'USD'}
-                    </span>
+                  {/* Category */}
+                  <div className="text-xs text-text-tertiary">
+                    {item.category || 'General'}
                   </div>
 
+                  {/* Action Button */}
                   <Button
                     variant="outline"
-                    className="w-full"
+                    className="w-full hover:bg-accent-primary hover:text-white transition-colors"
                     onClick={() => (window.location.href = `/marketplace/${item.slug}`)}
                   >
-                    View Details
+                    View Details →
                   </Button>
                 </CardContent>
               </Card>

@@ -1404,8 +1404,14 @@ export function PublicChatPage() {
                   </div>
 
                   <button
-                    onClick={() => setShowPaymentModal(true)}
-                    className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium"
+                    onClick={() => {
+                      if (creator?.id) {
+                        setShowPaymentModal(true);
+                      } else {
+                        showToast('Creator information not available. Please refresh the page.', 'error');
+                      }
+                    }}
+                    className="mt-3 w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
                   >
                     View pricing / Upgrade
                   </button>
@@ -1426,7 +1432,16 @@ export function PublicChatPage() {
                           Expires: {new Date(premiumExpiresAt).toLocaleString()}
                         </div>
                       )}
-                      <button onClick={() => setShowPaymentModal(true)} className="mt-2 text-xs underline">
+                      <button 
+                        onClick={() => {
+                          if (creator?.id) {
+                            setShowPaymentModal(true);
+                          } else {
+                            showToast('Creator information not available. Please refresh the page.', 'error');
+                          }
+                        }} 
+                        className="mt-2 text-xs underline"
+                      >
                         Extend access
                       </button>
                     </div>
@@ -1511,7 +1526,16 @@ export function PublicChatPage() {
             </div>
             {!isOwnAI && (
               <div className="mt-4">
-                <button onClick={() => setShowPaymentModal(true)} className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium">
+                <button 
+                  onClick={() => {
+                    if (creator?.id) {
+                      setShowPaymentModal(true);
+                    } else {
+                      showToast('Creator information not available. Please refresh the page.', 'error');
+                    }
+                  }} 
+                  className="w-full px-4 py-2 bg-accent-gradient text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+                >
                   View pricing / Upgrade
                 </button>
               </div>
@@ -1544,7 +1568,7 @@ export function PublicChatPage() {
       )}
 
       {/* Payment Modal */}
-      {FLAGS.payPerChat && showPaymentModal && (paymentData || (creator?.id && sessionId)) && (
+      {showPaymentModal && creator?.id && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center">
           <div className="bg-bg-secondary w-full md:max-w-md md:rounded-lg rounded-t-2xl relative max-h-[92vh] overflow-y-auto">
             <button
@@ -1555,8 +1579,8 @@ export function PublicChatPage() {
             </button>
 
             <PaymentPrompt
-              creatorId={paymentData?.creatorId || creator!.id}
-              sessionId={paymentData?.sessionId || sessionId}
+              creatorId={paymentData?.creatorId || creator.id}
+              sessionId={paymentData?.sessionId || sessionId || ''}
               paymentOptions={
                 paymentData?.paymentOptions ||
                 {
@@ -1568,9 +1592,7 @@ export function PublicChatPage() {
                 }
               }
               subscriptionOption={
-                FLAGS.payments &&
-                creator?.listingId &&
-                (creator?.subscriptionPriceCents || 0) > 0
+                creator?.listingId && (creator?.subscriptionPriceCents || 0) > 0
                   ? {
                       listingId: creator.listingId,
                       priceCents: creator.subscriptionPriceCents || 0,

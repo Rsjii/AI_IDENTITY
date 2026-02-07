@@ -189,10 +189,22 @@ export async function getMyListing(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const r = await db.query(
-    `SELECT * FROM "marketplace_listings" WHERE "creatorId"=$1 LIMIT 1`,
+    `SELECT * FROM "marketplace_listings" WHERE "creatorId"=$1 ORDER BY "createdAt" DESC`,
     [userId]
   );
-  return res.json({ item: r.rows[0] || null });
+  
+  // Return array for multiple listings support, but maintain backward compatibility
+  if (r.rows.length === 0) {
+    return res.json({ item: null, items: [] });
+  }
+  
+  // If only one listing, return both formats for backward compatibility
+  if (r.rows.length === 1) {
+    return res.json({ item: r.rows[0], items: r.rows });
+  }
+  
+  // Multiple listings - return array
+  return res.json({ items: r.rows, item: r.rows[0] }); // First one as default for backward compatibility
 }
 
 export async function upsertListing(req: Request, res: Response) {

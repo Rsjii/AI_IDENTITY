@@ -124,11 +124,12 @@ export function CreatorDashboardPage() {
 
         setRecentConversations((recentRes as any)?.items || []);
 
-        // Set marketplace listing data
-        if ((listingRes as any)?.item) {
+        // Set marketplace listing data (handle both single item and array)
+        const listingData = (listingRes as any)?.item || ((listingRes as any)?.items && (listingRes as any).items[0]);
+        if (listingData) {
           setListingData({
-            isPublic: (listingRes as any).item.isPublic ?? false,
-            id: (listingRes as any).item.id,
+            isPublic: listingData.isPublic ?? false,
+            id: listingData.id,
           });
         } else {
           setListingData(null);

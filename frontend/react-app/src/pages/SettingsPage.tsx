@@ -228,9 +228,11 @@ export function SettingsPage() {
   // Load marketplace listing
   const loadMarketplaceListing = async () => {
     try {
-      const res = await apiFetch<{ item: { isPublic: boolean } | null }>('/api/marketplace/my-listing');
-      if (res.item) {
-        setAiIsPublic(res.item.isPublic ?? false);
+      const res = await apiFetch<{ item?: { isPublic: boolean } | null; items?: Array<{ isPublic: boolean }> }>('/api/marketplace/my-listing');
+      // Handle both single item and array response
+      const listing = res.item || (res.items && res.items[0]);
+      if (listing) {
+        setAiIsPublic(listing.isPublic ?? false);
       } else {
         setAiIsPublic(false);
       }

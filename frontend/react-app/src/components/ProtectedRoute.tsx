@@ -48,7 +48,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const user = state.user as any;
 
   // 2) Profile incomplete => force /signup/profile, preserve next
-  if (user && !user.profileCompleted && !location.pathname.startsWith('/signup/profile')) {
+  // ✅ FIX: Only require profile for creators, visitors can skip or have minimal profile
+  if (user && !user.profileCompleted && user.userType !== 'visitor' && !location.pathname.startsWith('/signup/profile')) {
     return (
       <Navigate
         to={`/signup/profile?email=${encodeURIComponent(user.email)}&next=${encodeURIComponent(next)}`}

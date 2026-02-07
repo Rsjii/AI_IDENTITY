@@ -134,7 +134,14 @@ export function MarketplaceListingPage() {
   }
 
   const handleStartChat = () => {
-    window.location.href = `/chat/${listing?.slug}`;
+    // ✅ FIX: Use creator.handle instead of listing.slug
+    // Marketplace slug (e.g., "abhai-997442") is different from chat slug (e.g., "abhai")
+    // Chat URL uses User.handle, not marketplace_listings.slug
+    if (listing?.creator?.handle) {
+      window.location.href = `/chat/${listing.creator.handle}`;
+    } else {
+      showToast('Chat link not available', 'error');
+    }
   };
 
   const formatSubscribers = (count: number) => {
