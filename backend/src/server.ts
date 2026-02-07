@@ -142,8 +142,20 @@ async function startServer() {
         await initializeDatabase();
         logger.info('✅ Database tables initialized');
       } catch (dbError: any) {
-        logger.warn('⚠️ Database initialization failed, continuing anyway:', dbError?.message || dbError);
-        // Continue startup even if DB init fails (tables might already exist)
+        // ✅ In production, DB init failures are fatal (schema must be correct)
+        // In dev, allow graceful degradation for local development
+        if (isProd || config.nodeEnv === 'production') {
+          logger.error('❌ Database initialization failed in production - this is fatal:', {
+            err: dbError,
+            message: dbError?.message || String(dbError),
+            code: dbError?.code || 'NO_CODE',
+            hint: 'Database schema must be initialized correctly. Check migration logs.',
+          });
+          throw dbError; // Fail fast in production
+        } else {
+          logger.warn('⚠️ Database initialization failed, continuing anyway (dev mode):', dbError?.message || dbError);
+          // Continue startup in dev mode (tables might already exist, or DB might be unavailable)
+        }
       }
     }
 

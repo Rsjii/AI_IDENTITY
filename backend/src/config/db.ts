@@ -81,7 +81,14 @@ export const db = {
     
     while (attempts < maxAttempts) {
       try {
-        const res = await pool.query(text, params);
+        // ✅ IMPORTANT: multi-statement SQL (migrations) must be sent as a *simple query*
+        // Prepared statements cannot contain multiple commands.
+        // When params is undefined or empty, use simple query to support multi-statement SQL
+        const res =
+          params && params.length > 0
+            ? await pool.query(text, params)
+            : await pool.query(text);
+
         const duration = Date.now() - start;
         logger.debug('[DB] ✅ Executed query', { text: text.substring(0, 100), duration, rows: res.rowCount });
         return res;
