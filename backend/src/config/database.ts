@@ -49,9 +49,10 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'emailVerified' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "User" SET "emailVerified" = false WHERE "emailVerified" IS NULL;
     ALTER TABLE "User" ALTER COLUMN "emailVerified" SET DEFAULT false;
     ALTER TABLE "User" ALTER COLUMN "emailVerified" SET NOT NULL;
-    UPDATE "User" SET "emailVerified" = false WHERE "emailVerified" IS NULL;
   END IF;
 END $$;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMPTZ;
@@ -63,9 +64,10 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "profileCompleted" BOOLEAN;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'profileCompleted' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "User" SET "profileCompleted" = false WHERE "profileCompleted" IS NULL;
     ALTER TABLE "User" ALTER COLUMN "profileCompleted" SET DEFAULT false;
     ALTER TABLE "User" ALTER COLUMN "profileCompleted" SET NOT NULL;
-    UPDATE "User" SET "profileCompleted" = false WHERE "profileCompleted" IS NULL;
   END IF;
 END $$;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "timeZone" TEXT;
@@ -74,18 +76,20 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "planTier" TEXT;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'planTier' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "User" SET "planTier" = 'free' WHERE "planTier" IS NULL;
     ALTER TABLE "User" ALTER COLUMN "planTier" SET DEFAULT 'free';
     ALTER TABLE "User" ALTER COLUMN "planTier" SET NOT NULL;
-    UPDATE "User" SET "planTier" = 'free' WHERE "planTier" IS NULL;
   END IF;
 END $$;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "onboardingStep" TEXT;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'User' AND column_name = 'onboardingStep' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "User" SET "onboardingStep" = 'quiz' WHERE "onboardingStep" IS NULL;
     ALTER TABLE "User" ALTER COLUMN "onboardingStep" SET DEFAULT 'quiz';
     ALTER TABLE "User" ALTER COLUMN "onboardingStep" SET NOT NULL;
-    UPDATE "User" SET "onboardingStep" = 'quiz' WHERE "onboardingStep" IS NULL;
   END IF;
 END $$;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "publicSlug" TEXT;
@@ -797,18 +801,20 @@ ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "isPublic" BOOLEAN;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'isPublic' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "marketplace_listings" SET "isPublic" = false WHERE "isPublic" IS NULL;
     ALTER TABLE "marketplace_listings" ALTER COLUMN "isPublic" SET DEFAULT false;
     ALTER TABLE "marketplace_listings" ALTER COLUMN "isPublic" SET NOT NULL;
-    UPDATE "marketplace_listings" SET "isPublic" = false WHERE "isPublic" IS NULL;
   END IF;
 END $$;
 ALTER TABLE "marketplace_listings" ADD COLUMN IF NOT EXISTS "isFeatured" BOOLEAN;
 DO $$ 
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'marketplace_listings' AND column_name = 'isFeatured' AND is_nullable = 'YES') THEN
+    -- ✅ CRITICAL: UPDATE must happen BEFORE SET NOT NULL (PostgreSQL constraint)
+    UPDATE "marketplace_listings" SET "isFeatured" = false WHERE "isFeatured" IS NULL;
     ALTER TABLE "marketplace_listings" ALTER COLUMN "isFeatured" SET DEFAULT false;
     ALTER TABLE "marketplace_listings" ALTER COLUMN "isFeatured" SET NOT NULL;
-    UPDATE "marketplace_listings" SET "isFeatured" = false WHERE "isFeatured" IS NULL;
   END IF;
 END $$;
 
