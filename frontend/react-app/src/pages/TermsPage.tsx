@@ -79,7 +79,7 @@ export function TermsPage() {
             </div>
             <div>
               <h3 className="font-semibold text-foreground mb-2">Paid Subscriptions</h3>
-              <p>Pro ($49/mo), Growth ($149/mo), and Scale ($499/mo) subscriptions are billed monthly. By subscribing, you agree to:</p>
+              <p>Pro, Growth, and Scale subscriptions are billed monthly. Pricing is shown in INR for India and USD internationally based on your billing country selection at checkout. By subscribing, you agree to:</p>
               <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
                 <li>Pay the subscription fee in advance for each billing period</li>
                 <li>Automatic renewal unless cancelled before the billing date</li>

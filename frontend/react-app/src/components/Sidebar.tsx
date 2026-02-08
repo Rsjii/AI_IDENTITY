@@ -13,22 +13,9 @@ interface NavItem {
   to: string;
 }
 
-const CREATOR_MAIN: NavItem[] = [
-  { icon: BarChart3, label: 'Dashboard', to: '/dashboard' },
-  { icon: Bot, label: 'My AI', to: '/my-ai' },
-  { icon: MessageSquare, label: 'Conversations', to: '/conversations' },
-  { icon: Settings, label: 'Settings', to: '/settings' },
-];
-
 const CREATOR_ALSO: NavItem[] = [
   { icon: Compass, label: 'Explore', to: '/explore' },
   { icon: Clock, label: 'My Chats', to: '/my-chats' },
-];
-
-const ENDUSER_MAIN: NavItem[] = [
-  { icon: Compass, label: 'Explore', to: '/explore' },
-  { icon: Clock, label: 'My Chats', to: '/my-chats' },
-  { icon: Settings, label: 'Settings', to: '/settings' },
 ];
 
 export function Sidebar({

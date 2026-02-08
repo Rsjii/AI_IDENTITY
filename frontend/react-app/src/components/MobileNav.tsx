@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -17,7 +17,6 @@ export function MobileNav() {
   const { state, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const nav = useNavigate();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {

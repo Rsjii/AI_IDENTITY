@@ -29,7 +29,7 @@ import { OnboardingQuizPage } from './pages/OnboardingQuizPage';
 import { OnboardingContentPage } from './pages/OnboardingContentPage';
 import { OnboardingPricingPage } from './pages/OnboardingPricingPage';
 import { OnboardingPlanPage } from './pages/OnboardingPlanPage';
-import { OnboardingStripeConnectPage } from './pages/OnboardingStripeConnectPage';
+// OnboardingStripeConnectPage removed (Stripe removed)
 import { OnboardingDeployPage } from './pages/OnboardingDeployPage';
 import { OnboardingTrainingPage } from './pages/OnboardingTrainingPage';
 // New onboarding flow pages
@@ -56,7 +56,6 @@ import { MyAIPage } from './pages/MyAIPage';
 import { SetupChecklistPage } from './pages/setup/SetupChecklistPage';
 import { SetupPricingPage } from './pages/setup/SetupPricingPage';
 import { SetupPlanPage } from './pages/setup/SetupPlanPage';
-import { SetupStripePage } from './pages/setup/SetupStripePage';
 import { SetupSharePage } from './pages/setup/SetupSharePage';
 import { FLAGS } from './lib/flags';
 
@@ -134,14 +133,14 @@ function App() {
               <Route path="/onboarding/voice" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/training" element={<ProtectedRoute><OnboardingTrainingPage /></ProtectedRoute>} />
               <Route path="/onboarding/plan" element={<ProtectedRoute><OnboardingPlanPage /></ProtectedRoute>} />
-              <Route path="/onboarding/stripe-connect" element={<ProtectedRoute><OnboardingStripeConnectPage /></ProtectedRoute>} />
+              <Route path="/onboarding/stripe-connect" element={<Navigate to="/onboarding/deploy" replace />} />
               <Route path="/onboarding/deploy" element={<ProtectedRoute><OnboardingDeployPage /></ProtectedRoute>} />
               
               {/* Setup Flow Routes */}
               <Route path="/setup" element={<ProtectedRoute><SetupChecklistPage /></ProtectedRoute>} />
               <Route path="/setup/pricing" element={<ProtectedRoute><SetupPricingPage /></ProtectedRoute>} />
               <Route path="/setup/plan" element={<ProtectedRoute><SetupPlanPage /></ProtectedRoute>} />
-              <Route path="/setup/stripe" element={<ProtectedRoute><SetupStripePage /></ProtectedRoute>} />
+              <Route path="/setup/stripe" element={<Navigate to="/setup" replace />} />
               <Route path="/setup/share" element={<ProtectedRoute><SetupSharePage /></ProtectedRoute>} />
               
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />

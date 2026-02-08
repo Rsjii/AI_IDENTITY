@@ -665,6 +665,31 @@ ALTER TABLE "stripe_payouts" DROP CONSTRAINT IF EXISTS "stripe_payouts_creatorId
 ALTER TABLE "stripe_payouts" ADD CONSTRAINT "stripe_payouts_creatorId_fkey"
   FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- ========== BILLING TRANSACTIONS (Unified: Razorpay + LemonSqueezy plan purchases) ==========
+CREATE TABLE IF NOT EXISTS "billing_transactions" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "gateway" TEXT NOT NULL CHECK ("gateway" IN ('razorpay','lemonsqueezy')),
+  "tier" TEXT NOT NULL CHECK ("tier" IN ('starter','growth','scale')),
+  "amount" INTEGER, -- paise for razorpay; null for lemonsqueezy
+  "currency" TEXT,
+  "status" TEXT NOT NULL DEFAULT 'created' CHECK ("status" IN ('created','succeeded','failed')),
+  "gatewayOrderId" TEXT,   -- Razorpay order id OR LemonSqueezy checkout id
+  "gatewayPaymentId" TEXT, -- Razorpay payment id OR LemonSqueezy subscription/order id
+  "meta" JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "idx_billing_transactions_userId_createdAt"
+  ON "billing_transactions"("userId","createdAt");
+CREATE INDEX IF NOT EXISTS "idx_billing_transactions_gatewayOrderId"
+  ON "billing_transactions"("gatewayOrderId");
+
+ALTER TABLE "billing_transactions" DROP CONSTRAINT IF EXISTS "billing_transactions_userId_fkey";
+ALTER TABLE "billing_transactions" ADD CONSTRAINT "billing_transactions_userId_fkey"
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- Add missing columns to User table
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMPTZ;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "planTier" TEXT NOT NULL DEFAULT 'free';

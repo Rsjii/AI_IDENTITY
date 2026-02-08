@@ -58,6 +58,9 @@ c. abhi step 2 ke just direct baad aap step 3 dikha rahae hai, usme time lagt ha
 
 
 
+d. jab tak step 2 ke baad pura bana hi nahi hai user ko aap chat kaise allow kar rahe this is wrong na, user should not be allowed until ban jaaye
+
+
 
 5. maine abhi plan le liya tha, maine make public in dahboard clcik kiya , to aata hai msg Publish prerequisites not met, bhai bande ko saih sebatao na akise akrna chahiye steps wagerah, aur websites kaise karti hai sahi se dkh lena aur batao see from the net 
 

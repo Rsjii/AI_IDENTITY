@@ -269,12 +269,12 @@ export function CreatorDashboardPage() {
           choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
           subscription_price: 'Subscription price',
           pay_per_chat_price: 'Pay-per-chat price',
-          stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+          stripe_connect_verified: 'Payout setup (currently unavailable)',
         };
         const missing: string[] = Array.isArray(err.missing) ? err.missing : [];
         const msg = missing.length
           ? missing.map((m) => missingLabels[m] || m).join(', ')
-          : 'Complete listing basics + pricing + Stripe to publish.';
+          : 'Complete listing basics + pricing to publish.';
         showToast(`Cannot make public yet. Missing: ${msg}`, 'error', 7000);
         nav('/marketplace/manage');
         return;
@@ -493,7 +493,7 @@ const handleGenerateInsightsReport = () => {
                 <div>
                   <strong>Upgrade to unlock marketplace & monetization</strong>
                   <p className="text-sm mt-1">
-                    Free tier creators cannot list on marketplace or monetize. Upgrade to Starter plan ($49/month) 
+                    Free tier creators cannot list on marketplace or monetize. Upgrade to Starter plan 
                     to make your AI discoverable and start earning from visitors.
                   </p>
                 </div>

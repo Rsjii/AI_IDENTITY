@@ -25,7 +25,7 @@ function getRequiredOnboardingPath(user: any): string {
     pricing: '/onboarding/pricing',
     voice: '/onboarding/voice',
     plan: '/onboarding/plan',
-    stripe_connect: '/onboarding/stripe-connect',
+    stripe_connect: '/onboarding/deploy',
     deploy: '/onboarding/deploy',
     
     // Backward compatibility: some older code might use 'training'

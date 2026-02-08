@@ -1,19 +1,40 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Zap, TrendingUp, Building2, HelpCircle } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { startPlanCheckout, getLastBillingCountry, setLastBillingCountry, type BillingCountry } from '@/lib/planCheckout';
+import { formatMonthlyPrice } from '@/lib/planPriceBook';
 
 export function PricingPage() {
   const { state } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const goStripe = async (tier: 'starter' | 'growth' | 'scale') => {
+  const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
+  const defaultBillingCountry: BillingCountry = useMemo(() => {
+    const stored = getLastBillingCountry();
+    if (stored) return stored;
+
+    const p = String(userPhone || '').trim();
+    if (p.startsWith('+91') || p.startsWith('91')) return 'IN';
+
+    // Soft hint: browser locale/timezone
+    if (typeof navigator !== 'undefined') {
+      const lang = navigator.language || '';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      if (lang.toLowerCase().includes('-in') || tz === 'Asia/Kolkata') return 'IN';
+    }
+
+    return 'OTHER';
+  }, [userPhone]);
+
+  const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
+
+  const goCheckout = async (tier: 'starter' | 'growth' | 'scale') => {
     if (state.status !== 'authenticated') {
       window.location.href = '/auth';
       return;
@@ -21,13 +42,15 @@ export function PricingPage() {
     setLoading(true);
     setError('');
     try {
-      const r = await apiFetch<{ url: string }>('/api/billing/stripe/create-checkout-session', {
-        method: 'POST',
-        body: JSON.stringify({ tier }),
+      await startPlanCheckout({
+        tier,
+        returnUrl: '/settings?tab=billing',
+        billingCountry,
       });
-      window.location.href = r.url;
+      // Razorpay path returns:
+      window.location.href = '/settings?tab=billing';
     } catch (e: any) {
-      setError(e.message || 'Stripe checkout failed');
+      setError(e.message || 'Checkout failed');
       setLoading(false);
     }
   };
@@ -48,6 +71,30 @@ export function PricingPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* Billing Country Selector */}
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle>Billing Country</CardTitle>
+            <CardDescription>Select your billing country for plan purchases</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">India → Razorpay • Outside India → LemonSqueezy</div>
+            <select
+              className="border rounded-md px-3 py-2 bg-background text-sm"
+              value={billingCountry}
+              onChange={(e) => {
+                const v = e.target.value as BillingCountry;
+                setBillingCountry(v);
+                setLastBillingCountry(v);
+              }}
+              disabled={loading}
+            >
+              <option value="IN">India</option>
+              <option value="OTHER">Outside India</option>
+            </select>
+          </CardContent>
+        </Card>
 
         {/* Plan Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -117,7 +164,7 @@ export function PricingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-3xl font-bold">
-                $49
+                {formatMonthlyPrice(billingCountry, 'starter').replace('/mo', '')}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
               <div className="text-sm text-muted-foreground mb-4">
@@ -154,7 +201,7 @@ export function PricingPage() {
                   <TrendingUp className="h-3 w-3" />
                   <span>Best for: Beginners</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goStripe('starter')}>
+                <Button className="w-full" disabled={loading} onClick={() => goCheckout('starter')}>
                   Choose Starter
                 </Button>
               </div>
@@ -172,7 +219,7 @@ export function PricingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-3xl font-bold">
-                $99
+                {formatMonthlyPrice(billingCountry, 'growth').replace('/mo', '')}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
               <div className="text-sm text-muted-foreground mb-4">
@@ -205,7 +252,7 @@ export function PricingPage() {
                   <TrendingUp className="h-3 w-3" />
                   <span>Best for: Growing creators</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goStripe('growth')}>
+                <Button className="w-full" disabled={loading} onClick={() => goCheckout('growth')}>
                   Choose Growth
                 </Button>
               </div>
@@ -220,7 +267,7 @@ export function PricingPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-3xl font-bold">
-                $199
+                {formatMonthlyPrice(billingCountry, 'scale').replace('/mo', '')}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </div>
               <div className="text-sm text-muted-foreground mb-4">
@@ -253,7 +300,7 @@ export function PricingPage() {
                   <Building2 className="h-3 w-3" />
                   <span>Best for: Established brands</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goStripe('scale')}>
+                <Button className="w-full" disabled={loading} onClick={() => goCheckout('scale')}>
                   Choose Scale
                 </Button>
               </div>
@@ -283,9 +330,9 @@ export function PricingPage() {
                   <tr className="border-b">
                     <td className="p-3 font-medium">Price</td>
                     <td className="text-center p-3">$0</td>
-                    <td className="text-center p-3">$49/mo</td>
-                    <td className="text-center p-3">$99/mo</td>
-                    <td className="text-center p-3">$199/mo</td>
+                    <td className="text-center p-3">{formatMonthlyPrice(billingCountry, 'starter')}</td>
+                    <td className="text-center p-3">{formatMonthlyPrice(billingCountry, 'growth')}</td>
+                    <td className="text-center p-3">{formatMonthlyPrice(billingCountry, 'scale')}</td>
                   </tr>
                   <tr className="border-b bg-bg-tertiary/30">
                     <td className="p-3 font-medium">Monthly Chats</td>

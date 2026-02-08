@@ -124,7 +124,7 @@ export function MarketplaceManagePage() {
           choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
           subscription_price: 'Subscription price',
           pay_per_chat_price: 'Pay-per-chat price',
-          stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+          stripe_connect_verified: 'Payout setup (currently unavailable)',
         };
         const errorMsg = missing.map((m: string) => missingLabels[m] || m).join(', ');
         showToast(`Cannot publish. Missing: ${errorMsg}`, 'error', 7000);
@@ -153,7 +153,7 @@ export function MarketplaceManagePage() {
                 <div>
                   <strong>Upgrade to list on marketplace</strong>
                   <p className="text-sm mt-1">
-                    Free tier creators cannot list on the marketplace. Upgrade to Starter plan ($49/month) 
+                    Free tier creators cannot list on the marketplace. Upgrade to Starter plan 
                     to make your AI discoverable and start earning from visitors.
                   </p>
                 </div>

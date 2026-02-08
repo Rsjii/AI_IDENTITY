@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db, userQueries, stripePaymentQueries } from '../../config/database';
 import { getConversationCountsLast30Days, getTopQuestionsForPeriod } from '../../services/analyticsAggregationService';
-import { createConnectOnboardingLink, getConnectAccountStatus } from '../../services/stripeConnectService';
+// Stripe Connect removed - functions disabled
 
 function getUserId(req: Request): string | null {
   const u: any = (req as any).user;
@@ -627,38 +627,14 @@ export async function completeOnboarding(req: Request, res: Response) {
 }
 
 export async function connectStripeAccount(req: Request, res: Response) {
-  const userId = getUserId(req);
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  const { returnUrl, refreshUrl } = z.object({
-    returnUrl: z.string().url().optional(),
-    refreshUrl: z.string().url().optional(),
-  }).parse(req.body);
-
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const finalReturnUrl = returnUrl || `${frontendUrl}/settings?tab=billing&stripe=success`;
-  const finalRefreshUrl = refreshUrl || `${frontendUrl}/settings?tab=billing&stripe=refresh`;
-
-  const url = await createConnectOnboardingLink(userId, finalReturnUrl, finalRefreshUrl);
-  return res.json({ url });
+  return res.status(501).json({
+    error: 'Stripe Connect has been removed. Payouts are currently disabled.',
+    errorCode: 'STRIPE_CONNECT_DISABLED',
+  });
 }
 
 export async function getStripeConnectStatus(req: Request, res: Response) {
-  const userId = getUserId(req);
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  const account = await getConnectAccountStatus(userId);
-  if (!account) {
-    return res.json({ connected: false });
-  }
-
-  return res.json({
-    connected: true,
-    detailsSubmitted: account.details_submitted,
-    chargesEnabled: account.charges_enabled,
-    payoutsEnabled: account.payouts_enabled,
-    requirements: account.requirements || null,
-  });
+  return res.json({ connected: false });
 }
 
 export async function recentChats(req: Request, res: Response) {
@@ -907,8 +883,8 @@ export async function getSetupStatus(req: Request, res: Response) {
   const setupCompleted = (user as any).setupCompleted || {};
   const setupDismissed = (user as any).setupDismissed || false;
 
-  // ✅ Steps: share optional, publish mandatory (for monetization/publish flows)
-  const steps = ['pricing', 'plan', 'stripe', 'publish'];
+  // ✅ Steps: Stripe removed, only pricing/plan/publish required
+  const steps = ['pricing', 'plan', 'publish'];
 
   // ✅ Compute requirements from REAL data
   const listingR = await db.query(
@@ -939,16 +915,13 @@ export async function getSetupStatus(req: Request, res: Response) {
     ((listing.enableSubscriptions === true && Number(listing.subscriptionPriceCents || 0) > 0) ||
      (listing.enablePayPerChat === true && Number(listing.payPerChatPriceCents || 0) > 0));
 
-  const connect = await getConnectAccountStatus(userId);
-  const stripeVerified = !!(connect && connect.details_submitted && connect.payouts_enabled);
-
-  const publishReady = planEligible && listingBasicsOk && pricingOk && stripeVerified;
+  // ✅ Stripe removed - no longer required for publishing
+  const publishReady = planEligible && listingBasicsOk && pricingOk;
   const published = !!(listing && listing.isPublic === true && listing.publishStatus === 'published');
 
   // ✅ Auto-mark steps based on real data (effective completion)
   const effectiveSetupCompleted = {
     ...setupCompleted,
-    stripe: stripeVerified ? true : setupCompleted.stripe,
     publish: published ? true : setupCompleted.publish,
   };
 
@@ -963,12 +936,11 @@ export async function getSetupStatus(req: Request, res: Response) {
     totalSteps: steps.length,
     nextStep: completedSteps.length < steps.length ?
       steps.find(s => !effectiveSetupCompleted[s]) : null,
-    // ✅ New: backend truth
+    // ✅ New: backend truth (Stripe removed)
     setupRequirements: {
       planEligible,
       listingBasicsOk,
       pricingOk,
-      stripeVerified,
       publishReady,
       published,
     },

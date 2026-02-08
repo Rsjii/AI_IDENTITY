@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { startPlanCheckout, getLastBillingCountry, setLastBillingCountry, type BillingCountry } from '@/lib/planCheckout';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatMonthlyPrice } from '@/lib/planPriceBook';
 
 const PLANS = [
   {
@@ -14,7 +17,7 @@ const PLANS = [
     name: 'Free Trial',
     price: '$0',
     period: 'for 7 days',
-    description: 'Then $49/mo or downgrade to free',
+    description: 'Then upgrade to a paid plan or downgrade to free',
     features: ['All features unlocked', '5,000 chats/month', 'Monetization enabled', 'Marketplace listing', 'Email support'],
     badge: '🎁 RECOMMENDED',
     recommended: true,
@@ -52,7 +55,28 @@ const PLANS = [
 
 export function SetupPlanPage() {
   const navigate = useNavigate();
+  const { state } = useAuth();
   const [loading, setLoading] = useState('');
+
+  const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
+  const defaultBillingCountry: BillingCountry = useMemo(() => {
+    const stored = getLastBillingCountry();
+    if (stored) return stored;
+
+    const p = String(userPhone || '').trim();
+    if (p.startsWith('+91') || p.startsWith('91')) return 'IN';
+
+    // Soft hint: browser locale/timezone
+    if (typeof navigator !== 'undefined') {
+      const lang = navigator.language || '';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      if (lang.toLowerCase().includes('-in') || tz === 'Asia/Kolkata') return 'IN';
+    }
+
+    return 'OTHER';
+  }, [userPhone]);
+
+  const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
 
   const handleSelectPlan = async (action: string) => {
     setLoading(action);
@@ -60,14 +84,19 @@ export function SetupPlanPage() {
       if (action === 'trial') {
         await apiFetch('/api/creator/trial/start', { method: 'POST' });
       } else {
-        const res = await apiFetch('/api/billing/stripe/create-checkout-session', {
-          method: 'POST',
-          body: JSON.stringify({ tier: action }),
+        await startPlanCheckout({
+          tier: action as any,
+          returnUrl: '/setup?paid=1',
+          billingCountry,
         });
-        if (res.url) {
-          window.location.href = res.url;
-          return;
-        }
+        // Razorpay path continues:
+        await apiFetch('/api/creator/setup/step', {
+          method: 'POST',
+          body: JSON.stringify({ step: 'plan', completed: true }),
+        });
+        showToast('Plan selected!', 'success');
+        navigate('/setup');
+        return;
       }
 
       await apiFetch('/api/creator/setup/step', {
@@ -92,6 +121,28 @@ export function SetupPlanPage() {
           <p className="text-lg text-muted-foreground">Start with a free trial, upgrade when ready</p>
         </div>
 
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle>Billing country</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">India → Razorpay • Outside India → LemonSqueezy</div>
+            <select
+              className="border rounded-md px-3 py-2 bg-background text-sm"
+              value={billingCountry}
+              onChange={(e) => {
+                const v = e.target.value as BillingCountry;
+                setBillingCountry(v);
+                setLastBillingCountry(v);
+              }}
+              disabled={!!loading}
+            >
+              <option value="IN">India</option>
+              <option value="OTHER">Outside India</option>
+            </select>
+          </CardContent>
+        </Card>
+
         <div className="grid md:grid-cols-4 gap-6">
           {PLANS.map((plan) => (
             <Card key={plan.id} className={`relative glass transition-all hover:scale-105 ${plan.recommended ? 'border-2 border-accent-primary' : ''}`}>
@@ -106,7 +157,17 @@ export function SetupPlanPage() {
               <CardHeader className="text-center pb-4">
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-4xl font-bold">
+                    {plan.action === 'trial' 
+                      ? '$0'
+                      : plan.action === 'starter' 
+                        ? formatMonthlyPrice(billingCountry, 'starter').replace('/mo', '')
+                        : plan.action === 'growth'
+                          ? formatMonthlyPrice(billingCountry, 'growth').replace('/mo', '')
+                          : plan.action === 'scale'
+                            ? formatMonthlyPrice(billingCountry, 'scale').replace('/mo', '')
+                            : plan.price}
+                  </span>
                   <span className="text-muted-foreground text-sm ml-1">{plan.period}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>

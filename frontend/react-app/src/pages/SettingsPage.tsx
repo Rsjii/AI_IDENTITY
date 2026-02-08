@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { apiFetch, apiFetchForm, buildApiUrl } from '@/lib/api';
+import { startPlanCheckout, getLastBillingCountry, setLastBillingCountry, type BillingCountry } from '@/lib/planCheckout';
+import { formatMonthlyPrice } from '@/lib/planPriceBook';
 import { IntegrationsPage } from './Integrations';
 
 type Tab = 'profile' | 'pricing' | 'billing' | 'integrations' | 'notifications' | 'security' | 'preferences';
@@ -120,8 +122,7 @@ export function SettingsPage() {
     pendingEarningsCents: number;
   } | null>(null);
   const [requestingPayout, setRequestingPayout] = useState(false);
-  const [stripeConnectStatus, setStripeConnectStatus] = useState<any>(null);
-  const [connectingStripe, setConnectingStripe] = useState(false);
+  // Stripe Connect removed - no longer used
 
   // Active sessions (in Security tab)
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -212,7 +213,7 @@ export function SettingsPage() {
         setPaymentTriggerRules(config.paymentTriggerRules || { keywords: [], minLength: 0, alwaysRequire: false });
 
         loadBillingHistory();
-        loadStripeConnectStatus();
+        // Stripe Connect removed
 
         // Load variant groups if Scale plan
         if ((state.user as any).planTier === 'scale') {
@@ -298,12 +299,12 @@ export function SettingsPage() {
           choose_monetization: 'Enable monetization (Subscription or Pay-per-chat)',
           subscription_price: 'Subscription price',
           pay_per_chat_price: 'Pay-per-chat price',
-          stripe_connect_verified: 'Stripe Connect (details + payouts enabled)',
+          // Stripe Connect removed
         };
         const missing: string[] = Array.isArray(err.missing) ? err.missing : [];
         const msg = missing.length
           ? missing.map((m) => missingLabels[m] || m).join(', ')
-          : 'Complete listing basics + pricing + Stripe to publish.';
+          : 'Complete listing basics + pricing to publish.';
         showToast(`Cannot make public yet. Missing: ${msg}`, 'error', 7000);
         nav('/marketplace/manage');
         return;
@@ -374,16 +375,7 @@ export function SettingsPage() {
     }
   };
 
-  const loadStripeConnectStatus = async () => {
-    if (state.status !== 'authenticated') return;
-    try {
-      const res = await apiFetch('/api/creator/stripe/status');
-      setStripeConnectStatus(res);
-    } catch (e: any) {
-      console.error('Failed to load Stripe Connect status:', e);
-      setStripeConnectStatus({ connected: false });
-    }
-  };
+  // Stripe Connect removed - function no longer needed
 
   // Compute isCreator early (used in multiple places)
   const isCreator = state.status === 'authenticated' && state.user?.userType === 'creator';
@@ -511,20 +503,7 @@ export function SettingsPage() {
     }
   };
 
-  const handleConnectStripe = async () => {
-    setConnectingStripe(true);
-    try {
-      const res = await apiFetch<{ url: string }>('/api/creator/stripe/connect', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      window.location.href = res.url;
-    } catch (e: any) {
-      setError(e.message || 'Failed to start Stripe onboarding');
-    } finally {
-      setConnectingStripe(false);
-    }
-  };
+  // Stripe Connect removed - function no longer needed
 
   const handleChangePassword = async () => {
     setPasswordSaving(true);
@@ -800,27 +779,39 @@ export function SettingsPage() {
     }
   };
 
-  const upgradePlan = async (tier: 'pro' | 'growth' | 'scale') => {
+  const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
+  const defaultBillingCountry: BillingCountry = useMemo(() => {
+    const stored = getLastBillingCountry();
+    if (stored) return stored;
+
+    const p = String(userPhone || '').trim();
+    if (p.startsWith('+91') || p.startsWith('91')) return 'IN';
+
+    // Soft hint: browser locale/timezone
+    if (typeof navigator !== 'undefined') {
+      const lang = navigator.language || '';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      if (lang.toLowerCase().includes('-in') || tz === 'Asia/Kolkata') return 'IN';
+    }
+
+    return 'OTHER';
+  }, [userPhone]);
+
+  const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
+
+  const upgradePlan = async (tier: 'starter' | 'growth' | 'scale') => {
     setSaving(true);
     setError('');
     try {
-      const r = await apiFetch<{ url: string }>('/api/billing/stripe/create-checkout-session', {
-        method: 'POST',
-        body: JSON.stringify({ tier, returnUrl: '/settings?tab=billing' }),
+      await startPlanCheckout({
+        tier,
+        returnUrl: '/settings?tab=billing',
+        billingCountry,
       });
-      if (r.url) {
-        window.location.href = r.url;
-      } else {
-        setError('Failed to create checkout session. Please try again.');
-        setSaving(false);
-      }
+      // Razorpay (no redirect):
+      window.location.href = '/settings?tab=billing';
     } catch (e: any) {
-      // Handle specific Stripe setup errors
-      if (e.errorCode === 'STRIPE_ACCOUNT_SETUP_REQUIRED') {
-        setError('Stripe account setup required! Please set your business name in Stripe Dashboard: https://dashboard.stripe.com/account');
-      } else {
-        setError(e.message || 'Failed to start checkout. Please try again.');
-      }
+      setError(e.message || 'Checkout failed');
       setSaving(false);
     }
   };
@@ -1350,6 +1341,30 @@ export function SettingsPage() {
         {/* ===== BILLING TAB (CREATORS ONLY) ===== */}
         {activeTab === 'billing' && isCreator && (
           <div className="space-y-6">
+            {/* Billing Country Selector */}
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle>Billing Country</CardTitle>
+                <CardDescription>Select your billing country for plan purchases</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground">India → Razorpay • Outside India → LemonSqueezy</div>
+                <select
+                  className="border rounded-md px-3 py-2 bg-background text-sm"
+                  value={billingCountry}
+                  onChange={(e) => {
+                    const v = e.target.value as BillingCountry;
+                    setBillingCountry(v);
+                    setLastBillingCountry(v);
+                  }}
+                  disabled={saving}
+                >
+                  <option value="IN">India</option>
+                  <option value="OTHER">Outside India</option>
+                </select>
+              </CardContent>
+            </Card>
+
             {/* Earnings Overview */}
             {earningsBalances && (
               <Card className="glass">
@@ -1403,26 +1418,16 @@ export function SettingsPage() {
               </Card>
             )}
 
-            {/* Payout Settings - Stripe Connect */}
+            {/* Payout Settings - Currently Disabled */}
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Payout Settings</CardTitle>
-                <CardDescription>Enable marketplace payouts by connecting Stripe</CardDescription>
+                <CardDescription>Payouts are currently disabled (Stripe removed)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {stripeConnectStatus?.connected ? (
-                  <div className="space-y-2 text-sm text-text-secondary">
-                    <div>Connected: {stripeConnectStatus.chargesEnabled ? 'Charges enabled' : 'Charges pending'}</div>
-                    <div>Payouts: {stripeConnectStatus.payoutsEnabled ? 'Enabled' : 'Disabled'}</div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-text-secondary">
-                    Not connected. Connect to receive marketplace payouts.
-                  </div>
-                )}
-                <Button onClick={handleConnectStripe} disabled={connectingStripe}>
-                  {connectingStripe ? 'Connecting…' : stripeConnectStatus?.connected ? 'Update Stripe Info' : 'Connect Stripe'}
-                </Button>
+              <CardContent>
+                <div className="text-muted-foreground">
+                  Payout functionality will be re-enabled with RazorpayX or alternative payment provider in the future.
+                </div>
               </CardContent>
             </Card>
 
@@ -1656,24 +1661,24 @@ export function SettingsPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <Button
                       variant={planTier === 'starter' ? 'default' : 'outline'}
-                      onClick={() => upgradePlan('pro')}
+                      onClick={() => upgradePlan('starter')}
                       disabled={saving || planTier === 'starter'}
                     >
-                      Pro ($49/mo)
+                      Pro ({formatMonthlyPrice(billingCountry, 'starter')})
                     </Button>
                     <Button
                       variant={planTier === 'growth' ? 'default' : 'outline'}
                       onClick={() => upgradePlan('growth')}
                       disabled={saving || planTier === 'growth'}
                     >
-                      Growth ($149/mo)
+                      Growth ({formatMonthlyPrice(billingCountry, 'growth')})
                     </Button>
                     <Button
                       variant={planTier === 'scale' ? 'default' : 'outline'}
                       onClick={() => upgradePlan('scale')}
                       disabled={saving || planTier === 'scale'}
                     >
-                      Scale ($499/mo)
+                      Scale ({formatMonthlyPrice(billingCountry, 'scale')})
                     </Button>
                   </div>
                 )}

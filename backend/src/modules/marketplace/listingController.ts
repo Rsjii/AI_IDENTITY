@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db, userQueries } from '../../config/database';
 import { generateId } from '../../utils/idGenerator';
-import { getConnectAccountStatus } from '../../services/stripeConnectService';
 
 function getUserId(req: Request): string | null {
   const u: any = (req as any).user;
@@ -37,12 +36,6 @@ const upsertListingSchema = z.object({
   freeMessageLimit: z.number().int().min(0).optional(),
   publishStatus: z.enum(['draft','ready','published','suspended']).optional(),
 });
-
-async function getStripeConnectVerified(userId: string): Promise<boolean> {
-  const account = await getConnectAccountStatus(userId);
-  if (!account) return false;
-  return account.details_submitted === true && account.payouts_enabled === true;
-}
 
 function missingBasics(listing: any) {
   const missing: string[] = [];
@@ -294,12 +287,6 @@ export async function upsertListing(req: Request, res: Response) {
     const missing: string[] = [];
     missing.push(...missingBasics(merged));
     missing.push(...validatePricing(merged));
-
-    const needsStripe = merged.enableSubscriptions === true || merged.enablePayPerChat === true;
-    if (needsStripe) {
-      const stripeVerified = await getStripeConnectVerified(userId);
-      if (!stripeVerified) missing.push('stripe_connect_verified');
-    }
 
     if (missing.length) {
       return res.status(400).json({

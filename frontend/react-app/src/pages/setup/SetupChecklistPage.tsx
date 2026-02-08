@@ -4,7 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Check, ChevronRight, DollarSign, CreditCard, Zap, Globe, Share2 } from 'lucide-react';
+import { Check, ChevronRight, DollarSign, CreditCard, Globe, Share2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export function SetupChecklistPage() {
@@ -41,13 +41,6 @@ export function SetupChecklistPage() {
       description: 'Free trial or paid plan',
       icon: CreditCard,
       route: '/setup/plan',
-    },
-    {
-      key: 'stripe',
-      title: 'Connect Stripe',
-      description: 'Receive payouts automatically',
-      icon: Zap,
-      route: '/setup/stripe',
     },
     {
       key: 'publish',

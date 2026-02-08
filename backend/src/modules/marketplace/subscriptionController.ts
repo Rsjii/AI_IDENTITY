@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/database';
-import { getStripe } from '../../services/stripeService';
 import { generateId } from '../../utils/idGenerator';
 
 function getUserId(req: Request): string | null {
@@ -83,13 +82,7 @@ export async function cancelSubscription(req: Request, res: Response) {
   const sub = subRes.rows[0];
   if (!sub) return res.status(404).json({ error: 'Subscription not found' });
 
-  // If we have Stripe subscription id, cancel at period end in Stripe (source of truth)
-  if (sub.stripeSubscriptionId) {
-    const stripe = getStripe();
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-      cancel_at_period_end: true,
-    });
-  }
+  // Stripe removed - subscriptions disabled
 
   const r = await db.query(
     `UPDATE "marketplace_subscriptions"
@@ -102,67 +95,9 @@ export async function cancelSubscription(req: Request, res: Response) {
 }
 
 export async function createSubscriptionCheckout(req: Request, res: Response) {
-  const userId = getUserId(req);
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  const data = checkoutSchema.parse(req.body);
-  const listingId = data.listingId;
-
-  const listingRes = await db.query(
-    `SELECT ml.*, u."stripeConnectId" FROM "marketplace_listings" ml
-     JOIN "User" u ON u.id = ml."creatorId"
-     WHERE ml.id=$1 AND ml."isPublic"=true LIMIT 1`,
-    [listingId]
-  );
-  const listing = listingRes.rows[0];
-  if (!listing) return res.status(404).json({ error: 'Listing not found' });
-
-  if (!listing.stripeConnectId) {
-    return res.status(400).json({ error: 'Creator has not connected Stripe' });
-  }
-
-  const stripe = getStripe();
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    line_items: [
-      {
-        price_data: {
-          currency: (listing.currency || 'usd').toLowerCase(),
-          product_data: {
-            name: `${listing.slug} subscription`,
-          },
-          recurring: { interval: 'month' },
-          unit_amount: listing.subscriptionPriceCents,
-        },
-        quantity: 1,
-      },
-    ],
-    success_url:
-      data.successUrl && data.successUrl.startsWith(frontendUrl)
-        ? data.successUrl
-        : `${frontendUrl}/marketplace/${listing.slug}?subscribed=1`,
-    cancel_url:
-      data.cancelUrl && data.cancelUrl.startsWith(frontendUrl)
-        ? data.cancelUrl
-        : `${frontendUrl}/marketplace/${listing.slug}?cancelled=1`,
-    subscription_data: {
-      application_fee_percent: 25,
-      transfer_data: { destination: listing.stripeConnectId },
-      metadata: {
-        listingId,
-        userId,
-        type: 'marketplace_subscription',
-      },
-    },
-    metadata: {
-      listingId,
-      userId,
-      type: 'marketplace_subscription',
-    },
+  return res.status(501).json({
+    error: 'Marketplace subscriptions are disabled (Stripe removed).',
+    errorCode: 'SUBSCRIPTIONS_DISABLED',
   });
-
-  return res.json({ url: session.url });
 }
 

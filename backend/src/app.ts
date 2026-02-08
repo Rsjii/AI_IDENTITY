@@ -34,12 +34,11 @@ import voiceRoutes from './modules/voice/voiceRoutes';
 import widgetRoutes from './modules/widget/widgetRoutes';
 import instagramRoutes from './modules/instagram/instagramRoutes';
 import whatsappRoutes from './modules/whatsapp/whatsappRoutes';
-import stripeRoutes from './modules/billing/stripeRoutes';
+import unifiedBillingRoutes from './modules/billing/unifiedBillingRoutes';
 import contentRoutes from './modules/content/contentRoutes';
 import publicRoutes from './modules/public/publicRoutes';
 import creatorRoutes from './modules/creator/creatorRoutes';
 import userRoutes from './modules/user/userRoutes';
-import payPerChatRoutes from './modules/payments/payPerChatRoutes';
 import rateLimitRoutes from './modules/rateLimit/rateLimitRoutes';
 import marketplaceListingRoutes from './modules/marketplace/listingRoutes';
 import marketplaceReviewRoutes from './modules/marketplace/reviewRoutes';
@@ -72,9 +71,11 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://checkout.razorpay.com"],
       imgSrc: ["'self'", "data:", "https:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      frameSrc: ["'self'", "https://checkout.lemonsqueezy.com", "https://checkout.razorpay.com", "https://api.razorpay.com"],
+      connectSrc: ["'self'", "https://api.lemonsqueezy.com", "https://checkout.razorpay.com", "https://api.razorpay.com"],
       frameAncestors: ["'self'", "*"], // Allow embedding in iframes from any origin (for widget)
     },
   },
@@ -101,8 +102,8 @@ if (isProd) {
 app.use(cookieParser());
 app.use(extractJWTFromCookie);
 
-// Stripe webhook needs raw body BEFORE json parser (only for that route)
-app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json' }));
+// ✅ LemonSqueezy webhook needs raw body BEFORE json parser
+app.use('/api/billing/lemonsqueezy/webhook', express.raw({ type: 'application/json' }));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -621,10 +622,7 @@ if (isFeatureEnabled('ENABLE_WHATSAPP')) {
   app.use('/api/whatsapp', whatsappRoutes);
 }
 
-app.use('/api/billing/stripe', stripeRoutes);
-if (isFeatureEnabled('ENABLE_PAYMENTS') && isFeatureEnabled('ENABLE_PAY_PER_CHAT')) {
-  app.use('/api/payments/pay-per-chat', payPerChatRoutes);
-}
+app.use('/api/billing', unifiedBillingRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/creator', creatorRoutes);

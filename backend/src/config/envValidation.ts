@@ -60,10 +60,10 @@ export function validateEnv(): void {
     throw new Error(error);
   }
 
-  // Stripe warnings in explicit prod
+  // LemonSqueezy warnings in explicit prod
   if (isExplicitlyProd) {
-    if (!process.env['STRIPE_SECRET_KEY']) logger.warn('⚠️ STRIPE_SECRET_KEY not set (Stripe billing disabled).');
-    if (!process.env['STRIPE_WEBHOOK_SECRET']) logger.warn('⚠️ STRIPE_WEBHOOK_SECRET not set (Stripe webhook will fail).');
+    if (!process.env['LEMONSQUEEZY_API_KEY']) logger.warn('⚠️ LEMONSQUEEZY_API_KEY not set (Lemon billing disabled).');
+    if (!process.env['LEMONSQUEEZY_WEBHOOK_SECRET']) logger.warn('⚠️ LEMONSQUEEZY_WEBHOOK_SECRET not set (Lemon webhook will fail).');
   }
   
   logger.info('✅ Environment variables validated');

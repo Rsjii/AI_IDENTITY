@@ -132,3 +132,4 @@ Setup checklist shows green checkmark only when backend confirms real completion
 **Publishing**: Backend enforces all prerequisites before allowing public listing  
 **Payments**: Only work if creator is published + verified + eligible plan
 
+
