@@ -26,12 +26,20 @@ export function OnboardingCompletePage() {
   useOnboardingGuard();
 
   // ✅ Back should go to dashboard (not Step2)
-  useRedirectBack('/dashboard');
+  // ✅ Back from Step4 = SKIP optional steps forever
+  useRedirectBack('/dashboard', { markOnboardingDone: true });
 
   const handleSetupMonetization = async () => {
     setLoading(true);
     try {
-      // Don't mark onboarding as done yet, go to setup flow
+      // ✅ Mark onboarding as done (leaving Step4 = never show again)
+      await apiFetch('/api/creator/onboarding/step', {
+        method: 'POST',
+        body: JSON.stringify({ step: 'done' }),
+      });
+      await refresh();
+      sessionStorage.removeItem('selflyx_post_step2_window');
+      sessionStorage.removeItem('selflyx_allow_preview_once');
       nav('/setup', { replace: true });
     } catch (error: any) {
       showToast(error.message || 'Failed to continue', 'error');

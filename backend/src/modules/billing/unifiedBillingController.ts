@@ -57,16 +57,31 @@ export async function checkout(req: Request, res: Response) {
   const userId = (req as any).user?.id as string | undefined;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  logger.info({ userId, body: req.body }, '[CHECKOUT-BACKEND] === Checkout request received ===');
+  
   const parsed = checkoutSchema.parse(req.body);
   const tier = normalizeTier(String(parsed.tier));
+  
+  logger.info({ 
+    userId, 
+    tier, 
+    billingCountry: parsed.billingCountry,
+    returnUrl: parsed.returnUrl,
+    forceGateway: parsed.forceGateway 
+  }, '[CHECKOUT-BACKEND] Parsed checkout params');
 
   // ✅ BEST PRACTICE: checkout-selected country overrides heuristic
-  const gateway: Gateway =
-    parsed.billingCountry === 'IN'
-      ? 'razorpay'
-      : parsed.billingCountry === 'OTHER'
-        ? 'lemonsqueezy'
-        : await selectGatewayForUser(userId, parsed.forceGateway);
+  let gateway: Gateway;
+  if (parsed.billingCountry === 'IN') {
+    gateway = 'razorpay';
+    logger.info({ userId }, '[CHECKOUT-BACKEND] ✅ Gateway: Razorpay (explicit billingCountry=IN)');
+  } else if (parsed.billingCountry === 'OTHER') {
+    gateway = 'lemonsqueezy';
+    logger.info({ userId }, '[CHECKOUT-BACKEND] ✅ Gateway: LemonSqueezy (explicit billingCountry=OTHER)');
+  } else {
+    gateway = await selectGatewayForUser(userId, parsed.forceGateway);
+    logger.info({ userId, gateway }, '[CHECKOUT-BACKEND] ✅ Gateway selected via user phone heuristic');
+  }
 
   if (gateway === 'lemonsqueezy') {
     const frontendUrl = getFrontendUrl();
@@ -106,20 +121,30 @@ export async function checkout(req: Request, res: Response) {
 
   // Razorpay (India)
   const amountPaise = razorpayAmountForTierPaise(tier);
+  logger.info({ userId, tier, amountPaise }, '[CHECKOUT-BACKEND] 💳 Creating Razorpay order');
+
+  // Razorpay constraint: receipt must be <= 40 characters
+  // Format: pl_<last6UserId>_<tier>_<shortTimestamp>
+  const shortUserId = userId.slice(-6); // Last 6 chars of userId
+  const shortTimestamp = Date.now().toString(36).slice(-6); // Base36 timestamp (last 6 chars)
+  const receipt = `pl_${shortUserId}_${tier}_${shortTimestamp}`.slice(0, 40);
 
   const order = await createOrder({
     amount: amountPaise,
     currency: 'INR',
-    receipt: `plan_${userId}_${tier}_${Date.now()}`,
+    receipt: receipt,
     notes: { userId, tier },
   });
+  
+  logger.info({ userId, orderId: order.id, amount: order.amount }, '[CHECKOUT-BACKEND] ✅ Razorpay order created');
 
+  const transactionId = `bt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   await db.query(
     `INSERT INTO "billing_transactions"
      ("id","userId","gateway","tier","amount","currency","status","gatewayOrderId","meta")
      VALUES ($1,$2,'razorpay',$3,$4,'INR','created',$5,$6)`,
     [
-      `bt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      transactionId,
       userId,
       tier,
       amountPaise,
@@ -127,13 +152,18 @@ export async function checkout(req: Request, res: Response) {
       JSON.stringify({ receipt: `plan_${userId}_${tier}` }),
     ]
   );
+  
+  logger.info({ userId, transactionId, orderId: order.id }, '[CHECKOUT-BACKEND] 💾 Transaction record created');
 
-  return res.json({
+  const response = {
     gateway: 'razorpay',
     keyId: process.env.RAZORPAY_KEY_ID,
     order: { id: order.id, amount: order.amount, currency: order.currency },
     tier,
-  });
+  };
+  
+  logger.info({ userId, response }, '[CHECKOUT-BACKEND] ✅ Returning Razorpay checkout response');
+  return res.json(response);
 }
 
 const razorpayVerifySchema = z.object({
@@ -147,23 +177,35 @@ export async function verifyRazorpayCheckout(req: Request, res: Response) {
   const userId = (req as any).user?.id as string | undefined;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  logger.info({ userId, body: req.body }, '[RAZORPAY-VERIFY] === Payment verification request ===');
+  
   const parsed = razorpayVerifySchema.parse(req.body);
   const tier = normalizeTier(String(parsed.tier));
+  
+  logger.info({ userId, tier, orderId: parsed.orderId, paymentId: parsed.paymentId }, '[RAZORPAY-VERIFY] Verifying payment signature...');
 
   const ok = verifyPaymentSignature({
     orderId: parsed.orderId,
     paymentId: parsed.paymentId,
     signature: parsed.signature,
   });
-  if (!ok) return res.status(400).json({ error: 'Invalid signature' });
+  
+  if (!ok) {
+    logger.error({ userId, orderId: parsed.orderId }, '[RAZORPAY-VERIFY] ❌ Invalid payment signature');
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+  
+  logger.info({ userId }, '[RAZORPAY-VERIFY] ✅ Signature verified, updating user plan...');
 
   await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [tier, userId]);
+  logger.info({ userId, tier }, '[RAZORPAY-VERIFY] ✅ User plan tier updated');
 
   // ✅ Stripe removed: always go deploy
   try {
     await userQueries.updateOnboardingStep(userId, 'deploy');
+    logger.info({ userId }, '[RAZORPAY-VERIFY] ✅ Onboarding step updated to deploy');
   } catch (e: any) {
-    logger.warn({ err: e?.message || e }, 'Failed to update onboarding step after Razorpay verify');
+    logger.warn({ err: e?.message || e }, '[RAZORPAY-VERIFY] ⚠️ Failed to update onboarding step after Razorpay verify');
   }
 
   await db.query(
@@ -172,8 +214,10 @@ export async function verifyRazorpayCheckout(req: Request, res: Response) {
      WHERE "userId"=$2 AND "gatewayOrderId"=$3`,
     [parsed.paymentId, userId, parsed.orderId]
   );
-
-  logger.info({ userId, tier, orderId: parsed.orderId, paymentId: parsed.paymentId }, '✅ Razorpay plan payment verified');
+  
+  logger.info({ userId, tier, orderId: parsed.orderId, paymentId: parsed.paymentId }, '[RAZORPAY-VERIFY] ✅ Transaction status updated to succeeded');
+  logger.info({ userId, tier }, '[RAZORPAY-VERIFY] === Payment verification complete ===');
+  
   return res.json({ success: true, tier });
 }
 
@@ -210,6 +254,118 @@ export async function lemonSqueezyWebhook(req: Request, res: Response) {
     eventName === 'subscription_cancelled' ||
     eventName === 'subscription_canceled' ||
     eventName === 'subscription_expired';
+
+  // ✅ Handle non-plan Lemon purchases (pay-per-chat / marketplace subscription)
+  const type = String(custom?.type || '');
+
+  if (activate && type === 'pay_per_chat') {
+    const creatorId = String(custom?.creatorId || '');
+    const sessionId = String(custom?.sessionId || '');
+    const viewerUserId = String(custom?.viewerUserId || '');
+    const priceCents = Number(custom?.priceCents || 0) || 0;
+
+    if (creatorId && sessionId && viewerUserId && priceCents > 0) {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const premiumId = `ps_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+      await db.query(
+        `INSERT INTO "premium_sessions" ("id","creatorId","sessionId","stripePaymentId","expiresAt")
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT DO NOTHING`,
+        [premiumId, creatorId, sessionId, subscriptionId || checkoutId || 'lemon', expiresAt.toISOString()]
+      );
+
+      const amount = Math.floor(priceCents);
+      const platformFee = Math.floor(amount * 0.25);
+      const creatorEarnings = amount - platformFee;
+
+      const payId = `ppc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      await db.query(
+        `INSERT INTO "stripe_payments"
+         ("id","creatorId","payerUserId","sessionId","amount","currency","status","stripePaymentIntentId","platformFeeCents","creatorEarningsCents","type","createdAt")
+         VALUES ($1,$2,$3,$4,$5,'USD','succeeded',$6,$7,$8,'pay_per_chat',NOW())`,
+        [payId, creatorId, viewerUserId, sessionId, amount, String(subscriptionId || checkoutId || ''), platformFee, creatorEarnings]
+      );
+
+      logger.info({ creatorId, sessionId, premiumId, paymentId: payId }, '[LEMON-WEBHOOK] Pay-per-chat processed');
+    }
+
+    return res.json({ received: true });
+  }
+
+  if (activate && type === 'marketplace_subscription') {
+    const listingId = String(custom?.listingId || '');
+    const creatorId = String(custom?.creatorId || '');
+    const viewerUserId = String(custom?.viewerUserId || userId);
+    const priceCents = Number(custom?.priceCents || 0) || 0;
+
+    if (listingId && creatorId && viewerUserId && priceCents > 0) {
+      // Check if subscription already exists
+      const existing = await db.query(
+        `SELECT id, "currentPeriodEnd" FROM "marketplace_subscriptions" WHERE "listingId"=$1 AND "userId"=$2 LIMIT 1`,
+        [listingId, viewerUserId]
+      );
+
+      if (existing.rows.length === 0) {
+        // New subscription
+        const subId = `ms_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const periodStart = new Date();
+        const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+        await db.query(
+          `INSERT INTO "marketplace_subscriptions"
+           ("id","listingId","userId","status","currentPeriodStart","currentPeriodEnd","createdAt","updatedAt")
+           VALUES ($1,$2,$3,'active',$4,$5,NOW(),NOW())`,
+          [subId, listingId, viewerUserId, periodStart.toISOString(), periodEnd.toISOString()]
+        );
+
+        // Increment subscriber count
+        await db.query(
+          `UPDATE "marketplace_listings" SET "totalSubscribers" = "totalSubscribers" + 1 WHERE id=$1`,
+          [listingId]
+        );
+
+        logger.info({ listingId, creatorId, viewerUserId, subId }, '[LEMON-WEBHOOK] Marketplace subscription created');
+      } else {
+        // ✅ Auto-extend: Renewal - extend period from now or from existing end date (whichever is later)
+        const existingEnd = existing.rows[0].currentPeriodEnd 
+          ? new Date(existing.rows[0].currentPeriodEnd)
+          : new Date();
+        const now = new Date();
+        const extendFrom = existingEnd > now ? existingEnd : now;
+        const newPeriodEnd = new Date(extendFrom.getTime() + 30 * 24 * 60 * 60 * 1000); // Add 30 days
+
+        await db.query(
+          `UPDATE "marketplace_subscriptions"
+           SET "status"='active',
+               "currentPeriodStart"=$1,
+               "currentPeriodEnd"=$2,
+               "updatedAt"=NOW(),
+               "cancelAtPeriodEnd"=false,
+               "cancelledAt"=NULL
+           WHERE "listingId"=$3 AND "userId"=$4`,
+          [extendFrom.toISOString(), newPeriodEnd.toISOString(), listingId, viewerUserId]
+        );
+
+        logger.info({ listingId, viewerUserId, newPeriodEnd }, '[LEMON-WEBHOOK] Marketplace subscription extended');
+      }
+
+      // Ledger entry (always create, even on renewal)
+      const amount = Math.floor(priceCents);
+      const platformFee = Math.floor(amount * 0.25);
+      const creatorEarnings = amount - platformFee;
+
+      const payId = `msub_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      await db.query(
+        `INSERT INTO "stripe_payments"
+         ("id","creatorId","payerUserId","amount","currency","status","stripePaymentIntentId","platformFeeCents","creatorEarningsCents","type","createdAt")
+         VALUES ($1,$2,$3,$4,'USD','succeeded',$5,$6,$7,'marketplace_subscription',NOW())`,
+        [payId, creatorId, viewerUserId, amount, String(subscriptionId || checkoutId || ''), platformFee, creatorEarnings]
+      );
+    }
+
+    return res.json({ received: true });
+  }
 
   if (activate && userId && (tier === 'starter' || tier === 'growth' || tier === 'scale')) {
     await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [tier, userId]);

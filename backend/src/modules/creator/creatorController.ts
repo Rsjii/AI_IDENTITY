@@ -252,7 +252,10 @@ export async function earnings(req: Request, res: Response) {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const allEarnings = r.rows.filter((p: any) => p.status === 'succeeded' && p.type === 'pay_per_chat');
+  const allEarnings = r.rows.filter((p: any) => 
+    p.status === 'succeeded' && 
+    (p.type === 'pay_per_chat' || p.type === 'marketplace_subscription')
+  );
   const totalEarnings = allEarnings.reduce((sum: number, p: any) => sum + (p.creatorEarningsCents || 0), 0);
   
   const availableEarnings = allEarnings
@@ -332,7 +335,7 @@ export async function requestPayout(req: Request, res: Response) {
      FROM "stripe_payments"
      WHERE "creatorId"=$1 
        AND "status"='succeeded' 
-       AND "type"='pay_per_chat'
+       AND ("type"='pay_per_chat' OR "type"='marketplace_subscription')
        AND "createdAt" < NOW() - INTERVAL '7 days'
        AND "payoutId" IS NULL`,
     [userId]
@@ -361,20 +364,19 @@ export async function requestPayout(req: Request, res: Response) {
      SET "payoutId"=$1
      WHERE "creatorId"=$2 
        AND "status"='succeeded' 
-       AND "type"='pay_per_chat'
+       AND ("type"='pay_per_chat' OR "type"='marketplace_subscription')
        AND "createdAt" < NOW() - INTERVAL '7 days'
        AND "payoutId" IS NULL`,
     [payoutId, userId]
   );
 
-  // TODO: In production, trigger actual Stripe Connect transfer here
-  // For now, we'll just mark it as pending
+  // Payouts are processed manually (RazorpayX/LemonSqueezy integration pending)
 
   return res.json({ 
     success: true, 
     payoutId,
     amountCents: availableCents,
-    message: 'Payout request submitted. In production, this would trigger a Stripe Connect transfer.',
+    message: 'Payout request submitted successfully. Payouts are processed manually. You will receive payment within 5-7 business days.',
   });
 }
 

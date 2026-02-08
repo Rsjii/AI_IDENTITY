@@ -249,3 +249,4 @@ The application now follows industry-standard practices for currency display:
 
 This ensures users always see prices in the currency they expect, and the payment gateway matches their selection.
 
+

@@ -77,6 +77,44 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   const isVisitor = user?.userType === 'visitor';
 
+  // ✅ Visitors should never see creator onboarding
+  if (isVisitor && location.pathname.startsWith('/onboarding')) {
+    return <Navigate to="/explore" replace />;
+  }
+
+  // ✅ If userType already chosen, never allow /choose-type again (direct URL or back)
+  if (location.pathname.startsWith('/choose-type') && user?.profileCompleted === true && user?.userType) {
+    const sp = new URLSearchParams(location.search);
+    const nextQ = sp.get('next') || '';
+    const safeNextQ =
+      nextQ.startsWith('/') &&
+      !nextQ.startsWith('/auth') &&
+      !nextQ.startsWith('/signup') &&
+      !nextQ.startsWith('/choose-type')
+        ? nextQ
+        : '';
+
+    if (user.userType === 'visitor') {
+      const creatorOnly =
+        safeNextQ.startsWith('/onboarding') ||
+        safeNextQ.startsWith('/dashboard') ||
+        safeNextQ.startsWith('/setup') ||
+        safeNextQ.startsWith('/mirror') ||
+        safeNextQ.startsWith('/identity') ||
+        safeNextQ.startsWith('/conversations');
+
+      return <Navigate to={!creatorOnly && safeNextQ ? safeNextQ : '/explore'} replace />;
+    }
+
+    // creator
+    const onboardingDone = user?.onboardingStep === 'done' || user?.onboardingCompleted === true;
+    if (!onboardingDone) {
+      return <Navigate to={getRequiredOnboardingPath(user)} replace />;
+    }
+
+    return <Navigate to={safeNextQ || '/dashboard'} replace />;
+  }
+
   // ✅ 2.0) Block profile page if already completed (prevent repeat submissions)
   if (location.pathname.startsWith('/signup/profile') && user?.profileCompleted === true) {
     const sp = new URLSearchParams(location.search);

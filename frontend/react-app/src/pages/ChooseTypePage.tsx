@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { AuthShell } from '@/components/AuthShell';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePreventBack } from '@/hooks/useOnboardingGuard';
 
 function useQuery() {
   const { search } = useLocation();
@@ -15,9 +14,6 @@ function useQuery() {
 export function ChooseTypePage() {
   const q = useQuery();
   const { refresh } = useAuth();
-
-  // ✅ Prevent back navigation - select way is a critical step
-  usePreventBack(true);
 
   const nextParam = q.get('next') || '';
   const safeNext = nextParam.startsWith('/') ? nextParam : '';
@@ -45,7 +41,17 @@ export function ChooseTypePage() {
       await refresh();
 
       // ✅ NEW FLOW: Creator goes to new onboarding start
-      const target = userType === 'creator' ? '/onboarding/start' : (safeNext || '/explore');
+      // ✅ FIX: Filter out creator-only routes for visitors (prevent onboarding leak)
+      const isCreatorOnlyNext =
+        safeNext.startsWith('/onboarding') ||
+        safeNext.startsWith('/dashboard') ||
+        safeNext.startsWith('/setup') ||
+        safeNext.startsWith('/mirror') ||
+        safeNext.startsWith('/identity') ||
+        safeNext.startsWith('/conversations');
+
+      const visitorTarget = !isCreatorOnlyNext ? (safeNext || '/explore') : '/explore';
+      const target = userType === 'creator' ? '/onboarding/start' : visitorTarget;
 
       // ✅ FIX: hard redirect so ProtectedRoute can't see stale state
       window.location.replace(target);

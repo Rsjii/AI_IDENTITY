@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiFetch } from '@/lib/api';
 
 /**
  * Hook to prevent access to onboarding pages after onboarding is complete
@@ -26,14 +27,29 @@ export function useOnboardingGuard() {
 
     if (!isOnboarding) return;
 
-    // After core onboarding is complete, only allow Step 3/4 *if* the window is active.
     const windowActive = sessionStorage.getItem('selflyx_post_step2_window') === '1';
     const isPreviewOrComplete =
       path.startsWith('/onboarding/preview') || path.startsWith('/onboarding/complete');
 
+    // ✅ Allow optional steps only in same-session window
     if (windowActive && isPreviewOrComplete) return;
 
-    // Otherwise, never show onboarding again
+    // ✅ If user tries to access Step3/4 without window (kill/reopen or returning later),
+    // persist "skip optional" on server so it stays skipped forever.
+    if (isPreviewOrComplete) {
+      (async () => {
+        try {
+          await apiFetch('/api/creator/onboarding/step', {
+            method: 'POST',
+            body: JSON.stringify({ step: 'done' }),
+          });
+        } catch {}
+
+        sessionStorage.removeItem('selflyx_post_step2_window');
+        sessionStorage.removeItem('selflyx_allow_preview_once');
+      })();
+    }
+
     navigate('/dashboard', { replace: true });
   }, [state, navigate, location.pathname]);
 }
@@ -64,14 +80,39 @@ export function usePreventBack(enabled: boolean = true) {
 /**
  * Hook to redirect back navigation to a specific route (e.g., dashboard)
  * Use this on pages where back button should go to dashboard instead of previous page
+ * @param redirectTo - Route to redirect to on back button
+ * @param opts - Options including markOnboardingDone to persist skip on back
  */
-export function useRedirectBack(redirectTo: string = '/dashboard') {
+export function useRedirectBack(
+  redirectTo: string = '/dashboard',
+  opts?: { markOnboardingDone?: boolean }
+) {
   const navigate = useNavigate();
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       e.preventDefault();
-      navigate(redirectTo, { replace: true });
+
+      (async () => {
+        const path = window.location.pathname;
+        const isPreviewOrComplete =
+          path.startsWith('/onboarding/preview') || path.startsWith('/onboarding/complete');
+
+        // ✅ Back from Step3/4 = SKIP optional steps forever
+        if (opts?.markOnboardingDone && isPreviewOrComplete) {
+          try {
+            await apiFetch('/api/creator/onboarding/step', {
+              method: 'POST',
+              body: JSON.stringify({ step: 'done' }),
+            });
+          } catch {}
+
+          sessionStorage.removeItem('selflyx_post_step2_window');
+          sessionStorage.removeItem('selflyx_allow_preview_once');
+        }
+
+        navigate(redirectTo, { replace: true });
+      })();
     };
 
     // Push a dummy state so back button triggers popstate
@@ -81,5 +122,5 @@ export function useRedirectBack(redirectTo: string = '/dashboard') {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [navigate, redirectTo]);
+  }, [navigate, redirectTo, opts?.markOnboardingDone]);
 }

@@ -49,6 +49,7 @@ export function AuthPage() {
   
     const userType = (state.user as any)?.userType;
     const step = state.user?.onboardingStep;
+    const onboardingCompleted = (state.user as any)?.onboardingCompleted === true;
 
     if (!userType) {
       navigate('/choose-type', { replace: true });
@@ -61,8 +62,8 @@ export function AuthPage() {
       return;
     }
 
-    // creator logic (existing)
-    if (step === 'done') {
+    // ✅ creator: Step1+2 done => dashboard (Step3/4 optional)
+    if (step === 'done' || onboardingCompleted) {
       navigate('/dashboard', { replace: true });
     } else {
       navigate('/onboarding', { replace: true });

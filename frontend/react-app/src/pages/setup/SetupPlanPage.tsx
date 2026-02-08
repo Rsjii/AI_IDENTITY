@@ -60,19 +60,58 @@ export function SetupPlanPage() {
 
   const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
   const defaultBillingCountry: BillingCountry = useMemo(() => {
+    console.log('[BILLING-DETECT] === Starting billing country detection ===');
+    
+    // Step 1: Check localStorage
     const stored = getLastBillingCountry();
-    if (stored) return stored;
+    if (stored) {
+      console.log('[BILLING-DETECT] ✅ Found stored preference:', stored);
+      return stored;
+    }
+    console.log('[BILLING-DETECT] ⏭️ No stored preference, checking hints...');
 
+    // Step 2: Check phone number
     const p = String(userPhone || '').trim();
-    if (p.startsWith('+91') || p.startsWith('91')) return 'IN';
+    console.log('[BILLING-DETECT] 📱 User phone:', p || '(not provided)');
+    if (p.startsWith('+91') || p.startsWith('91')) {
+      console.log('[BILLING-DETECT] ✅ Phone number indicates India (+91)');
+      return 'IN';
+    }
+    console.log('[BILLING-DETECT] ⏭️ Phone number does not indicate India');
 
-    // Soft hint: browser locale/timezone
+    // Step 3: Check browser locale/timezone
     if (typeof navigator !== 'undefined') {
       const lang = navigator.language || '';
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-      if (lang.toLowerCase().includes('-in') || tz === 'Asia/Kolkata') return 'IN';
+      console.log('[BILLING-DETECT] 🌐 Browser language:', lang);
+      
+      let tz = '';
+      try {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        console.log('[BILLING-DETECT] 🕐 Browser timezone:', tz);
+      } catch (e) {
+        console.warn('[BILLING-DETECT] ⚠️ Timezone detection failed:', e);
+      }
+      
+      const langMatchesIndia = lang.toLowerCase().includes('-in');
+      const tzMatchesIndia = tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta';
+      
+      console.log('[BILLING-DETECT] 📊 Detection results:', {
+        language: lang,
+        languageMatchesIndia: langMatchesIndia,
+        timezone: tz,
+        timezoneMatchesIndia: tzMatchesIndia,
+      });
+      
+      if (langMatchesIndia || tzMatchesIndia) {
+        console.log('[BILLING-DETECT] ✅ Browser hints indicate India');
+        return 'IN';
+      }
+      console.log('[BILLING-DETECT] ⏭️ Browser hints do not indicate India');
+    } else {
+      console.log('[BILLING-DETECT] ⚠️ Navigator not available (SSR?)');
     }
 
+    console.log('[BILLING-DETECT] 🔄 Defaulting to OTHER (International/USD)');
     return 'OTHER';
   }, [userPhone]);
 
@@ -84,12 +123,18 @@ export function SetupPlanPage() {
       if (action === 'trial') {
         await apiFetch('/api/creator/trial/start', { method: 'POST' });
       } else {
-        await startPlanCheckout({
+        const result = await startPlanCheckout({
           tier: action as any,
           returnUrl: '/setup?paid=1',
           billingCountry,
         });
-        // Razorpay path continues:
+        
+        if (result.gateway === 'lemonsqueezy') {
+          // redirect already triggered inside startPlanCheckout
+          return;
+        }
+        
+        // Razorpay finished => safe to mark step + continue
         await apiFetch('/api/creator/setup/step', {
           method: 'POST',
           body: JSON.stringify({ step: 'plan', completed: true }),

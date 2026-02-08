@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Star, MessageSquare, Users, CheckCircle2, Zap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLastBillingCountry, setLastBillingCountry, type BillingCountry } from '@/lib/planCheckout';
 
 interface Listing {
   id: string;
@@ -55,6 +56,25 @@ export function MarketplaceListingPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
+  const defaultBillingCountry: BillingCountry = useMemo(() => {
+    const stored = getLastBillingCountry();
+    if (stored) return stored;
+
+    const p = String(userPhone || '').trim();
+    if (p.startsWith('+91') || p.startsWith('91')) return 'IN';
+
+    if (typeof navigator !== 'undefined') {
+      const lang = navigator.language || '';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      if (lang.toLowerCase().includes('-in') || tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta') return 'IN';
+    }
+
+    return 'OTHER';
+  }, [userPhone]);
+
+  const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -72,11 +92,58 @@ export function MarketplaceListingPage() {
     setSubscribing(true);
     try {
       if (listing.subscriptionPriceCents > 0) {
-        const res = await apiFetch<{ url: string }>('/api/marketplace/subscriptions/checkout', {
+        setLastBillingCountry(billingCountry);
+        const res = await apiFetch<{ gateway: 'lemonsqueezy'; url: string } | { gateway: 'razorpay'; keyId: string; order: { id: string; amount: number; currency: string }; listingId: string }>('/api/marketplace/subscriptions/checkout', {
           method: 'POST',
-          body: JSON.stringify({ listingId: listing.id }),
+          body: JSON.stringify({ listingId: listing.id, billingCountry }),
         });
-        window.location.href = res.url;
+        
+        if (res.gateway === 'lemonsqueezy') {
+          window.location.href = res.url;
+          return;
+        }
+
+        // Razorpay path
+        if (!window.Razorpay) {
+          showToast('Razorpay not loaded', 'error');
+          setSubscribing(false);
+          return;
+        }
+
+        const rz = new window.Razorpay({
+          key: res.keyId,
+          amount: res.order.amount,
+          currency: res.order.currency,
+          order_id: res.order.id,
+          name: 'Selflyx',
+          description: `Subscribe to ${listing.title || 'creator'}`,
+          handler: async (resp: any) => {
+            try {
+              await apiFetch('/api/marketplace/subscriptions/verify', {
+                method: 'POST',
+                body: JSON.stringify({
+                  listingId: res.listingId,
+                  orderId: res.order.id,
+                  paymentId: resp.razorpay_payment_id,
+                  signature: resp.razorpay_signature,
+                }),
+              });
+              showToast('Subscription activated!', 'success');
+              // Reload page to show subscription status
+              window.location.reload();
+            } catch (e: any) {
+              showToast(e.message || 'Payment verification failed', 'error');
+              setSubscribing(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setSubscribing(false);
+            },
+          },
+        });
+
+        rz.open();
         return;
       }
       await apiFetch('/api/marketplace/subscriptions/start', {

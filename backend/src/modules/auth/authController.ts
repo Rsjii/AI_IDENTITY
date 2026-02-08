@@ -527,7 +527,7 @@ export const signupVerify = async (req: Request, res: Response, next: NextFuncti
     
     res.json({ 
       message: 'Account activated successfully', 
-      redirect: '/onboarding'
+      redirect: `/signup/profile?email=${encodeURIComponent(email)}`
     });
   } catch (error: any) {
     // ✅ Ensure Error is serialized (message/stack) so we can see root cause in logs
@@ -1616,6 +1616,7 @@ export const me = async (req: Request, res: Response) => {
       profileCompleted: user.profileCompleted,
       active: user.active,
       onboardingStep: (user as any).onboardingStep,
+      onboardingCompleted: (user as any).onboardingCompleted,
       userType: (user as any).userType || null,
       isAdmin,
       hasPassword: Boolean(user.passwordHash),

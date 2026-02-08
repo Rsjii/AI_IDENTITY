@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../middleware/errorHandler';
-import { createPaymentIntent, confirmPayment } from './payPerChatController';
+import { requireJWTFromCookie } from '../../middleware/jwtCookie';
+import { validateCSRF } from '../../middleware/csrf';
+import { sanitizeInput } from '../../middleware/validation';
+import { createPayPerChatIntent, confirmPayPerChatRazorpay } from './payPerChatController';
 
 const router = Router();
 
-// ✅ Public visitors can pay, so no JWT required
-router.post('/intent', asyncHandler(createPaymentIntent));
-router.post('/confirm', asyncHandler(confirmPayment));
+// ✅ Login-first mode: require JWT + CSRF
+router.post('/pay-per-chat/intent', requireJWTFromCookie, validateCSRF, sanitizeInput, asyncHandler(createPayPerChatIntent));
+router.post('/pay-per-chat/confirm', requireJWTFromCookie, validateCSRF, sanitizeInput, asyncHandler(confirmPayPerChatRazorpay));
 
 export default router;
-

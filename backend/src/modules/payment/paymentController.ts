@@ -36,10 +36,16 @@ export async function createPaymentOrder(req: Request, res: Response) {
     return res.status(400).json({ success: false, error: 'Already subscribed', tier: existing.tier });
   }
 
+  // Razorpay constraint: receipt must be <= 40 characters
+  // Format: sub_<last6UserId>_<tier>_<shortTimestamp>
+  const shortUserId = userId.slice(-6); // Last 6 chars of userId
+  const shortTimestamp = Date.now().toString(36).slice(-6); // Base36 timestamp (last 6 chars)
+  const receipt = `sub_${shortUserId}_${tier}_${shortTimestamp}`.slice(0, 40);
+
   const order = await createOrder({
     amount: PRICES[tier],
     currency: 'INR',
-    receipt: `sub_${userId}_${tier}_${Date.now()}`,
+    receipt: receipt,
     notes: { userId, tier },
   });
 

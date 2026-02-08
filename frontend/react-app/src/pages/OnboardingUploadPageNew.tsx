@@ -383,61 +383,115 @@ export function OnboardingUploadPageNew() {
             </div>
           </div>
 
-          {/* Continue Button */}
-          <Button
-            onClick={async () => {
-              try {
-                setLoading(true);
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Continue to Preview Button */}
+            <Button
+              onClick={async () => {
+                try {
+                  setLoading(true);
 
-                // Upload all staged files first
-                if (stagedFiles.length > 0) {
-                  showToast(`Uploading ${stagedFiles.length} file(s)...`, 'info', 2000);
-                  for (const stagedFile of stagedFiles) {
-                    await uploadFile(stagedFile.file);
+                  // Upload all staged files first
+                  if (stagedFiles.length > 0) {
+                    showToast(`Uploading ${stagedFiles.length} file(s)...`, 'info', 2000);
+                    for (const stagedFile of stagedFiles) {
+                      await uploadFile(stagedFile.file);
+                    }
+                    setStagedFiles([]);
+                    showToast('All files uploaded successfully!', 'success', 2000);
                   }
-                  setStagedFiles([]);
-                  showToast('All files uploaded successfully!', 'success', 2000);
+
+                  // Update onboarding step
+                  await apiFetch('/api/creator/onboarding/step', {
+                    method: 'POST',
+                    body: JSON.stringify({ step: 'preview' }),
+                  });
+
+                  await refreshAuth();
+
+                  // ✅ Set "post-step2 window" flag - allows Step3/4 until user leaves onboarding
+                  sessionStorage.setItem('selflyx_post_step2_window', '1');
+
+                  nav('/onboarding/preview');
+                } catch (error) {
+                  console.error('Failed during continue:', error);
+                  showToast('Something went wrong. Please try again.', 'error');
+                } finally {
+                  setLoading(false);
                 }
+              }}
+              className="w-full bg-accent-gradient hover:opacity-90 text-white"
+              size="lg"
+              disabled={!hasMinimumWords || loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Continue to Preview
+                  {stagedFiles.length > 0 && (
+                    <span className="ml-2 text-xs opacity-75">
+                      (Upload {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''})
+                    </span>
+                  )}
+                </>
+              )}
+            </Button>
 
-                // Update onboarding step
-                await apiFetch('/api/creator/onboarding/step', {
-                  method: 'POST',
-                  body: JSON.stringify({ step: 'preview' }),
-                });
+            {/* Skip Optional Steps Button */}
+            <Button
+              onClick={async () => {
+                try {
+                  setLoading(true);
 
-                await refreshAuth();
+                  // Upload all staged files first (if any)
+                  if (stagedFiles.length > 0) {
+                    showToast(`Uploading ${stagedFiles.length} file(s)...`, 'info', 2000);
+                    for (const stagedFile of stagedFiles) {
+                      await uploadFile(stagedFile.file);
+                    }
+                    setStagedFiles([]);
+                    showToast('All files uploaded successfully!', 'success', 2000);
+                  }
 
-                // ✅ Set "post-step2 window" flag - allows Step3/4 until user leaves onboarding
-                sessionStorage.setItem('selflyx_post_step2_window', '1');
+                  // Mark onboarding as done (skip Step 3 & 4)
+                  await apiFetch('/api/creator/onboarding/step', {
+                    method: 'POST',
+                    body: JSON.stringify({ step: 'done' }),
+                  });
 
-                nav('/onboarding/preview');
-              } catch (error) {
-                console.error('Failed during continue:', error);
-                showToast('Something went wrong. Please try again.', 'error');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            className="w-full bg-accent-gradient hover:opacity-90 text-white"
-            size="lg"
-            disabled={!hasMinimumWords || loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Processing...
-              </>
-            ) : (
-              <>
-                Continue to Preview
-                {stagedFiles.length > 0 && (
-                  <span className="ml-2 text-xs opacity-75">
-                    (Upload {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''})
-                  </span>
-                )}
-              </>
-            )}
-          </Button>
+                  await refreshAuth();
+
+                  // Clear any onboarding window flags
+                  sessionStorage.removeItem('selflyx_post_step2_window');
+                  sessionStorage.removeItem('selflyx_allow_preview_once');
+
+                  nav('/dashboard', { replace: true });
+                } catch (error) {
+                  console.error('Failed to skip optional steps:', error);
+                  showToast('Something went wrong. Please try again.', 'error');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              variant="outline"
+              className="w-full"
+              size="lg"
+              disabled={!hasMinimumWords || loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                'Skip Optional Steps & Go to Dashboard'
+              )}
+            </Button>
+          </div>
 
           <p className="text-xs text-text-tertiary text-center">
             Step 2 of 4 - Your content is encrypted and never shared

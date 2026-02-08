@@ -40,7 +40,8 @@ export function OnboardingPreviewPage() {
   useOnboardingGuard();
 
   // ✅ After core onboarding (Step2), back should take user to dashboard
-  useRedirectBack('/dashboard');
+  // ✅ Back from Step3 = SKIP optional steps forever
+  useRedirectBack('/dashboard', { markOnboardingDone: true });
 
   // ✅ Gate: poll training-status, only enable testing when ready
   useEffect(() => {
@@ -213,7 +214,28 @@ export function OnboardingPreviewPage() {
                     Continue to Setup <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
 
-                  <Button variant="outline" onClick={() => nav('/dashboard', { replace: true })}>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setNavigating(true);
+                      try {
+                        // Mark onboarding as done (skip optional steps)
+                        await apiFetch('/api/creator/onboarding/step', {
+                          method: 'POST',
+                          body: JSON.stringify({ step: 'done' }),
+                        });
+                        await refresh();
+                        sessionStorage.removeItem('selflyx_post_step2_window');
+                        sessionStorage.removeItem('selflyx_allow_preview_once');
+                        nav('/dashboard', { replace: true });
+                      } catch (error: any) {
+                        showToast(error.message || 'Failed to continue', 'error');
+                      } finally {
+                        setNavigating(false);
+                      }
+                    }}
+                    disabled={navigating}
+                  >
                     Go to Dashboard
                   </Button>
                 </div>

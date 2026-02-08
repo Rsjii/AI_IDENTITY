@@ -67,8 +67,27 @@ export function LoginVerifyPage() {
       );
 
       await refresh(); // ✅ Refresh auth state after JWT cookie is set
-      if (result.redirect) navigate(result.redirect, { replace: true });
-      else navigate('/onboarding', { replace: true });      
+      
+      if (result.redirect) {
+        navigate(result.redirect, { replace: true });
+        return;
+      }
+
+      // ✅ Check user state to determine correct redirect
+      const me = await apiFetch<any>('/api/auth/me');
+      const userType = me?.user?.userType;
+      const step = me?.user?.onboardingStep;
+      const onboardingCompleted = me?.user?.onboardingCompleted === true;
+
+      if (!userType) {
+        navigate('/choose-type', { replace: true });
+      } else if (userType === 'visitor') {
+        navigate('/explore', { replace: true });
+      } else if (step === 'done' || onboardingCompleted) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/onboarding', { replace: true });
+      }      
     } catch (err: any) {
       setError(getUserFriendlyError(err) || 'OTP verification failed. Please check your code and try again.');
     } finally {

@@ -123,3 +123,40 @@ export function extractLemonEvent(payload: any): {
 
   return { eventName, custom, variantId, checkoutId, subscriptionId };
 }
+
+export async function createLemonCheckoutForVariant(params: {
+  variantId: string;
+  userId: string;
+  email: string;
+  name?: string | null;
+  redirectUrl: string;
+  custom: Record<string, any>;
+}): Promise<{ checkoutId: string; url: string }> {
+  const storeId = mustGet('LEMONSQUEEZY_STORE_ID');
+
+  const payload = {
+    data: {
+      type: 'checkouts',
+      attributes: {
+        checkout_data: {
+          email: params.email,
+          name: params.name || undefined,
+          custom: params.custom,
+        },
+        product_options: { redirect_url: params.redirectUrl },
+      },
+      relationships: {
+        store: { data: { type: 'stores', id: String(storeId) } },
+        variant: { data: { type: 'variants', id: String(params.variantId) } },
+      },
+    },
+  };
+
+  const json = await lemonFetch('/checkouts', { method: 'POST', body: JSON.stringify(payload) });
+
+  const checkoutId = String(json?.data?.id || '');
+  const url = String(json?.data?.attributes?.url || '');
+  if (!checkoutId || !url) throw new Error('Invalid LemonSqueezy checkout response');
+
+  return { checkoutId, url };
+}

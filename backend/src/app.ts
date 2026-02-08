@@ -46,6 +46,7 @@ import marketplaceSubscriptionRoutes from './modules/marketplace/subscriptionRou
 import videoRoutes from './modules/video/videoRoutes';
 import phoneRoutes from './modules/phone/phoneRoutes';
 import conversationsRoutes from './modules/conversations/conversationsRoutes';
+import payPerChatRoutes from './modules/payments/payPerChatRoutes';
 
 const cookieSameSite = isProd ? 'none' : 'lax';
 
@@ -390,6 +391,26 @@ app.use(async (req, res, next) => {
         }
         return res.redirect('/choose-type');
       }
+    } else if (path === '/choose-type') {
+      // ✅ userType already chosen => never allow choose-type again
+      if (fullUser.userType === 'visitor') {
+        if (isApiRequest) {
+          return res.status(403).json({ error: 'User type already selected', errorCode: 'USER_TYPE_SET', redirect: '/explore' });
+        }
+        return res.redirect('/explore');
+      }
+
+      // creator
+      if (fullUser.onboardingStep && fullUser.onboardingStep !== 'done') {
+        if (isApiRequest) {
+          return res.status(403).json({ error: 'User type already selected', errorCode: 'USER_TYPE_SET', redirect: '/onboarding' });
+        }
+        return res.redirect('/onboarding');
+      }
+      if (isApiRequest) {
+        return res.status(403).json({ error: 'User type already selected', errorCode: 'USER_TYPE_SET', redirect: '/dashboard' });
+      }
+      return res.redirect('/dashboard');
     } else if (fullUser.userType === 'creator' && fullUser.onboardingStep && fullUser.onboardingStep !== 'done') {
       // Creator who hasn't finished onboarding → force onboarding (unless already on onboarding routes)
       if (!path.startsWith('/onboarding') && !path.startsWith('/api/identity') && !path.startsWith('/api/content') && !path.startsWith('/api/creator') && !path.startsWith('/api/payments') && !path.startsWith('/api/billing') && path !== '/choose-type') {
@@ -639,6 +660,10 @@ if (isFeatureEnabled('ENABLE_VIDEO')) {
 }
 if (isFeatureEnabled('ENABLE_PHONE') && isFeatureEnabled('ENABLE_PAYMENTS')) {
   app.use('/api/phone', phoneRoutes);
+}
+// ✅ End-user payments (pay-per-chat etc)
+if (isFeatureEnabled('ENABLE_PAYMENTS')) {
+  app.use('/api/payments', payPerChatRoutes);
 }
 
 // Health check

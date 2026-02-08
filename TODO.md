@@ -65,3 +65,20 @@ d. jab tak step 2 ke baad pura bana hi nahi hai user ko aap chat kaise allow kar
 5. maine abhi plan le liya tha, maine make public in dahboard clcik kiya , to aata hai msg Publish prerequisites not met, bhai bande ko saih sebatao na akise akrna chahiye steps wagerah, aur websites kaise karti hai sahi se dkh lena aur batao see from the net 
 
 6. dada dada end user ke me aap dikha rahe montize nahi kar sakte, clone nahi bana hai, is it correct behaviour, should ye sab hame end user waale way waale users ko dikhana chahiye
+
+
+
+7. Issue 1: Training complete nahi hua
+Logs se lagta hai training abhi complete nahi hui. Payment test ke liye pehle training complete honi chahiye.
+Solution: Training complete hone ka wait karo, ya manually training status update karo:
+-- Database mein manually training complete mark karo (testing ke liye)UPDATE "Identity" SET "trainingStatus" = 'ready', "trainingProgress" = 100 WHERE "userId" = 'your_user_id';
+
+8. plan update hone ke baad jab user plan dekhe to kya dikhna chahiye, jpdate kaise , select nahi dikhna cjahiye, sowngrad yaaa kaise karna dekh lene dada appp
+
+9. publish ur listing par http://localhost:5173/onboarding/complete ispe kaise chala gaya madarchod kaha jaana chahiye sahi se karo
+
+10. Feature on homepage, iska kya matlab hai in the /marketplace/manage, also baaki pura strcuture, also isme phir isme monetizaiton kyu diya hai, bahut jyaada issue hai
+
+11. persoanl clone ka flow, review agerah ka flow, chag , marketplace ye bhi dekh lena, personal me alag hona chahiye
+
+12. sab jaagh user ke accordign onsi currency dikh rahe, jab onboarding me user set kar raha tab kaise hoga, in whihc currency , maanlo creator ne inr 1000 rakh, foreign waalo ko kaise dikhega, kya dikheag, ye clarity honi chahiye sab jagah a-z sahi se jo hai currrency ke hisaab se hona chahiye sahi ho raha hai sab jagah ensure karo, india + internayional sahi se dekh lo

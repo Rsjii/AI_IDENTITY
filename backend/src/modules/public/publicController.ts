@@ -109,7 +109,9 @@ async function hasActiveMarketplaceSubscription(userId: string, listingId: strin
   const r = await db.query(
     `SELECT 1
      FROM "marketplace_subscriptions"
-     WHERE "listingId"=$1 AND "userId"=$2 AND "status" IN ('active','trialing')
+     WHERE "listingId"=$1 AND "userId"=$2 
+       AND "status" IN ('active','trialing')
+       AND ("currentPeriodEnd" IS NULL OR "currentPeriodEnd" >= NOW())
      LIMIT 1`,
     [listingId, userId]
   );
@@ -728,6 +730,29 @@ export async function publicChat(req: any, res: Response) {
   const priceConfig = creator.priceConfig as any;
   const forced = shouldForcePaywall(priceConfig);
   const smart = shouldSmartTriggerPaywall(message, priceConfig);
+
+  // ✅ If pay-per-chat infra is disabled or creator hasn't enabled payments,
+  // NEVER return requiresPayment (otherwise users get stuck)
+  if (!payPerChatAllowed || !enablePayments) {
+    const result = await generateMirrorReplyWithLogging(creator.id, 'public_chat', message, {
+      platform: 'web',
+      sessionId: sid,
+      visitorId,
+      persistChat: false,
+    });
+
+    if (result.reply) {
+      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+    }
+
+    return res.json({
+      success: true,
+      sessionId: sid,
+      reply: result.reply || '',
+      mirrorRunId: result.mirrorRunId,
+      isSubscribed,
+    });
+  }
 
   // ✅ Subscribed or premium active → legitimately unlocked, full reply always
   if (isSubscribed || hasPremiumSession) {
