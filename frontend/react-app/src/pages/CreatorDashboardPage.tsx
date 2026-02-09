@@ -896,7 +896,7 @@ const handleGenerateInsightsReport = () => {
                     <div className="text-2xl font-bold text-text-primary">{activeSubs.toLocaleString()}</div>
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Total Earned</div>
                     <div className="text-2xl font-bold text-text-primary">
@@ -912,7 +912,7 @@ const handleGenerateInsightsReport = () => {
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Avg Transaction</div>
                     <div className="text-2xl font-bold text-text-primary">
-                      {data?.earnings?.length ? 
+                      {data?.earnings?.length ?
                         formatCurrency(Math.floor(data.earnings.reduce((sum, e) => sum + e.amount, 0) / data.earnings.length)) :
                         '$0.00'}
                     </div>
@@ -920,8 +920,8 @@ const handleGenerateInsightsReport = () => {
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Conversion Rate</div>
                     <div className="text-2xl font-bold text-text-primary">
-                      {data?.chats?.total ? 
-                        ((data.earnings?.length || 0) / data.chats.total * 100).toFixed(1) : 
+                      {data?.chats?.total ?
+                        ((data.earnings?.length || 0) / data.chats.total * 100).toFixed(1) :
                         '0.0'}%
                     </div>
                   </div>
@@ -970,7 +970,7 @@ const handleGenerateInsightsReport = () => {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <div className="grid grid-cols-4 gap-4 text-sm font-semibold text-text-secondary pb-2 border-b border-border-default">
+                  <div className="hidden md:grid md:grid-cols-4 gap-4 text-sm font-semibold text-text-secondary pb-2 border-b border-border-default">
                     <div>Source Name</div>
                     <div className="text-right">Times Referenced</div>
                     <div className="text-right">Avg Confidence</div>
@@ -981,11 +981,11 @@ const handleGenerateInsightsReport = () => {
                     { name: 'Blog Posts.txt', references: 156, confidence: 0.87, lastUsed: '5 hours ago' },
                     { name: 'YouTube Transcript', references: 89, confidence: 0.78, lastUsed: '1 day ago' },
                   ].map((source, i) => (
-                    <div key={i} className="grid grid-cols-4 gap-4 py-3 border-b border-border-default">
+                    <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-b border-border-default">
                       <div className="text-text-primary">{source.name}</div>
-                      <div className="text-right text-text-primary">{source.references}</div>
-                      <div className="text-right text-text-primary">{(source.confidence * 100).toFixed(0)}%</div>
-                      <div className="text-right text-text-tertiary">{source.lastUsed}</div>
+                      <div className="text-right md:text-right text-text-primary">{source.references}</div>
+                      <div className="text-right md:text-right text-text-primary">{(source.confidence * 100).toFixed(0)}%</div>
+                      <div className="text-right md:text-right text-text-tertiary">{source.lastUsed}</div>
                     </div>
                   ))}
                 </div>
@@ -995,7 +995,7 @@ const handleGenerateInsightsReport = () => {
             {/* AI Health Tab */}
             {activeTab === 'ai-health' && (
               <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-4 bg-bg-tertiary rounded-lg">
                     <div className="text-sm text-text-secondary mb-1">Avg Tokens</div>
                     <div className="text-2xl font-bold text-text-primary">1,234</div>

@@ -76,7 +76,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 bg-bg-secondary border-r border-border-subtle flex flex-col transition-[width] duration-300 ease-out ${
+      className={`fixed inset-y-0 left-0 z-sidebar bg-bg-secondary border-r border-border-subtle flex flex-col transition-[width] duration-300 ease-out ${
         expanded ? 'w-[260px]' : 'w-[72px]'
       }`}
     >

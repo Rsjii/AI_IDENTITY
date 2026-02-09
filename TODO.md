@@ -88,4 +88,6 @@ Solution: Training complete hone ka wait karo, ya manually training status updat
 
 13. there is nothing cld as unlmited bhai pay per chat me kuch limit hogi, how are we differentiating both of these pya per chat vs end user subscription, limits kaise define ho rahi, what if user takes both
 
-14. creator end pe subscription pe chat wise se jyaada storage wise hona chahiye matlab free user upto 25 mb, ohir 100 mb and higher planse ke liye gb, so storage ke accordind hona chahiye not chats only, u think actual me kaise ohna chahiye
+14. creator end pe subscription pe chat wise se jyaada storage wise hona chahiye matlab free user upto 25 mb, ohir 100 mb and higher planse ke liye gb, so storage ke accordind hona chahiye not chats only, u think actual me kaise ohna chahiyes
+
+15. isme wo agar renew waala part hai usme kaise karna hai, matlab bande ki payment fail ho jaaye waala case

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
 
 interface PlanChangeModalProps {
@@ -36,34 +37,23 @@ export function PlanChangeModal({
   billingInfo,
   loading,
 }: PlanChangeModalProps) {
-  if (!open) return null;
-
   const isUpgrade = changeType === 'upgrade';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl">
-              {isUpgrade ? '⬆️ Upgrade' : '⬇️ Downgrade'} to {newPlan.name}
-            </CardTitle>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              disabled={loading}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <CardDescription>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">
+            {isUpgrade ? '⬆️ Upgrade' : '⬇️ Downgrade'} to {newPlan.name}
+          </DialogTitle>
+          <DialogDescription>
             {isUpgrade
               ? 'Review the changes and confirm your upgrade'
               : 'Please review what you will lose by downgrading'}
-          </CardDescription>
-        </CardHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <CardContent className="space-y-6">
+        <div className="space-y-6">
           {/* Plan Comparison */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="border rounded-lg p-4 bg-bg-secondary/30">
@@ -159,17 +149,17 @@ export function PlanChangeModal({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full sm:flex-1"
               onClick={onClose}
               disabled={loading}
             >
               Cancel
             </Button>
             <Button
-              className={`flex-1 ${isUpgrade ? 'bg-gradient-to-r from-accent-primary to-accent-secondary' : ''}`}
+              className={`w-full sm:flex-1 ${isUpgrade ? 'bg-gradient-to-r from-accent-primary to-accent-secondary' : ''}`}
               variant={isUpgrade ? 'default' : 'destructive'}
               onClick={onConfirm}
               disabled={loading}
@@ -186,8 +176,8 @@ export function PlanChangeModal({
               )}
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

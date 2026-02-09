@@ -26,16 +26,16 @@ export function MobileNav() {
   const isCreator = state.status === 'authenticated' && state.user?.userType === 'creator';
 
   const creatorTabs: MobileTab[] = [
-    { icon: BarChart3, label: 'Dash', to: '/dashboard' },
+    { icon: BarChart3, label: 'Dashboard', to: '/dashboard' },
     { icon: Bot, label: 'My AI', to: '/my-ai' },
     { icon: MessageSquare, label: 'Chats', to: '/conversations' },
-    { icon: Settings, label: 'Set.', to: '/settings' },
+    { icon: Settings, label: 'Settings', to: '/settings' },
   ];
 
   const endUserTabs: MobileTab[] = [
     { icon: Compass, label: 'Explore', to: '/explore' },
     { icon: Clock, label: 'Chats', to: '/my-chats' },
-    { icon: Settings, label: 'Set.', to: '/settings' },
+    { icon: Settings, label: 'Settings', to: '/settings' },
   ];
 
   const tabs = isCreator ? creatorTabs : endUserTabs;
@@ -58,14 +58,14 @@ export function MobileNav() {
       {/* Backdrop */}
       {sheetOpen && (
         <div
-          className="fixed inset-0 z-[49] bg-black/40"
+          className="fixed inset-0 z-backdrop bg-black/40"
           onClick={() => setSheetOpen(false)}
         />
       )}
 
       {/* Bottom Sheet — slides up above nav bar */}
       {sheetOpen && (
-        <div className="fixed bottom-[64px] left-0 right-0 z-50 bg-bg-secondary border-t border-border-subtle rounded-t-xl px-4 py-3 shadow-xl">
+        <div className="fixed bottom-[64px] left-0 right-0 z-modal bg-bg-secondary border-t border-border-subtle rounded-t-xl px-4 py-3 shadow-xl">
           {/* Drag handle */}
           <div className="flex justify-center mb-3">
             <div className="w-10 h-1 bg-bg-elevated rounded-full" />
@@ -117,8 +117,12 @@ export function MobileNav() {
 
       {/* Bottom Nav Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 bg-bg-secondary/95 backdrop-blur-sm border-t border-border-subtle"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="fixed bottom-0 left-0 right-0 z-mobile-nav bg-bg-secondary/95 backdrop-blur-lg border-t border-border-subtle"
+        style={{
+          paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}
       >
         <div className="flex justify-around items-center h-[64px]">
           {tabs.map((tab) => {
@@ -127,12 +131,12 @@ export function MobileNav() {
               <Link
                 key={tab.to}
                 to={tab.to}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
-                  active ? 'text-accent-primary' : 'text-text-muted hover:text-text-secondary'
+                className={`flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-lg transition-all touch-manipulation active:scale-95 ${
+                  active ? 'text-accent-primary font-semibold' : 'text-text-muted hover:text-text-secondary'
                 }`}
               >
-                <tab.icon className="h-5 w-5" />
-                <span className="text-xs leading-none">{tab.label}</span>
+                <tab.icon className={`h-5 w-5 transition-transform ${active ? 'scale-110' : ''}`} strokeWidth={active ? 2.5 : 2} />
+                <span className="text-[10px] leading-none">{tab.label}</span>
               </Link>
             );
           })}
@@ -140,7 +144,7 @@ export function MobileNav() {
           {/* More (creator) / Me (end user) */}
           <button
             onClick={() => setSheetOpen(!sheetOpen)}
-            className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-text-muted hover:text-text-secondary transition-colors"
+            className="flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] px-2 rounded-lg text-text-muted hover:text-text-secondary transition-all touch-manipulation active:scale-95"
           >
             {isCreator ? (
               <MoreHorizontal className="h-5 w-5" />
@@ -151,7 +155,7 @@ export function MobileNav() {
                 </span>
               </div>
             )}
-            <span className="text-xs leading-none">{isCreator ? 'More' : 'Me'}</span>
+            <span className="text-[10px] leading-none">{isCreator ? 'More' : 'Me'}</span>
           </button>
         </div>
       </nav>

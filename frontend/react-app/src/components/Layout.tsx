@@ -72,7 +72,7 @@ export function Layout({
           {/* Backdrop (desktop) — keeps main intact, sidebar overlays on top */}
           {sidebarExpanded && (
             <div
-              className="fixed inset-0 z-30 bg-black/40"
+              className="fixed inset-0 z-sticky bg-black/40"
               onClick={() => setSidebarExpanded(false)}
               aria-hidden="true"
             />
@@ -86,11 +86,11 @@ export function Layout({
         </div>
       )}
 
-      {/* Main Content — Always 72px shift (collapsed width) so content never hides under sidebar */}
+      {/* Main Content — Proper spacing for navbar (top) and mobile nav (bottom) */}
       <main
         className={`
           flex-1
-          ${showNav ? 'lg:ml-[72px] pb-[80px] lg:pb-0' : ''}
+          ${showNav ? 'pt-16 pb-20 lg:pb-0 pl-0 lg:pl-[72px] transition-[padding] duration-300' : ''}
           ${useContainer ? 'container mx-auto px-4 py-10' : ''}
           ${mainClassName}
         `}

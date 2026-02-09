@@ -124,8 +124,8 @@ export function PublishPrerequisitesModal({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
             {allComplete ? 'Close' : 'Save as Draft'}
           </Button>
           {!allComplete && (
@@ -136,7 +136,7 @@ export function PublishPrerequisitesModal({
                   firstIncomplete.action.onClick();
                 }
               }}
-              className="bg-accent-gradient hover:opacity-90 text-white"
+              className="w-full sm:w-auto bg-accent-gradient hover:opacity-90 text-white"
             >
               Complete Steps
               <ArrowRight className="h-4 w-4 ml-2" />

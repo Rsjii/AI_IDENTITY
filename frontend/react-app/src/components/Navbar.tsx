@@ -40,8 +40,27 @@ export function Navbar() {
     setMobileOpen(false);
   }, [state.status]);
 
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav
+      className="fixed top-0 left-0 right-0 z-navbar border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      style={{
+        paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">

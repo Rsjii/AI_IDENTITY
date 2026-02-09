@@ -1459,7 +1459,7 @@ export function SettingsPage() {
                       <div className="text-xs text-muted-foreground mt-1">Hold period (last 7 days)</div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       onClick={handleRequestPayout}
                       disabled={requestingPayout || earningsBalances.availableEarningsCents < 1000}
@@ -1474,7 +1474,7 @@ export function SettingsPage() {
                         `Request Payout (Min $10.00)`
                       )}
                     </Button>
-                    <Button variant="outline" onClick={handleExportCSV}>
+                    <Button variant="outline" onClick={handleExportCSV} className="sm:w-auto">
                       <FileText className="mr-2 h-4 w-4" />
                       Export CSV
                     </Button>
@@ -1576,7 +1576,7 @@ export function SettingsPage() {
                           </label>
                         ))}
                       </div>
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex flex-col sm:flex-row gap-2 mt-2">
                         <Input
                           type="number"
                           min={1}
@@ -1584,8 +1584,9 @@ export function SettingsPage() {
                           value={customTierInput}
                           onChange={(e) => setCustomTierInput(e.target.value)}
                           placeholder="Custom amount (USD)"
+                          className="flex-1"
                         />
-                        <Button type="button" variant="outline" onClick={addCustomTier}>
+                        <Button type="button" variant="outline" onClick={addCustomTier} className="sm:w-auto">
                           Add
                         </Button>
                       </div>

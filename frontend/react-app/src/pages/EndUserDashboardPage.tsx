@@ -212,9 +212,9 @@ export function EndUserDashboardPage() {
                           <Sparkles className="w-6 h-6 text-primary" />
                         </div>
                       )}
-                      <div>
-                        <div className="font-semibold">{sub.creatorName}</div>
-                        <div className="text-sm text-muted-foreground">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate">{sub.creatorName}</div>
+                        <div className="text-sm text-muted-foreground truncate">
                           {formatPrice(sub.priceCents, sub.currency)}/mo • Renews {formatRenewalDate(sub.renewsAt)}
                         </div>
                       </div>
@@ -270,9 +270,9 @@ export function EndUserDashboardPage() {
                           <Sparkles className="w-6 h-6 text-primary" />
                         </div>
                       )}
-                      <div>
-                        <div className="font-semibold">{access.creatorName}</div>
-                        <div className="text-sm text-muted-foreground">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate">{access.creatorName}</div>
+                        <div className="text-sm text-muted-foreground truncate">
                           {getTimeRemaining(access.expiresAt)}
                         </div>
                       </div>

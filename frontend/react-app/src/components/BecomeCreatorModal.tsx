@@ -105,10 +105,10 @@ export function BecomeCreatorModal({ isOpen, onClose }: BecomeCreatorModalProps)
         </div>
 
         <DialogFooter className="flex gap-2">
-          <Button onClick={onClose} variant="outline" disabled={loading}>
+          <Button onClick={onClose} variant="outline" disabled={loading} className="w-full sm:w-auto">
             Maybe Later
           </Button>
-          <Button onClick={handleStartCreating} disabled={loading} size="lg">
+          <Button onClick={handleStartCreating} disabled={loading} size="lg" className="w-full sm:w-auto">
             {loading ? (
               'Starting...'
             ) : (
