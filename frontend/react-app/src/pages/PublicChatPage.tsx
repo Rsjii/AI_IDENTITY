@@ -490,6 +490,14 @@ export function PublicChatPage() {
     setShowPaymentModal(true);
   };
 
+  const persistSessionId = (sid: string) => {
+    if (!sid) return;
+    setSessionId(sid);
+    localStorage.setItem(sessionKey, sid);
+    localStorage.setItem(sessionTsKey, String(Date.now()));
+    setCookie(sessionKey, sid, THIRTY_DAYS_SECONDS);
+  };
+
   const send = async () => {
     // ✅ Block send when not authenticated (login-first mode)
     if (!isAuthed) {
@@ -1616,6 +1624,7 @@ export function PublicChatPage() {
               returnTo={`/chat/${encodeURIComponent(slug)}${
                 (paymentData?.sessionId || sessionId) ? `?sessionId=${encodeURIComponent(paymentData?.sessionId || sessionId)}` : ''
               }`}
+              onSessionId={persistSessionId}
               previewText={previewTextForModal}
               messageIdToUnlock={messageIdToUnlock || undefined}
               creatorName={creator?.displayName}

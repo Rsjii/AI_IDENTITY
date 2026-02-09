@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { db, userQueries } from '../../config/database';
+import { db, userQueries, chatSessionQueries } from '../../config/database';
 import { createOrder, verifyPaymentSignature } from '../../services/razorpayService';
 import { createLemonCheckoutForVariant } from '../../services/lemonSqueezyService';
 import { logger } from '../../config/logger';
@@ -25,6 +25,14 @@ async function selectGatewayForViewer(viewerUserId: string, billingCountry?: Bil
   const u = await userQueries.findById(viewerUserId);
   if (isIndiaPhone((u as any)?.phone)) return 'razorpay';
   return 'lemonsqueezy';
+}
+
+function appendSessionId(returnUrl: string, sessionId: string) {
+  if (!returnUrl) return returnUrl;
+  if (returnUrl.includes('sessionId=')) return returnUrl;
+  return returnUrl.includes('?')
+    ? `${returnUrl}&sessionId=${encodeURIComponent(sessionId)}`
+    : `${returnUrl}?sessionId=${encodeURIComponent(sessionId)}`;
 }
 
 async function getPayPerChatPrice(creatorId: string): Promise<number> {
@@ -59,7 +67,7 @@ function lemonVariantForPayPerChat(priceCents: number): string {
 
 const intentSchema = z.object({
   creatorId: z.string().min(1),
-  sessionId: z.string().min(1),
+  sessionId: z.string().optional(),
   billingCountry: z.enum(['IN', 'OTHER']).optional(),
   // returnUrl for Lemon redirect back to chat
   returnUrl: z.string().optional(),
@@ -69,7 +77,19 @@ export async function createPayPerChatIntent(req: Request, res: Response) {
   const viewerUserId = getUserId(req);
   if (!viewerUserId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { creatorId, sessionId, billingCountry, returnUrl } = intentSchema.parse(req.body);
+  const { creatorId, sessionId: providedSessionId, billingCountry, returnUrl } = intentSchema.parse(req.body);
+
+  // Ensure we always have a valid sessionId
+  let sessionId = (providedSessionId || '').trim();
+  if (!sessionId) {
+    const created = await chatSessionQueries.create({
+      creatorId,
+      userId: viewerUserId,
+      visitorId: null,
+      platform: 'web',
+    });
+    sessionId = created.id;
+  }
 
   const priceCents = await getPayPerChatPrice(creatorId);
   if (!priceCents || priceCents <= 0) {
@@ -81,7 +101,7 @@ export async function createPayPerChatIntent(req: Request, res: Response) {
   if (gateway === 'lemonsqueezy') {
     const variantId = lemonVariantForPayPerChat(priceCents);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const ru = returnUrl || '/chat';
+    const ru = appendSessionId(returnUrl || '/chat', sessionId);
     const redirectUrl = `${frontendUrl}${ru.startsWith('/') ? ru : '/' + ru}`;
 
     const co = await createLemonCheckoutForVariant({
@@ -99,7 +119,7 @@ export async function createPayPerChatIntent(req: Request, res: Response) {
       },
     });
 
-    return res.json({ gateway: 'lemonsqueezy', url: co.url });
+    return res.json({ gateway: 'lemonsqueezy', url: co.url, sessionId });
   }
 
   // Razorpay

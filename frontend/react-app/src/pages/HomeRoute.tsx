@@ -39,7 +39,16 @@ export function HomeRoute() {
   if (state.status === 'loading') return null;
 
   if (state.status === 'authenticated') {
-    return <Navigate to="/dashboard" replace />;
+    const user = state.user as any;
+
+    // Route based on user role
+    // Creators → Creator Dashboard
+    // End-users → End-User Dashboard (subscriptions)
+    if (user.userType === 'creator' || user.creatorTitle) {
+      return <Navigate to="/dashboard" replace />;
+    } else {
+      return <Navigate to="/my-subscriptions" replace />;
+    }
   }
 
   // ✅ Logged-out: show marketing landing (standard SaaS)

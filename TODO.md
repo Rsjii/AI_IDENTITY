@@ -82,3 +82,10 @@ Solution: Training complete hone ka wait karo, ya manually training status updat
 11. persoanl clone ka flow, review agerah ka flow, chag , marketplace ye bhi dekh lena, personal me alag hona chahiye
 
 12. sab jaagh user ke accordign onsi currency dikh rahe, jab onboarding me user set kar raha tab kaise hoga, in whihc currency , maanlo creator ne inr 1000 rakh, foreign waalo ko kaise dikhega, kya dikheag, ye clarity honi chahiye sab jagah a-z sahi se jo hai currrency ke hisaab se hona chahiye sahi ho raha hai sab jagah ensure karo, india + internayional sahi se dekh lo
+
+/////////////////////////////////////
+//////////////////////////////////////////////////
+
+13. there is nothing cld as unlmited bhai pay per chat me kuch limit hogi, how are we differentiating both of these pya per chat vs end user subscription, limits kaise define ho rahi, what if user takes both
+
+14. creator end pe subscription pe chat wise se jyaada storage wise hona chahiye matlab free user upto 25 mb, ohir 100 mb and higher planse ke liye gb, so storage ke accordind hona chahiye not chats only, u think actual me kaise ohna chahiye

@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboardingGuard, useRedirectBack } from '@/hooks/useOnboardingGuard';
-import { Loader2, Send, Sparkles, ArrowRight, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Loader2, Send, Sparkles, ArrowRight, CheckCircle2, MessageSquare, AlertCircle, Clock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -22,8 +23,19 @@ export function OnboardingPreviewPage() {
   const [trainingStatus, setTrainingStatus] = useState<'not_started' | 'training' | 'ready' | 'error'>('training');
   const [trainingProgress, setTrainingProgress] = useState(0);
   const [trainingMessage, setTrainingMessage] = useState('Preparing your AI…');
+  const [estimatedSecondsRemaining, setEstimatedSecondsRemaining] = useState<number | null>(null);
 
   const isReady = trainingStatus === 'ready';
+
+  // Calculate estimated time remaining based on progress
+  const getEstimatedTime = (progress: number): string => {
+    if (progress >= 100) return 'Almost done...';
+    if (progress >= 90) return '~30 seconds';
+    if (progress >= 75) return '~1 minute';
+    if (progress >= 50) return '~2 minutes';
+    if (progress >= 25) return '~3 minutes';
+    return '~3-5 minutes';
+  };
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -48,11 +60,17 @@ export function OnboardingPreviewPage() {
     let alive = true;
     const tick = async () => {
       try {
-        const s = await apiFetch<{ status: any; progress?: number; message?: string }>('/api/identity/training-status');
+        const s = await apiFetch<{
+          status: any;
+          progress?: number;
+          message?: string;
+          estimatedSecondsRemaining?: number;
+        }>('/api/identity/training-status');
         if (!alive) return;
         setTrainingStatus(s.status || 'training');
         setTrainingProgress(Number(s.progress || 0));
         setTrainingMessage(String(s.message || 'Preparing…'));
+        setEstimatedSecondsRemaining(s.estimatedSecondsRemaining ?? null);
 
         if (s.status === 'ready') {
           setMessages([{ role: 'assistant', content: 'Your AI is ready. Ask me anything to test!' }]);
@@ -181,65 +199,135 @@ export function OnboardingPreviewPage() {
             </div>
 
             {!isReady ? (
-              <div className="rounded-lg border border-border-default bg-bg-secondary p-4">
-                <div className="h-2 w-full bg-bg-tertiary rounded-full overflow-hidden mb-2">
-                  <div
-                    className="h-full bg-accent-primary transition-all"
-                    style={{ width: `${Math.min(trainingProgress, 100)}%` }}
-                  />
-                </div>
-                <div className="text-xs text-text-tertiary mt-2">
-                  You can continue setup while this finishes. Testing will unlock automatically.
-                </div>
+              <Card className="border-2 border-accent-primary/30 bg-accent-primary/5">
+                <CardContent className="pt-6">
+                  {/* Prominent Training Status */}
+                  <div className="flex items-start gap-4 mb-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-accent-primary flex-shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold mb-1">Building Your AI Clone...</h3>
+                      <p className="text-sm text-text-secondary mb-3">Processing your content and training responses</p>
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  <Button
-                    onClick={async () => {
-                      setNavigating(true);
-                      try {
-                        await apiFetch('/api/creator/onboarding/step', {
-                          method: 'POST',
-                          body: JSON.stringify({ step: 'complete' }),
-                        });
-                        await refresh();
-                        nav('/onboarding/complete', { replace: true });
-                      } finally {
-                        setNavigating(false);
-                      }
-                    }}
-                    className="bg-accent-gradient hover:opacity-90 text-white"
-                    disabled={navigating}
-                  >
-                    {navigating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Continue to Setup <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                      {/* Progress Bar */}
+                      <div className="h-3 w-full bg-bg-tertiary rounded-full overflow-hidden mb-2">
+                        <div
+                          className="h-full bg-accent-primary transition-all duration-300"
+                          style={{ width: `${Math.min(trainingProgress, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{Math.round(trainingProgress)}% complete</span>
+                        {trainingProgress > 0 && trainingProgress < 100 && (
+                          <span className="text-text-tertiary flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {estimatedSecondsRemaining !== null ? (
+                              estimatedSecondsRemaining < 60
+                                ? `~${Math.max(estimatedSecondsRemaining, 10)} seconds remaining`
+                                : `~${Math.ceil(estimatedSecondsRemaining / 60)} ${Math.ceil(estimatedSecondsRemaining / 60) === 1 ? 'minute' : 'minutes'} remaining`
+                            ) : (
+                              getEstimatedTime(trainingProgress)
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      setNavigating(true);
-                      try {
-                        // Mark onboarding as done (skip optional steps)
-                        await apiFetch('/api/creator/onboarding/step', {
-                          method: 'POST',
-                          body: JSON.stringify({ step: 'done' }),
-                        });
-                        await refresh();
-                        sessionStorage.removeItem('selflyx_post_step2_window');
-                        sessionStorage.removeItem('selflyx_allow_preview_once');
-                        nav('/dashboard', { replace: true });
-                      } catch (error: any) {
-                        showToast(error.message || 'Failed to continue', 'error');
-                      } finally {
-                        setNavigating(false);
-                      }
-                    }}
-                    disabled={navigating}
-                  >
-                    Go to Dashboard
-                  </Button>
-                </div>
-              </div>
+                  {/* What's Happening */}
+                  <details className="group mb-4">
+                    <summary className="cursor-pointer text-sm font-medium text-accent-primary hover:text-accent-primary/80 flex items-center gap-2">
+                      What's happening right now?
+                      <ArrowRight className="h-4 w-4 group-open:rotate-90 transition-transform" />
+                    </summary>
+                    <ul className="mt-3 space-y-2 ml-1">
+                      <li className="flex items-start gap-2 text-sm">
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span>Analyzing your uploaded content</span>
+                      </li>
+                      <li className="flex items-start gap-2 text-sm">
+                        {trainingProgress >= 30 ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <Loader2 className="h-4 w-4 text-accent-primary animate-spin flex-shrink-0 mt-0.5" />
+                        )}
+                        <span>Generating knowledge embeddings</span>
+                      </li>
+                      <li className="flex items-start gap-2 text-sm">
+                        {trainingProgress >= 60 ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full border-2 border-bg-tertiary flex-shrink-0 mt-0.5" />
+                        )}
+                        <span>Training response patterns</span>
+                      </li>
+                      <li className="flex items-start gap-2 text-sm">
+                        {trainingProgress >= 90 ? (
+                          <Loader2 className="h-4 w-4 text-accent-primary animate-spin flex-shrink-0 mt-0.5" />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full border-2 border-bg-tertiary flex-shrink-0 mt-0.5" />
+                        )}
+                        <span>Setting up your AI personality</span>
+                      </li>
+                    </ul>
+                  </details>
+
+                  {/* Tip */}
+                  <Alert className="mb-4 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-sm">
+                      <strong>Tip:</strong> You can continue setup while this finishes in the background!
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      onClick={async () => {
+                        setNavigating(true);
+                        try {
+                          await apiFetch('/api/creator/onboarding/step', {
+                            method: 'POST',
+                            body: JSON.stringify({ step: 'complete' }),
+                          });
+                          await refresh();
+                          nav('/onboarding/complete', { replace: true });
+                        } finally {
+                          setNavigating(false);
+                        }
+                      }}
+                      className="bg-accent-gradient hover:opacity-90 text-white"
+                      disabled={navigating}
+                    >
+                      {navigating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Continue Setup (Recommended)
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        setNavigating(true);
+                        try {
+                          await apiFetch('/api/creator/onboarding/step', {
+                            method: 'POST',
+                            body: JSON.stringify({ step: 'done' }),
+                          });
+                          await refresh();
+                          sessionStorage.removeItem('selflyx_post_step2_window');
+                          sessionStorage.removeItem('selflyx_allow_preview_once');
+                          nav('/dashboard', { replace: true });
+                        } catch (error: any) {
+                          showToast(error.message || 'Failed to continue', 'error');
+                        } finally {
+                          setNavigating(false);
+                        }
+                      }}
+                      disabled={navigating}
+                    >
+                      Skip to Dashboard
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <div className="rounded-lg bg-accent-primary/10 border border-accent-primary/20 p-4">
                 <div className="flex items-start gap-3">
@@ -253,7 +341,18 @@ export function OnboardingPreviewPage() {
             )}
 
             {/* Chat Interface */}
-            <div className="border border-border-default rounded-xl overflow-hidden bg-bg-secondary">
+            <div className={`border border-border-default rounded-xl overflow-hidden bg-bg-secondary relative ${!isReady ? 'opacity-60' : ''}`}>
+              {/* Disabled Overlay */}
+              {!isReady && (
+                <div className="absolute inset-0 bg-bg-primary/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                  <div className="text-center p-6">
+                    <Loader2 className="h-8 w-8 animate-spin text-accent-primary mx-auto mb-3" />
+                    <p className="font-medium text-sm">Chat will be available once training completes...</p>
+                    <p className="text-xs text-text-tertiary mt-1">Feel free to continue setup while this finishes!</p>
+                  </div>
+                </div>
+              )}
+
               {/* Messages */}
               <div className="h-[400px] overflow-y-auto p-4 space-y-4">
                 {messages.map((msg, idx) => (
@@ -300,7 +399,7 @@ export function OnboardingPreviewPage() {
                         handleSend();
                       }
                     }}
-                    placeholder={isReady ? 'Ask your AI a question…' : 'AI is still building…'}
+                    placeholder={isReady ? 'Ask your AI a question…' : 'Chat will be available once training completes...'}
                     className="flex-1 bg-bg-secondary border-border-default"
                     disabled={!isReady || loading}
                   />

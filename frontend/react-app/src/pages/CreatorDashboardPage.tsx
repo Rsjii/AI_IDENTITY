@@ -506,6 +506,45 @@ const handleGenerateInsightsReport = () => {
           </Alert>
         )}
 
+        {/* Chat Limit 80% Warning */}
+        {(() => {
+          const LIMITS: Record<string, number> = {
+            free: 500,
+            starter: 5000,
+            growth: 25000,
+            scale: Number.MAX_SAFE_INTEGER,
+          };
+          const limit = LIMITS[planTier as keyof typeof LIMITS] || 500;
+          const usage = data?.chats?.month || 0;
+          const usagePercent = (usage / limit) * 100;
+
+          if (usage > limit * 0.8 && usage < limit) {
+            return (
+              <Alert className="border-yellow-500/30 bg-yellow-500/10">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>⚠️ Warning: {usage.toLocaleString()} / {limit.toLocaleString()} chats used this month</strong>
+                      <p className="text-sm mt-1">
+                        You've used {usagePercent.toFixed(0)}% of your monthly chat limit.
+                        {planTier === 'starter' && ' Upgrade to Growth for 25K chats/month.'}
+                        {planTier === 'growth' && ' Upgrade to Scale for unlimited chats.'}
+                      </p>
+                    </div>
+                    {planTier !== 'scale' && (
+                      <Button onClick={() => nav('/pricing')} size="sm" className="ml-4">
+                        Upgrade Now
+                      </Button>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            );
+          }
+          return null;
+        })()}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>

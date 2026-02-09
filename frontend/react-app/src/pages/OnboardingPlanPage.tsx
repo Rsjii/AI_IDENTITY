@@ -130,34 +130,90 @@ export function OnboardingPlanPage() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Base Currency Selection Card */}
+        <Card className="glass border-accent-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              💰 Your Base Currency
+            </CardTitle>
+            <CardDescription>
+              All your earnings will be paid out in this currency. Users worldwide can pay in their local currency.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div
+                onClick={() => {
+                  setBillingCountry('IN');
+                  setLastBillingCountry('IN');
+                }}
+                className={`cursor-pointer border-2 rounded-lg p-4 transition-all hover:scale-105 ${
+                  billingCountry === 'IN'
+                    ? 'border-accent-primary bg-accent-primary/10'
+                    : 'border-border-default hover:border-accent-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">₹</span>
+                  <div className="flex-1">
+                    <div className="font-semibold text-lg">Indian Rupee (INR)</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Payouts via Razorpay to Indian bank accounts
+                    </div>
+                  </div>
+                  {billingCountry === 'IN' && (
+                    <div className="h-6 w-6 rounded-full bg-accent-primary flex items-center justify-center">
+                      <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                onClick={() => {
+                  setBillingCountry('OTHER');
+                  setLastBillingCountry('OTHER');
+                }}
+                className={`cursor-pointer border-2 rounded-lg p-4 transition-all hover:scale-105 ${
+                  billingCountry === 'OTHER'
+                    ? 'border-accent-primary bg-accent-primary/10'
+                    : 'border-border-default hover:border-accent-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">$</span>
+                  <div className="flex-1">
+                    <div className="font-semibold text-lg">US Dollar (USD)</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Payouts via LemonSqueezy to international accounts
+                    </div>
+                  </div>
+                  {billingCountry === 'OTHER' && (
+                    <div className="h-6 w-6 rounded-full bg-accent-primary flex items-center justify-center">
+                      <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                💡 <strong>Tip:</strong> Choose based on where you'll receive payments. Users worldwide can pay in their local currency, and we'll handle conversion automatically.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="glass">
           <CardHeader>
             <CardTitle>Choose your plan</CardTitle>
-            <CardDescription>Start with a 7-day free trial or subscribe.</CardDescription>
+            <CardDescription>Start with a 7-day free trial or subscribe to a paid plan.</CardDescription>
           </CardHeader>
-          <CardContent className="pb-0">
-            <div className="flex items-center justify-between gap-3 border rounded-md p-3">
-              <div>
-                <div className="font-medium">Billing country</div>
-                <div className="text-xs text-muted-foreground">
-                  India → Razorpay • Outside India → LemonSqueezy
-                </div>
-              </div>
-              <select
-                className="border rounded-md px-3 py-2 bg-background text-sm"
-                value={billingCountry}
-                onChange={(e) => {
-                  const v = e.target.value as BillingCountry;
-                  setBillingCountry(v);
-                  setLastBillingCountry(v);
-                }}
-                disabled={loading}
-              >
-                <option value="IN">India</option>
-                <option value="OTHER">Outside India</option>
-              </select>
-            </div>
-          </CardContent>
           <CardContent className="grid md:grid-cols-4 gap-4">
             <div className="border rounded-md p-4">
               <div className="font-semibold">Free Trial</div>

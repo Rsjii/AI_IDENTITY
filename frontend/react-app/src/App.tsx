@@ -40,6 +40,7 @@ import { OnboardingCompletePage } from './pages/OnboardingCompletePage';
 import { PublicChatPage } from './pages/PublicChatPage';
 import { Layout } from './components/Layout';
 import { CreatorDashboardPage } from './pages/CreatorDashboardPage';
+import { EndUserDashboardPage } from './pages/EndUserDashboardPage';
 import { CreatorPublicProfile } from './pages/CreatorPublicProfile';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { MarketplaceListingPage } from './pages/MarketplaceListingPage';
@@ -144,6 +145,7 @@ function App() {
               <Route path="/setup/share" element={<ProtectedRoute><SetupSharePage /></ProtectedRoute>} />
               
               <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
+              <Route path="/my-subscriptions" element={<ProtectedRoute><EndUserDashboardPage /></ProtectedRoute>} />
               <Route path="/knowledge" element={<Navigate to="/my-ai?tab=train" replace />} />
               {/* ✅ Chat route PUBLIC but locked inside PublicChatPage (login gate) */}
               <Route

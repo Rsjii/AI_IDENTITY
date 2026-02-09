@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
+import { TooltipIcon } from '@/components/ui/tooltip';
 
 export function SetupPricingPage() {
   const navigate = useNavigate();
@@ -58,7 +59,10 @@ export function SetupPricingPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <Label htmlFor="payPerChat">Pay-per-chat (24h access)</Label>
+                <Label htmlFor="payPerChat" className="flex items-center gap-1">
+                  Pay-per-chat (24h access)
+                  <TooltipIcon content="One-time payment for 24 hours of unlimited access. Great for users who want to try your AI without a recurring commitment. You keep 75% of the payment." />
+                </Label>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-2xl">$</span>
                   <Input
@@ -75,7 +79,10 @@ export function SetupPricingPage() {
               </div>
 
               <div>
-                <Label htmlFor="subscription">Monthly subscription (unlimited)</Label>
+                <Label htmlFor="subscription" className="flex items-center gap-1">
+                  Monthly subscription (unlimited)
+                  <TooltipIcon content="Recurring monthly subscription for unlimited access. Perfect for building a loyal user base with predictable revenue. Subscribers get unlimited chats every month." />
+                </Label>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-2xl">$</span>
                   <Input
@@ -93,7 +100,10 @@ export function SetupPricingPage() {
               </div>
 
               <div>
-                <Label htmlFor="freeLimit">Free preview messages</Label>
+                <Label htmlFor="freeLimit" className="flex items-center gap-1">
+                  Free preview messages
+                  <TooltipIcon content="Let users send a few messages for free before requiring payment. This helps them experience your AI's value and increases conversion. Set to 0 to require immediate payment." />
+                </Label>
                 <Input
                   id="freeLimit"
                   type="number"
@@ -103,7 +113,7 @@ export function SetupPricingPage() {
                   onChange={(e) => setPricing({ ...pricing, freeMessageLimit: parseInt(e.target.value) })}
                   className="mt-2"
                 />
-                <p className="text-sm text-muted-foreground mt-1">0-10 messages</p>
+                <p className="text-sm text-muted-foreground mt-1">0-10 messages (3-5 recommended for best conversion)</p>
               </div>
 
               <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20">

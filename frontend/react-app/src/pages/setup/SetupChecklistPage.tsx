@@ -29,25 +29,28 @@ export function SetupChecklistPage() {
 
   const steps = [
     {
-      key: 'pricing',
-      title: 'Set Your Pricing',
-      description: 'How much visitors will pay',
-      icon: DollarSign,
-      route: '/setup/pricing',
-    },
-    {
       key: 'plan',
-      title: 'Choose Platform Plan',
-      description: 'Free trial or paid plan',
+      title: 'Step 1: Choose Your Platform Plan',
+      description: 'Select free trial, Starter, Growth, or Scale plan to unlock features',
       icon: CreditCard,
       route: '/setup/plan',
+      helpText: 'Start with a 7-day free trial (all features) or choose a paid plan',
+    },
+    {
+      key: 'pricing',
+      title: 'Step 2: Configure Monetization',
+      description: 'Set pay-per-chat and subscription pricing for your AI',
+      icon: DollarSign,
+      route: '/setup/pricing',
+      helpText: 'Enable at least one monetization option: Pay-per-chat or Monthly subscription',
     },
     {
       key: 'publish',
-      title: 'Publish Your Listing',
-      description: 'Make your AI discoverable on marketplace',
+      title: 'Step 3: Create Marketplace Listing',
+      description: 'Add title, description, thumbnail, and publish your AI to the world',
       icon: Globe,
       route: '/marketplace/manage',
+      helpText: 'Fill in listing details and make your AI discoverable in the marketplace',
     },
   ];
 
@@ -117,6 +120,11 @@ export function SetupChecklistPage() {
                       <div>
                         <CardTitle className="text-xl">{step.title}</CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
+                        {(step as any).helpText && (
+                          <p className="text-xs text-text-secondary mt-2 italic">
+                            💡 {(step as any).helpText}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <ChevronRight className="h-6 w-6 text-muted-foreground" />

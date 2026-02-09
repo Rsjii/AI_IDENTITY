@@ -1,11 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Star, MessageSquare, Users, CheckCircle2, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Star, MessageSquare, Users, CheckCircle2, Zap, Edit, Settings } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { showToast } from '@/lib/toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,8 +47,11 @@ interface ReviewItem {
 
 export function MarketplaceListingPage() {
   const { slug = '' } = useParams();
+  const nav = useNavigate();
   const { state } = useAuth();
   const isAuthed = state.status === 'authenticated';
+  const user = state.status === 'authenticated' ? state.user : null;
+  const userId = user?.id;
   const [listing, setListing] = useState<Listing | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +60,7 @@ export function MarketplaceListingPage() {
   const [userRating, setUserRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [previewAsUser, setPreviewAsUser] = useState(false);
 
   const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
   const defaultBillingCountry: BillingCountry = useMemo(() => {
@@ -73,7 +79,7 @@ export function MarketplaceListingPage() {
     return 'OTHER';
   }, [userPhone]);
 
-  const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
+  const [billingCountry] = useState<BillingCountry>(defaultBillingCountry);
 
   useEffect(() => {
     const load = async () => {
@@ -116,7 +122,7 @@ export function MarketplaceListingPage() {
           currency: res.order.currency,
           order_id: res.order.id,
           name: 'Selflyx',
-          description: `Subscribe to ${listing.title || 'creator'}`,
+          description: `Subscribe to ${listing.creator.name || listing.creator.handle || 'creator'}`,
           handler: async (resp: any) => {
             try {
               await apiFetch('/api/marketplace/subscriptions/verify', {
@@ -217,6 +223,9 @@ export function MarketplaceListingPage() {
     return count.toString();
   };
 
+  // Check if current user is the creator
+  const isOwnClone = userId && listing && userId === listing.creator.id;
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
@@ -287,85 +296,192 @@ export function MarketplaceListingPage() {
         </Card>
 
         {/* Pricing & Actions */}
-        <Card className="bg-bg-secondary border-border-default">
-          <CardHeader>
-            <CardTitle>Pricing</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              {listing.subscriptionPriceCents > 0 && (
-                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
-                  <div>
-                    <div className="font-semibold">Subscription</div>
-                    <div className="text-sm text-text-secondary">Unlimited conversations</div>
-                  </div>
-                  <div className="text-lg font-bold text-text-primary">
-                    ${(listing.subscriptionPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
-                    <span className="text-sm font-normal text-text-secondary">/month</span>
-                  </div>
-                </div>
-              )}
-              
-              {listing.payPerChatPriceCents && listing.payPerChatPriceCents > 0 && (
-                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
-                  <div>
-                    <div className="font-semibold">Pay Per Chat</div>
-                    <div className="text-sm text-text-secondary">One-time payment, 24h access</div>
-                  </div>
-                  <div className="text-lg font-bold text-text-primary">
-                    ${(listing.payPerChatPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
-                  </div>
-                </div>
-              )}
+        {isOwnClone && !previewAsUser ? (
+          <Card className="bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                ✏️ This is YOUR AI Clone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
+                <AlertDescription>
+                  <strong>Creator Access:</strong> You have full access for testing. Regular users see payment options here.
+                </AlertDescription>
+              </Alert>
 
-              {listing.freeMessageLimit !== null && listing.freeMessageLimit > 0 && (
-                <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
-                  <div>
-                    <div className="font-semibold">Free Tier</div>
-                    <div className="text-sm text-text-secondary">
-                      {listing.freeMessageLimit} messages per day
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Your Pricing (visible to users):</h4>
+                {listing.subscriptionPriceCents > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Subscription</div>
+                      <div className="text-xs text-text-secondary">Unlimited conversations</div>
+                    </div>
+                    <div className="text-lg font-bold">
+                      ${(listing.subscriptionPriceCents / 100).toFixed(2)}
+                      <span className="text-sm font-normal text-text-secondary">/mo</span>
                     </div>
                   </div>
-                  <div className="text-lg font-bold text-green-500">Free</div>
-                </div>
-              )}
+                )}
 
-              {listing.freeTrialQuestions > 0 && (
-                <div className="p-3 bg-accent-primary/10 border border-accent-primary/20 rounded-md">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-accent-primary" />
-                    <span className="text-sm font-medium">
-                      Free trial: {listing.freeTrialQuestions} questions included
-                    </span>
+                {listing.payPerChatPriceCents && listing.payPerChatPriceCents > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Pay Per Chat</div>
+                      <div className="text-xs text-text-secondary">24h access</div>
+                    </div>
+                    <div className="text-lg font-bold">
+                      ${(listing.payPerChatPriceCents / 100).toFixed(2)}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button 
-                onClick={handleStartChat} 
-                className="flex-1"
-                size="lg"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Start Chat Now
-              </Button>
-              {listing.subscriptionPriceCents > 0 && (
-                <Button 
-                  onClick={handleSubscribe} 
-                  disabled={subscribing}
-                  variant="outline"
-                  className="flex-1"
+                {listing.freeMessageLimit !== null && listing.freeMessageLimit > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Free Tier</div>
+                      <div className="text-xs text-text-secondary">
+                        {listing.freeMessageLimit} messages/day
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold text-green-500">Free</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  onClick={handleStartChat}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   size="lg"
                 >
-                  {subscribing ? 'Starting...' : 'Subscribe for Unlimited'}
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Test Your AI (Free for You)
                 </Button>
+                <Button
+                  onClick={() => nav('/dashboard')}
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Go to Dashboard
+                </Button>
+                <Button
+                  onClick={() => nav('/marketplace/manage')}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Listing
+                </Button>
+              </div>
+
+              {/* Preview Toggle */}
+              <div className="pt-4 border-t">
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <Switch
+                    checked={previewAsUser}
+                    onCheckedChange={setPreviewAsUser}
+                  />
+                  <span className="text-sm">Preview as end user (see payment flow)</span>
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-bg-secondary border-border-default">
+            <CardHeader>
+              <CardTitle>Pricing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                {listing.subscriptionPriceCents > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Subscription</div>
+                      <div className="text-sm text-text-secondary">Unlimited conversations</div>
+                    </div>
+                    <div className="text-lg font-bold text-text-primary">
+                      ${(listing.subscriptionPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
+                      <span className="text-sm font-normal text-text-secondary">/month</span>
+                    </div>
+                  </div>
+                )}
+
+                {listing.payPerChatPriceCents && listing.payPerChatPriceCents > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Pay Per Chat</div>
+                      <div className="text-sm text-text-secondary">One-time payment, 24h access</div>
+                    </div>
+                    <div className="text-lg font-bold text-text-primary">
+                      ${(listing.payPerChatPriceCents / 100).toFixed(2)}/{listing.currency || 'USD'}
+                    </div>
+                  </div>
+                )}
+
+                {listing.freeMessageLimit !== null && listing.freeMessageLimit > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-md">
+                    <div>
+                      <div className="font-semibold">Free Tier</div>
+                      <div className="text-sm text-text-secondary">
+                        {listing.freeMessageLimit} messages per day
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold text-green-500">Free</div>
+                  </div>
+                )}
+
+                {listing.freeTrialQuestions > 0 && (
+                  <div className="p-3 bg-accent-primary/10 border border-accent-primary/20 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-accent-primary" />
+                      <span className="text-sm font-medium">
+                        Free trial: {listing.freeTrialQuestions} questions included
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={handleStartChat}
+                  className="flex-1"
+                  size="lg"
+                  disabled={Boolean(isOwnClone && !previewAsUser)}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Start Chat Now
+                </Button>
+                {listing.subscriptionPriceCents > 0 && !isOwnClone && (
+                  <Button
+                    onClick={handleSubscribe}
+                    disabled={subscribing}
+                    variant="outline"
+                    className="flex-1"
+                    size="lg"
+                  >
+                    {subscribing ? 'Starting...' : 'Subscribe for Unlimited'}
+                  </Button>
+                )}
+              </div>
+
+              {isOwnClone && previewAsUser && (
+                <Alert className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                  <AlertDescription className="text-sm">
+                    <strong>Preview Mode:</strong> You're viewing this as an end user would see it.
+                  </AlertDescription>
+                </Alert>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* What's Included */}
         <Card className="bg-bg-secondary border-border-default">
@@ -436,9 +552,15 @@ export function MarketplaceListingPage() {
         {isAuthed && (
           <Card className="bg-bg-secondary border-border-default mb-6">
             <CardContent className="pt-6">
-              {!showReviewForm ? (
-                <Button 
-                  variant="outline" 
+              {isOwnClone ? (
+                <Alert className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                  <AlertDescription>
+                    <strong>Note:</strong> You cannot review your own AI. Reviews from your users will appear here.
+                  </AlertDescription>
+                </Alert>
+              ) : !showReviewForm ? (
+                <Button
+                  variant="outline"
                   onClick={() => setShowReviewForm(true)}
                   className="w-full"
                 >

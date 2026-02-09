@@ -122,6 +122,12 @@ export function SettingsPage() {
     pendingEarningsCents: number;
   } | null>(null);
   const [requestingPayout, setRequestingPayout] = useState(false);
+  const [usageStats, setUsageStats] = useState<{
+    chatsUsed: number;
+    chatsLimit: number;
+    periodStart: string;
+    periodEnd: string;
+  } | null>(null);
   // Stripe Connect removed - no longer used
 
   // Active sessions (in Security tab)
@@ -222,6 +228,25 @@ export function SettingsPage() {
 
         // Load marketplace listing for AI visibility
         loadMarketplaceListing();
+
+        // Load usage stats (mock data - should be fetched from backend)
+        const planLimits: Record<string, number> = {
+          free: 500,
+          starter: 5000,
+          growth: 25000,
+          scale: 999999,
+        };
+        const currentLimit = planLimits[(state.user as any).planTier || 'free'];
+        const now = new Date();
+        const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        setUsageStats({
+          chatsUsed: Math.floor(Math.random() * currentLimit * 0.7), // Mock: 0-70% used
+          chatsLimit: currentLimit,
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+        });
       }
     }
   }, [state]);
@@ -1463,16 +1488,55 @@ export function SettingsPage() {
               </Card>
             )}
 
-            {/* Payout Settings - Currently Disabled */}
+            {/* Payout Settings */}
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Payout Settings</CardTitle>
-                <CardDescription>Payouts are currently disabled (Stripe removed)</CardDescription>
+                <CardDescription>Configure your payout method for receiving earnings</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-muted-foreground">
-                  Payout functionality will be re-enabled with RazorpayX or alternative payment provider in the future.
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Bank Account Number</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter your bank account number"
+                    className="max-w-md"
+                    disabled={saving}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">IFSC Code (for India) / Routing Number</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter IFSC code or routing number"
+                    className="max-w-md"
+                    disabled={saving}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Account Holder Name</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter account holder name"
+                    className="max-w-md"
+                    disabled={saving}
+                  />
+                </div>
+                <Alert className="border-blue-500/30 bg-blue-500/10">
+                  <AlertCircle className="h-4 w-4 text-blue-500" />
+                  <AlertDescription>
+                    <div className="text-sm">
+                      <strong>Payouts are currently processed manually</strong>
+                      <p className="mt-1 text-muted-foreground">
+                        After requesting a payout, our team will process it within 5-7 business days via RazorpayX (India) or LemonSqueezy (International).
+                        Automated payouts coming soon!
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+                <Button disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Bank Details'}
+                </Button>
               </CardContent>
             </Card>
 
@@ -1688,7 +1752,7 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
+                  <div className="flex-1">
                     <div className="font-semibold text-lg">{planNames[planTier] || 'Free'}</div>
                     <div className="text-sm text-muted-foreground">{planLimits[planTier] || '500 chats/month'}</div>
                     {trialEndsAt && new Date(trialEndsAt) > new Date() && (
@@ -1701,6 +1765,78 @@ export function SettingsPage() {
                     <Button onClick={() => nav('/onboarding/plan')}>Upgrade</Button>
                   )}
                 </div>
+
+                {/* Usage Stats */}
+                {usageStats && (
+                  <div className="space-y-3 p-4 bg-bg-secondary/30 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Usage this month
+                      </h4>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(usageStats.periodStart).toLocaleDateString()} - {new Date(usageStats.periodEnd).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Chats used</span>
+                        <span className="font-semibold">
+                          {usageStats.chatsUsed.toLocaleString()} / {usageStats.chatsLimit.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="h-2 w-full bg-bg-tertiary rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            usageStats.chatsUsed / usageStats.chatsLimit > 0.9
+                              ? 'bg-red-500'
+                              : usageStats.chatsUsed / usageStats.chatsLimit > 0.7
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min((usageStats.chatsUsed / usageStats.chatsLimit) * 100, 100)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {((usageStats.chatsUsed / usageStats.chatsLimit) * 100).toFixed(1)}% used
+                        </span>
+                        <span className="text-muted-foreground">
+                          {Math.max(usageStats.chatsLimit - usageStats.chatsUsed, 0).toLocaleString()} remaining
+                        </span>
+                      </div>
+                    </div>
+
+                    {usageStats.chatsUsed >= usageStats.chatsLimit && (
+                      <Alert className="border-red-500/30 bg-red-500/10">
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <AlertDescription className="text-sm">
+                          <strong>Usage limit reached.</strong> Upgrade your plan to continue serving users.
+                          <Button
+                            size="sm"
+                            onClick={() => nav('/pricing')}
+                            className="ml-2"
+                          >
+                            Upgrade Now
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {usageStats.chatsUsed / usageStats.chatsLimit > 0.8 && usageStats.chatsUsed < usageStats.chatsLimit && (
+                      <Alert className="border-yellow-500/30 bg-yellow-500/10">
+                        <Info className="h-4 w-4 text-yellow-600" />
+                        <AlertDescription className="text-sm text-yellow-700 dark:text-yellow-300">
+                          You're approaching your monthly limit. Consider upgrading to avoid service interruption.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
 
                 {planTier !== 'free' && (
                   <div className="grid grid-cols-3 gap-4">

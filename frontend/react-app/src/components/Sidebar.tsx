@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   BarChart3, Bot, MessageSquare, Settings, Compass, Clock,
-  Moon, Sun, LogOut, ChevronLeft, ChevronRight,
+  Moon, Sun, LogOut, ChevronLeft, ChevronRight, CreditCard,
 } from 'lucide-react';
 
 interface NavItem {
@@ -14,8 +14,16 @@ interface NavItem {
 }
 
 const CREATOR_ALSO: NavItem[] = [
+  { icon: CreditCard, label: 'My Subscriptions', to: '/my-subscriptions' },
   { icon: Compass, label: 'Explore', to: '/explore' },
   { icon: Clock, label: 'My Chats', to: '/my-chats' },
+];
+
+const END_USER_ITEMS: NavItem[] = [
+  { icon: CreditCard, label: 'My Subscriptions', to: '/my-subscriptions' },
+  { icon: Compass, label: 'Explore', to: '/explore' },
+  { icon: Clock, label: 'My Chats', to: '/my-chats' },
+  { icon: Settings, label: 'Settings', to: '/settings?tab=profile' },
 ];
 
 export function Sidebar({
@@ -40,11 +48,7 @@ export function Sidebar({
         { icon: MessageSquare, label: 'Conversations', to: '/conversations' },
         { icon: Settings, label: 'Settings', to: '/settings?tab=profile' },
       ]
-    : [
-        { icon: Compass, label: 'Explore', to: '/explore' },
-        { icon: Clock, label: 'My Chats', to: '/my-chats' },
-        { icon: Settings, label: 'Settings', to: '/settings?tab=profile' },
-      ];
+    : END_USER_ITEMS;
 
   const alsoItems = isCreator ? CREATOR_ALSO : [];
 
@@ -52,6 +56,7 @@ export function Sidebar({
     if (to.startsWith('/my-ai')) return location.pathname.startsWith('/my-ai');
     if (to.startsWith('/conversations')) return location.pathname.startsWith('/conversations');
     if (to.startsWith('/settings')) return location.pathname.startsWith('/settings');
+    if (to.startsWith('/my-subscriptions')) return location.pathname.startsWith('/my-subscriptions');
     return location.pathname === to;
   }, [location.pathname]);
 

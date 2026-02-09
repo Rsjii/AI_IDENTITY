@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { ThemeToggle } from './ThemeToggle';
+import { RoleSwitcher } from './RoleSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
@@ -114,6 +115,7 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
+            {isAuthed && <RoleSwitcher />}
             <ThemeToggle />
 
             {/* Mobile menu button */}

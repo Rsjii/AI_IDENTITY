@@ -8,13 +8,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { startPlanCheckout, getLastBillingCountry, setLastBillingCountry, type BillingCountry } from '@/lib/planCheckout';
 import { formatMonthlyPrice } from '@/lib/planPriceBook';
+import { PlanChangeModal } from '@/components/PlanChangeModal';
 
 export function PricingPage() {
   const { state } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPlanChangeModal, setShowPlanChangeModal] = useState(false);
+  const [selectedPlanChange, setSelectedPlanChange] = useState<{
+    tier: 'starter' | 'growth' | 'scale';
+    type: 'upgrade' | 'downgrade';
+  } | null>(null);
 
+  const user = state.status === 'authenticated' ? state.user : null;
   const userPhone = state.status === 'authenticated' ? (state.user as any)?.phone || '' : '';
+  const currentPlanTier = (user as any)?.planTier || 'free';
+  const planStartDate = (user as any)?.planStartDate;
+  const nextBillingDate = (user as any)?.nextBillingDate;
   const defaultBillingCountry: BillingCountry = useMemo(() => {
     console.log('[BILLING-DETECT] === Starting billing country detection ===');
     
@@ -72,6 +82,58 @@ export function PricingPage() {
   }, [userPhone]);
 
   const [billingCountry, setBillingCountry] = useState<BillingCountry>(defaultBillingCountry);
+
+  // Helper functions for plan comparison
+  const planHierarchy = { free: 0, starter: 1, growth: 2, scale: 3 };
+  const isCurrentPlan = (tier: string) => currentPlanTier === tier;
+  const isUpgrade = (tier: string) => planHierarchy[tier as keyof typeof planHierarchy] > planHierarchy[currentPlanTier as keyof typeof planHierarchy];
+  const isDowngrade = (tier: string) => planHierarchy[tier as keyof typeof planHierarchy] < planHierarchy[currentPlanTier as keyof typeof planHierarchy];
+
+  const formatDate = (date: string | undefined) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Plan details helper
+  const getPlanDetails = (tier: string) => {
+    const plans: Record<string, { name: string; price: string; features: string[] }> = {
+      free: {
+        name: 'Free',
+        price: '$0/month',
+        features: ['500 chats/month', 'Create AI clone', 'Upload content', 'Chat link'],
+      },
+      starter: {
+        name: 'Starter',
+        price: formatMonthlyPrice(billingCountry, 'starter'),
+        features: ['5,000 chats/month', 'Public marketplace', 'Monetization', 'Website widget', 'Email support'],
+      },
+      growth: {
+        name: 'Growth',
+        price: formatMonthlyPrice(billingCountry, 'growth'),
+        features: ['25,000 chats/month', 'Everything in Starter', 'Custom branding', 'Priority support', 'Advanced analytics'],
+      },
+      scale: {
+        name: 'Scale',
+        price: formatMonthlyPrice(billingCountry, 'scale'),
+        features: ['Unlimited chats', 'Everything in Growth', 'Dedicated manager', 'WhatsApp integration', 'Custom integrations'],
+      },
+    };
+    return plans[tier] || plans.free;
+  };
+
+  const handlePlanSelect = (tier: 'starter' | 'growth' | 'scale') => {
+    if (isCurrentPlan(tier)) return;
+
+    const changeType = isUpgrade(tier) ? 'upgrade' : 'downgrade';
+    setSelectedPlanChange({ tier, type: changeType });
+    setShowPlanChangeModal(true);
+  };
+
+  const handleConfirmPlanChange = async () => {
+    if (!selectedPlanChange) return;
+    await goCheckout(selectedPlanChange.tier);
+    setShowPlanChangeModal(false);
+  };
 
   const goCheckout = async (tier: 'starter' | 'growth' | 'scale') => {
     console.log('[CHECKOUT] === Starting checkout process ===');
@@ -157,11 +219,18 @@ export function PricingPage() {
         {/* Plan Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Free Plan */}
-          <Card className="glass border-border-default relative">
+          <Card className={`glass relative ${
+            isCurrentPlan('free') ? 'border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20' : 'border-border-default'
+          }`}>
+            {isCurrentPlan('free') && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge className="bg-green-500 text-white">✓ CURRENT PLAN</Badge>
+              </div>
+            )}
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Free
-                <Badge variant="outline">Testing</Badge>
+                {!isCurrentPlan('free') && <Badge variant="outline">Testing</Badge>}
               </CardTitle>
               <CardDescription>Perfect for trying out</CardDescription>
             </CardHeader>
@@ -204,17 +273,36 @@ export function PricingPage() {
                   <Zap className="h-3 w-3" />
                   <span>Best for: Testing your AI</span>
                 </div>
-                <Button variant="outline" className="w-full" disabled>
-                  Current Plan
-                </Button>
+                {isCurrentPlan('free') ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✓ Active since {formatDate(planStartDate)}
+                    </p>
+                    <Button variant="outline" className="w-full" disabled>
+                      Current Plan
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>
+                    Downgrade to Free
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Starter Plan */}
-          <Card className="glass border-accent-primary/30 relative">
+          <Card className={`glass relative ${
+            isCurrentPlan('starter')
+              ? 'border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20'
+              : 'border-accent-primary/30'
+          }`}>
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge className="bg-accent-primary text-white">Most Popular</Badge>
+              {isCurrentPlan('starter') ? (
+                <Badge className="bg-green-500 text-white">✓ CURRENT PLAN</Badge>
+              ) : (
+                <Badge className="bg-accent-primary text-white">Most Popular</Badge>
+              )}
             </div>
             <CardHeader>
               <CardTitle>Starter</CardTitle>
@@ -259,17 +347,49 @@ export function PricingPage() {
                   <TrendingUp className="h-3 w-3" />
                   <span>Best for: Beginners</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goCheckout('starter')}>
-                  Choose Starter
-                </Button>
+                {isCurrentPlan('starter') ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✓ Active since {formatDate(planStartDate)}
+                    </p>
+                    {nextBillingDate && (
+                      <p className="text-xs text-text-secondary">
+                        Next billing: {formatDate(nextBillingDate)}
+                      </p>
+                    )}
+                    <Button variant="outline" className="w-full" disabled>
+                      Current Plan
+                    </Button>
+                  </div>
+                ) : isUpgrade('starter') ? (
+                  <Button className="w-full bg-accent-gradient hover:opacity-90 text-white" disabled={loading} onClick={() => handlePlanSelect('starter')}>
+                    Upgrade to Starter →
+                  </Button>
+                ) : isDowngrade('starter') ? (
+                  <Button variant="outline" className="w-full" disabled={loading} onClick={() => handlePlanSelect('starter')}>
+                    Downgrade to Starter
+                  </Button>
+                ) : (
+                  <Button className="w-full" disabled={loading} onClick={() => handlePlanSelect('starter')}>
+                    Choose Starter
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Growth Plan */}
-          <Card className="glass border-border-default relative">
+          <Card className={`glass relative ${
+            isCurrentPlan('growth')
+              ? 'border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20'
+              : 'border-border-default'
+          }`}>
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge variant="secondary">Best Value</Badge>
+              {isCurrentPlan('growth') ? (
+                <Badge className="bg-green-500 text-white">✓ CURRENT PLAN</Badge>
+              ) : (
+                <Badge variant="secondary">Best Value</Badge>
+              )}
             </div>
             <CardHeader>
               <CardTitle>Growth</CardTitle>
@@ -310,15 +430,48 @@ export function PricingPage() {
                   <TrendingUp className="h-3 w-3" />
                   <span>Best for: Growing creators</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goCheckout('growth')}>
-                  Choose Growth
-                </Button>
+                {isCurrentPlan('growth') ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✓ Active since {formatDate(planStartDate)}
+                    </p>
+                    {nextBillingDate && (
+                      <p className="text-xs text-text-secondary">
+                        Next billing: {formatDate(nextBillingDate)}
+                      </p>
+                    )}
+                    <Button variant="outline" className="w-full" disabled>
+                      Current Plan
+                    </Button>
+                  </div>
+                ) : isUpgrade('growth') ? (
+                  <Button className="w-full bg-accent-gradient hover:opacity-90 text-white" disabled={loading} onClick={() => handlePlanSelect('growth')}>
+                    Upgrade to Growth →
+                  </Button>
+                ) : isDowngrade('growth') ? (
+                  <Button variant="outline" className="w-full" disabled={loading} onClick={() => handlePlanSelect('growth')}>
+                    Downgrade to Growth
+                  </Button>
+                ) : (
+                  <Button className="w-full" disabled={loading} onClick={() => handlePlanSelect('growth')}>
+                    Choose Growth
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Scale Plan */}
-          <Card className="glass border-border-default relative">
+          <Card className={`glass relative ${
+            isCurrentPlan('scale')
+              ? 'border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20'
+              : 'border-border-default'
+          }`}>
+            {isCurrentPlan('scale') && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <Badge className="bg-green-500 text-white">✓ CURRENT PLAN</Badge>
+              </div>
+            )}
             <CardHeader>
               <CardTitle>Scale</CardTitle>
               <CardDescription>Enterprise features</CardDescription>
@@ -358,9 +511,33 @@ export function PricingPage() {
                   <Building2 className="h-3 w-3" />
                   <span>Best for: Established brands</span>
                 </div>
-                <Button className="w-full" disabled={loading} onClick={() => goCheckout('scale')}>
-                  Choose Scale
-                </Button>
+                {isCurrentPlan('scale') ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✓ Active since {formatDate(planStartDate)}
+                    </p>
+                    {nextBillingDate && (
+                      <p className="text-xs text-text-secondary">
+                        Next billing: {formatDate(nextBillingDate)}
+                      </p>
+                    )}
+                    <Button variant="outline" className="w-full" disabled>
+                      Current Plan
+                    </Button>
+                  </div>
+                ) : isUpgrade('scale') ? (
+                  <Button className="w-full bg-accent-gradient hover:opacity-90 text-white" disabled={loading} onClick={() => handlePlanSelect('scale')}>
+                    Upgrade to Scale →
+                  </Button>
+                ) : isDowngrade('scale') ? (
+                  <Button variant="outline" className="w-full" disabled={loading} onClick={() => handlePlanSelect('scale')}>
+                    Downgrade to Scale
+                  </Button>
+                ) : (
+                  <Button className="w-full" disabled={loading} onClick={() => handlePlanSelect('scale')}>
+                    Choose Scale
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -523,6 +700,27 @@ export function PricingPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Plan Change Confirmation Modal */}
+      {selectedPlanChange && (
+        <PlanChangeModal
+          open={showPlanChangeModal}
+          onClose={() => {
+            setShowPlanChangeModal(false);
+            setSelectedPlanChange(null);
+          }}
+          onConfirm={handleConfirmPlanChange}
+          changeType={selectedPlanChange.type}
+          currentPlan={getPlanDetails(currentPlanTier)}
+          newPlan={getPlanDetails(selectedPlanChange.tier)}
+          billingInfo={{
+            immediateCharge: selectedPlanChange.type === 'upgrade' ? '$100' : undefined,
+            nextBillingDate: formatDate(nextBillingDate) || 'Feb 28, 2026',
+            nextBillingAmount: getPlanDetails(selectedPlanChange.tier).price,
+          }}
+          loading={loading}
+        />
+      )}
     </Layout>
   );
 }

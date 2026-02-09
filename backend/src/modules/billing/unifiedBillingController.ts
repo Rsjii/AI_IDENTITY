@@ -394,7 +394,28 @@ export async function lemonSqueezyWebhook(req: Request, res: Response) {
   }
 
   if (cancel && userId) {
+    // Downgrade user to free tier
     await db.query(`UPDATE "User" SET "planTier"='free' WHERE id=$1`, [userId]);
+
+    // Hide marketplace listing if trial expired
+    // (Note: This webhook fires for both trial expiry and manual cancellation)
+    const userResult = await db.query(
+      `SELECT "trialEndsAt" FROM "User" WHERE id=$1`,
+      [userId]
+    );
+    const user = userResult.rows[0];
+
+    if (user && user.trialEndsAt && new Date() > new Date(user.trialEndsAt)) {
+      // Trial has expired - hide marketplace listing
+      await db.query(
+        `UPDATE "marketplace_listings" SET "isPublic"=false WHERE "creatorId"=$1`,
+        [userId]
+      );
+
+      // TODO: Send email notification
+      // await emailService.sendTrialExpiredEmail(user.email);
+    }
+
     return res.json({ received: true });
   }
 
