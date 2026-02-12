@@ -86,8 +86,23 @@ Solution: Training complete hone ka wait karo, ya manually training status updat
 /////////////////////////////////////
 //////////////////////////////////////////////////
 
-13. there is nothing cld as unlmited bhai pay per chat me kuch limit hogi, how are we differentiating both of these pya per chat vs end user subscription, limits kaise define ho rahi, what if user takes both
+13. ✅ SOLVED - See zz_TODO_1/FINAL_MVP_PRICING_PLAN.md
+    - Pay-per-chat: 24h Pass with 100 message HARD LIMIT (NOT unlimited)
+    - Priority: Subscription > 24h Pass > Free
+    - If user has both: Subscription wins (no refund)
+    - Implementation: 2-3 hours
 
-14. creator end pe subscription pe chat wise se jyaada storage wise hona chahiye matlab free user upto 25 mb, ohir 100 mb and higher planse ke liye gb, so storage ke accordind hona chahiye not chats only, u think actual me kaise ohna chahiyes
+14. ✅ SOLVED - See zz_TODO_1/FINAL_MVP_PRICING_PLAN.md
+    - Storage is PRIMARY: 50 MB → 250 MB → 2 GB → 10 GB
+    - Chats are SECONDARY: soft warnings only
+    - Database: Just 3 columns (messages_used, period_start, storage_used_mb)
 
-15. isme wo agar renew waala part hai usme kaise karna hai, matlab bande ki payment fail ho jaaye waala case
+15. ❌ SKIP FOR MVP - Payment renewal handled by Razorpay/LemonSqueezy webhooks
+    - They automatically retry failed payments
+    - On final failure: webhook downgrades user to free tier
+    - Already implemented in unifiedBillingController.ts
+
+16. ✅ DECIDED - 24h Pass (NOT credit-based, NOT per-chat billing)
+    - User pays $10 → Gets 24h access + 100 message limit
+    - Whichever ends first (100 msgs OR 24h) = access ends
+    - Simple, clear, industry standard

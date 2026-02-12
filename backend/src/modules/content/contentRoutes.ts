@@ -5,6 +5,7 @@ import { validateCSRF } from '../../middleware/csrf';
 import { sanitizeInput } from '../../middleware/validation';
 import { enhancedSanitize } from '../../middleware/sanitizer';
 import { asyncHandler } from '../../middleware/errorHandler';
+import { checkStorageQuota } from '../../middleware/storageQuota';
 import {
   paste,
   youtube,
@@ -46,7 +47,8 @@ router.post('/youtube', enhancedSanitize(), sanitizeInput, validateCSRF, asyncHa
 router.post('/url', enhancedSanitize(), sanitizeInput, validateCSRF, asyncHandler(url));
 
 // ✅ Multer must come BEFORE validateCSRF (multer parses FormData first)
-router.post('/upload', uploadMem.single('file'), validateCSRF, asyncHandler(upload));
+// Storage quota check after multer (needs file size)
+router.post('/upload', uploadMem.single('file'), checkStorageQuota, validateCSRF, asyncHandler(upload));
 router.delete('/:id', sanitizeInput, validateCSRF, asyncHandler(remove));
 
 // "URL based" social imports (no OAuth)

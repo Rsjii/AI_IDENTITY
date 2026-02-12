@@ -3,6 +3,7 @@ import authPageRoutes from './authPageRoutes';
 import identityPageRoutes from './identityPageRoutes';
 import adminPageRoutes from './adminPageRoutes';
 import historyPageRoutes from './historyPageRoutes';
+import creatorPageRoutes from './creatorPageRoutes';
 import { generateCSRFToken } from '../middleware/csrf';
 import { asyncHandler } from '../middleware/errorHandler';
 import { logger } from '../config/logger';
@@ -39,6 +40,9 @@ router.use(identityPageRoutes);
 
 // History pages
 router.use(historyPageRoutes);
+
+// Creator pages
+router.use(creatorPageRoutes);
 
 // Admin pages
 router.use(adminPageRoutes);

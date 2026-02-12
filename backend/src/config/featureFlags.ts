@@ -16,6 +16,9 @@ export interface FeatureFlags {
   ENABLE_EMAIL_NOTIFICATIONS: boolean;
   ENABLE_PAYMENTS: boolean; // ✅ Payment integration flag
 
+  // ✅ Token-based pricing system
+  ENABLE_TOKEN_SYSTEM: boolean;
+
   // Phase 2/3 feature toggles (integrations + revenue modules)
   ENABLE_WIDGET: boolean;
   ENABLE_PAY_PER_CHAT: boolean;
@@ -68,6 +71,9 @@ export function getFeatureFlags(): FeatureFlags {
     
     // Payments (Phase 1: subscription only, disabled by default)
     ENABLE_PAYMENTS: envFlag('ENABLE_PAYMENTS', false),
+
+    // ✅ Token-based pricing system (disabled by default)
+    ENABLE_TOKEN_SYSTEM: envFlag('ENABLE_TOKEN_SYSTEM', false),
 
     // Phase 1 features (ON by default for Phase 1)
     ENABLE_WIDGET: envFlag('ENABLE_WIDGET', true),

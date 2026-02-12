@@ -340,5 +340,13 @@ export async function createFileSource(userId: string, file: Express.Multer.File
   // ✅ FIX: Only ensureTrainingJob (embeddings will be generated in background via training job)
   await ensureTrainingJob(userId);
 
+  // Update storage usage
+  try {
+    const { updateStorageUsage } = await import('../../middleware/storageQuota');
+    await updateStorageUsage(userId, file.size);
+  } catch (error) {
+    logger.warn({ error, userId, fileSize: file.size }, 'Failed to update storage usage');
+  }
+
   return source;
 }

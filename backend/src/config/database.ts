@@ -1102,6 +1102,118 @@ CREATE INDEX IF NOT EXISTS "idx_analytics_daily_userId_date" ON "analytics_daily
 ALTER TABLE "analytics_daily" DROP CONSTRAINT IF EXISTS "analytics_daily_userId_fkey";
 ALTER TABLE "analytics_daily" ADD CONSTRAINT "analytics_daily_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ========== TOKEN SYSTEM (merged migrations) ==========
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Add creator plan + storage tracking columns (token system)
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_tier VARCHAR(50) DEFAULT 'free';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_token_quota BIGINT DEFAULT 100000;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_storage_mb INTEGER DEFAULT 100;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS storage_used_mb NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_period_start TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_period_end TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days');
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS creator_plan_subscription_id VARCHAR(255);
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan_status VARCHAR(50) DEFAULT 'active';
+
+CREATE INDEX IF NOT EXISTS idx_user_plan ON "User"(plan_tier, plan_status);
+
+-- Marketplace subscriptions: add token counters (per-viewer accounting)
+ALTER TABLE "marketplace_subscriptions" ADD COLUMN IF NOT EXISTS token_limit BIGINT;
+ALTER TABLE "marketplace_subscriptions" ADD COLUMN IF NOT EXISTS tokens_used_this_period BIGINT DEFAULT 0;
+
+UPDATE "marketplace_subscriptions"
+SET tokens_used_this_period = COALESCE(tokens_used_this_period, 0)
+WHERE tokens_used_this_period IS NULL;
+
+-- Token usage tables
+CREATE TABLE IF NOT EXISTS token_usage (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+
+  user_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+  creator_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+  session_id TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL,
+  message_id TEXT REFERENCES chat_messages(id) ON DELETE CASCADE,
+
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  system_tokens INTEGER NOT NULL DEFAULT 0,
+  total_tokens INTEGER GENERATED ALWAYS AS (input_tokens + output_tokens + system_tokens) STORED,
+
+  model_used VARCHAR(100),
+  access_type VARCHAR(50),
+
+  estimated_cost_usd NUMERIC(10, 6),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_usage_user ON token_usage(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_token_usage_creator ON token_usage(creator_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_token_usage_session ON token_usage(session_id);
+CREATE INDEX IF NOT EXISTS idx_token_usage_access_type ON token_usage(access_type);
+
+CREATE TABLE IF NOT EXISTS creator_token_aggregates (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  creator_id TEXT UNIQUE REFERENCES "User"(id) ON DELETE CASCADE,
+
+  current_period_start TIMESTAMPTZ NOT NULL DEFAULT DATE_TRUNC('month', NOW()),
+  current_period_end TIMESTAMPTZ NOT NULL DEFAULT DATE_TRUNC('month', NOW()) + INTERVAL '1 month',
+  tokens_used_this_period BIGINT DEFAULT 0,
+
+  total_tokens_all_time BIGINT DEFAULT 0,
+  total_conversations_all_time INTEGER DEFAULT 0,
+
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_token_agg ON creator_token_aggregates(creator_id);
+
+CREATE TABLE IF NOT EXISTS user_creator_token_aggregates (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  user_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+  creator_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+
+  current_period_start TIMESTAMPTZ NOT NULL DEFAULT DATE_TRUNC('month', NOW()),
+  current_period_end TIMESTAMPTZ NOT NULL DEFAULT DATE_TRUNC('month', NOW()) + INTERVAL '1 month',
+  tokens_used_this_period BIGINT DEFAULT 0,
+
+  total_tokens_all_time BIGINT DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  CONSTRAINT unique_user_creator UNIQUE(user_id, creator_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_creator_agg ON user_creator_token_aggregates(user_id, creator_id);
+
+CREATE TABLE IF NOT EXISTS token_packs (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  user_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+  creator_id TEXT REFERENCES "User"(id) ON DELETE CASCADE,
+
+  tokens_purchased BIGINT NOT NULL,
+  tokens_remaining BIGINT NOT NULL,
+  amount_paid_cents INTEGER NOT NULL,
+  currency VARCHAR(3) DEFAULT 'USD',
+
+  stripe_payment_intent_id VARCHAR(255),
+  razorpay_order_id VARCHAR(255),
+  razorpay_payment_id VARCHAR(255),
+
+  purchased_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_packs_user ON token_packs(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_packs_creator ON token_packs(creator_id);
+CREATE INDEX IF NOT EXISTS idx_token_packs_remaining
+  ON token_packs(user_id, creator_id, tokens_remaining)
+  WHERE tokens_remaining > 0;
+
+-- ========== FILE SIZE TRACKING (merged migration) ==========
+ALTER TABLE "voice_clones" ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT DEFAULT 0;
+ALTER TABLE "video_avatars" ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT DEFAULT 0;
+
+UPDATE "voice_clones" SET file_size_bytes = 0 WHERE file_size_bytes IS NULL;
+UPDATE "video_avatars" SET file_size_bytes = 0 WHERE file_size_bytes IS NULL;
 `;
 
 export async function initializeDatabase() {

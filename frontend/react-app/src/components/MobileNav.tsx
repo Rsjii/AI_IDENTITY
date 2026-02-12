@@ -135,7 +135,7 @@ export function MobileNav() {
                   active ? 'text-accent-primary font-semibold' : 'text-text-muted hover:text-text-secondary'
                 }`}
               >
-                <tab.icon className={`h-5 w-5 transition-transform ${active ? 'scale-110' : ''}`} strokeWidth={active ? 2.5 : 2} />
+                <tab.icon className={`h-5 w-5 transition-transform ${active ? 'scale-110' : ''}`} />
                 <span className="text-[10px] leading-none">{tab.label}</span>
               </Link>
             );

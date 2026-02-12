@@ -7,6 +7,8 @@ import { EventLogger } from '../../services/eventLogger';
 import { EVENT_TYPES } from '../../config/constants';
 import { generateVoiceAudio } from '../voice/voiceService';
 import { isFeatureEnabled } from '../../config/featureFlags';
+import { checkTokenAccess } from '../../middleware/checkTokenAccess';
+import { recordTokenUsage, getUserUsageStats } from '../../services/tokenService';
 
 const DEFAULT_PAY_PER_CHAT_TIERS = [100, 500, 1000, 2500, 5000];
 
@@ -669,6 +671,11 @@ export async function publicChat(req: any, res: Response) {
     sessionId: sid,
   }, '[PUBLIC_CHAT] ✅ User message saved to chat_messages table');
 
+  // ✅ TOKEN SYSTEM: Check if user has token access (skip for owners)
+  const effectiveUserId = viewerUserId || visitorId || 'anonymous';
+  let tokenAccess: any = null;
+  let tokenAccessChecked = false;
+
   // ✅ Creator preview: own AI => unlimited, no paywall, no subscription needed
   if (isOwnAI) {
     logger.info({
@@ -712,6 +719,73 @@ export async function publicChat(req: any, res: Response) {
     });
   }
 
+  // ✅ TOKEN SYSTEM: Check token access for non-owners
+  if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM')) {
+    tokenAccess = await checkTokenAccess(
+      effectiveUserId,
+      creator.id,
+      sid,
+      message.length
+    );
+    tokenAccessChecked = true;
+
+    logger.info({
+      step: '6B_TOKEN_ACCESS_CHECK',
+      allowed: tokenAccess.allowed,
+      accessType: tokenAccess.accessType,
+      reason: tokenAccess.reason,
+    }, '[PUBLIC_CHAT] 🎫 Token access check completed');
+
+    if (!tokenAccess.allowed) {
+      // Rate limit hit
+      if (tokenAccess.rateLimitHit) {
+        logger.warn({
+          step: '6C_RATE_LIMIT',
+          userId: effectiveUserId,
+          creatorId: creator.id,
+        }, '[PUBLIC_CHAT] ⚠️ Rate limit exceeded');
+
+        return res.status(429).json({
+          success: false,
+          error: 'Rate limit exceeded',
+          message: tokenAccess.reason || 'Please slow down and try again in a moment.',
+          retryAfter: 60,
+        });
+      }
+
+      // Payment required
+      if (tokenAccess.needsPayment) {
+        logger.info({
+          step: '6C_PAYMENT_REQUIRED',
+          userId: effectiveUserId,
+          creatorId: creator.id,
+        }, '[PUBLIC_CHAT] 💳 Payment required - no token access');
+
+        return res.status(402).json({
+          success: false,
+          error: 'Payment required',
+          errorCode: 'TOKEN_LIMIT_REACHED',
+          message: tokenAccess.reason || 'No active subscription or token packs available',
+          showPaywall: true,
+        });
+      }
+
+      // Other access denial
+      logger.warn({
+        step: '6C_ACCESS_DENIED',
+        userId: effectiveUserId,
+        creatorId: creator.id,
+        reason: tokenAccess.reason,
+      }, '[PUBLIC_CHAT] ⛔ Access denied');
+
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied',
+        message: tokenAccess.reason,
+      });
+    }
+  }
+
   // Premium check
   const hasPremiumSession = await premiumSessionQueries.isSessionPremium(sid);
 
@@ -741,8 +815,50 @@ export async function publicChat(req: any, res: Response) {
       persistChat: false,
     });
 
+    let assistantMsgId: string | null = null;
     if (result.reply) {
-      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      const assistantMsg = await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      assistantMsgId = assistantMsg.id;
+    }
+
+    // ✅ TOKEN SYSTEM: Record token usage
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed && result.mirrorRunId && assistantMsgId) {
+      try {
+        // Get actual token usage from mirror_runs table
+        const mirrorRun = await mirrorRunQueries.findById(result.mirrorRunId);
+        if (mirrorRun) {
+          await recordTokenUsage({
+            userId: effectiveUserId,
+            creatorId: creator.id,
+            sessionId: sid,
+            messageId: assistantMsgId,
+            inputTokens: mirrorRun.tokensIn || 0,
+            outputTokens: mirrorRun.tokensOut || 0,
+            systemTokens: 0,
+            modelUsed: mirrorRun.model || 'unknown',
+            accessType: tokenAccess.accessType,
+          });
+          logger.info({
+            step: '9B_TOKEN_RECORDED',
+            tokensIn: mirrorRun.tokensIn,
+            tokensOut: mirrorRun.tokensOut,
+            accessType: tokenAccess.accessType,
+          }, '[PUBLIC_CHAT] 🎫 Token usage recorded');
+        }
+      } catch (err) {
+        logger.error('Failed to record token usage:', err);
+        // Don't fail the request if token recording fails
+      }
+    }
+
+    // Get usage stats for response
+    let usageStats: any = null;
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed) {
+      try {
+        usageStats = await getUserUsageStats(effectiveUserId, creator.id, tokenAccess.accessType);
+      } catch (err) {
+        logger.error('Failed to get usage stats:', err);
+      }
     }
 
     return res.json({
@@ -751,6 +867,13 @@ export async function publicChat(req: any, res: Response) {
       reply: result.reply || '',
       mirrorRunId: result.mirrorRunId,
       isSubscribed,
+      ...(usageStats && {
+        usage: {
+          type: tokenAccess?.accessType,
+          percentageUsed: usageStats.percentageUsed,
+          showWarning: usageStats.percentageUsed >= 80,
+        },
+      }),
     });
   }
 
@@ -774,8 +897,42 @@ export async function publicChat(req: any, res: Response) {
       }
     }
 
+    let assistantMsgId2: string | null = null;
     if (result.reply) {
-      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      const assistantMsg = await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      assistantMsgId2 = assistantMsg.id;
+    }
+
+    // ✅ TOKEN SYSTEM: Record token usage
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed && result.mirrorRunId && assistantMsgId2) {
+      try {
+        const mirrorRun = await mirrorRunQueries.findById(result.mirrorRunId);
+        if (mirrorRun) {
+          await recordTokenUsage({
+            userId: effectiveUserId,
+            creatorId: creator.id,
+            sessionId: sid,
+            messageId: assistantMsgId2,
+            inputTokens: mirrorRun.tokensIn || 0,
+            outputTokens: mirrorRun.tokensOut || 0,
+            systemTokens: 0,
+            modelUsed: mirrorRun.model || 'unknown',
+            accessType: tokenAccess.accessType,
+          });
+        }
+      } catch (err) {
+        logger.error('Failed to record token usage (subscribed path):', err);
+      }
+    }
+
+    // Get usage stats for response
+    let usageStats2: any = null;
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed) {
+      try {
+        usageStats2 = await getUserUsageStats(effectiveUserId, creator.id, tokenAccess.accessType);
+      } catch (err) {
+        logger.error('Failed to get usage stats:', err);
+      }
     }
 
     return res.json({
@@ -785,6 +942,13 @@ export async function publicChat(req: any, res: Response) {
       mirrorRunId: result.mirrorRunId,
       audioUrl,
       isSubscribed,
+      ...(usageStats2 && {
+        usage: {
+          type: tokenAccess?.accessType,
+          percentageUsed: usageStats2.percentageUsed,
+          showWarning: usageStats2.percentageUsed >= 80,
+        },
+      }),
     });
   }
 
@@ -824,13 +988,47 @@ export async function publicChat(req: any, res: Response) {
       fromCache: result.fromCache || false,
     }, '[PUBLIC_CHAT] 🤖 Free response generated');
 
+    let assistantMsgId3: string | null = null;
     if (result.reply) {
-      await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      const assistantMsg = await chatMessageQueries.add({ sessionId: sid, role: 'assistant', content: result.reply });
+      assistantMsgId3 = assistantMsg.id;
       logger.info({
         step: '12_FREE_RESPONSE_SAVED',
         sessionId: sid,
         totalDuration: Date.now() - chatStartTime,
       }, '[PUBLIC_CHAT] ✅ Free response saved - request complete');
+    }
+
+    // ✅ TOKEN SYSTEM: Record token usage
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed && result.mirrorRunId && assistantMsgId3) {
+      try {
+        const mirrorRun = await mirrorRunQueries.findById(result.mirrorRunId);
+        if (mirrorRun) {
+          await recordTokenUsage({
+            userId: effectiveUserId,
+            creatorId: creator.id,
+            sessionId: sid,
+            messageId: assistantMsgId3,
+            inputTokens: mirrorRun.tokensIn || 0,
+            outputTokens: mirrorRun.tokensOut || 0,
+            systemTokens: 0,
+            modelUsed: mirrorRun.model || 'unknown',
+            accessType: tokenAccess.accessType,
+          });
+        }
+      } catch (err) {
+        logger.error('Failed to record token usage (free path):', err);
+      }
+    }
+
+    // Get usage stats for response
+    let usageStats3: any = null;
+    if (isFeatureEnabled('ENABLE_TOKEN_SYSTEM') && tokenAccessChecked && tokenAccess?.allowed) {
+      try {
+        usageStats3 = await getUserUsageStats(effectiveUserId, creator.id, tokenAccess.accessType);
+      } catch (err) {
+        logger.error('Failed to get usage stats:', err);
+      }
     }
 
     return res.json({
@@ -839,6 +1037,13 @@ export async function publicChat(req: any, res: Response) {
       reply: result.reply || '',
       mirrorRunId: result.mirrorRunId,
       isSubscribed,
+      ...(usageStats3 && {
+        usage: {
+          type: tokenAccess?.accessType,
+          percentageUsed: usageStats3.percentageUsed,
+          showWarning: usageStats3.percentageUsed >= 80,
+        },
+      }),
     });
   }
 

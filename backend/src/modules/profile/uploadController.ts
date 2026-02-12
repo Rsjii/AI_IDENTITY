@@ -91,6 +91,14 @@ export const handleProfileImageUpload = async (req: Request, res: Response) => {
         imagePath
       );
 
+      // Update storage usage
+      try {
+        const { updateStorageUsage } = await import('../../middleware/storageQuota');
+        await updateStorageUsage(currentUser.id, req.file.size);
+      } catch (error) {
+        logger.warn('Failed to update storage usage for profile image:', error);
+      }
+
       res.json({
         success: true,
         imageUrl: imagePath,

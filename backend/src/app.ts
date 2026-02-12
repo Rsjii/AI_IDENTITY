@@ -43,6 +43,7 @@ import rateLimitRoutes from './modules/rateLimit/rateLimitRoutes';
 import marketplaceListingRoutes from './modules/marketplace/listingRoutes';
 import marketplaceReviewRoutes from './modules/marketplace/reviewRoutes';
 import marketplaceSubscriptionRoutes from './modules/marketplace/subscriptionRoutes';
+import tokenPackRoutes from './modules/marketplace/tokenPackRoutes';
 import videoRoutes from './modules/video/videoRoutes';
 import phoneRoutes from './modules/phone/phoneRoutes';
 import conversationsRoutes from './modules/conversations/conversationsRoutes';
@@ -654,6 +655,7 @@ if (isFeatureEnabled('ENABLE_MARKETPLACE') && isFeatureEnabled('ENABLE_PAYMENTS'
   app.use('/api/marketplace', marketplaceListingRoutes);
   app.use('/api/marketplace', marketplaceReviewRoutes);
   app.use('/api/marketplace', marketplaceSubscriptionRoutes);
+  app.use('/api/marketplace', tokenPackRoutes);
 }
 if (isFeatureEnabled('ENABLE_VIDEO')) {
   app.use('/api/video', videoRoutes);

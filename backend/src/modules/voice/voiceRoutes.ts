@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { validateCSRF } from '../../middleware/csrf';
+import { checkStorageQuota } from '../../middleware/storageQuota';
 import * as voiceController from './voiceController';
 
 const router = Router();
@@ -26,8 +27,8 @@ const upload = multer({
 // Cookie-auth (same as /api/identity)
 router.use(requireJWTFromCookie);
 
-// Upload sample (CSRF)
-router.post('/upload', validateCSRF, upload.single('audio'), voiceController.uploadVoiceSample);
+// Upload sample (CSRF + Storage Quota)
+router.post('/upload', upload.single('audio'), checkStorageQuota, validateCSRF, voiceController.uploadVoiceSample);
 
 // Train (CSRF)
 router.post('/train/:voiceId', validateCSRF, voiceController.trainVoice);

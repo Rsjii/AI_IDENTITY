@@ -123,6 +123,14 @@ export async function uploadAndCreateVoice(userId: string, file: Express.Multer.
   await voiceCloneQueries.updateVoiceId(voiceClone.id, elevenlabsVoiceId, sampleUpload.url);
   await voiceCloneQueries.updateStatus(voiceClone.id, 'ready');
 
+  // 4) Update storage usage
+  try {
+    const { updateStorageUsage } = await import('../../middleware/storageQuota');
+    await updateStorageUsage(userId, file.size);
+  } catch (error) {
+    logger.warn({ error, userId, fileSize: file.size }, 'Failed to update storage usage for voice sample');
+  }
+
   return await voiceCloneQueries.findById(voiceClone.id);
 }
 

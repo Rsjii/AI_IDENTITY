@@ -24,6 +24,11 @@ import {
   updateSetupStep,
   dismissSetupBanner,
 } from './creatorController';
+import {
+  listFiles,
+  getStorageUsage,
+  deleteFile
+} from '../files/fileManagementController';
 
 const router = Router();
 router.use(requireJWTFromCookie);
@@ -51,5 +56,10 @@ router.get('/subscribers', asyncHandler(listSubscribers));
 router.get('/setup/status', asyncHandler(getSetupStatus));
 router.post('/setup/step', sanitizeInput, validateCSRF, asyncHandler(updateSetupStep));
 router.post('/setup/dismiss', validateCSRF, asyncHandler(dismissSetupBanner));
+
+// File management routes
+router.get('/files', asyncHandler(listFiles));
+router.get('/storage', asyncHandler(getStorageUsage));
+router.delete('/files/:id', validateCSRF, asyncHandler(deleteFile));
 
 export default router;

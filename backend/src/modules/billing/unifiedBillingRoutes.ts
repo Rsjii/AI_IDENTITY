@@ -3,6 +3,7 @@ import { requireJWTFromCookie } from '../../middleware/jwtCookie';
 import { validateCSRFOptional, validateCSRF } from '../../middleware/csrf';
 import { asyncHandler } from '../../middleware/errorHandler';
 import { checkout, verifyRazorpayCheckout, lemonSqueezyWebhook } from './unifiedBillingController';
+import creatorPlanRoutes from './creatorPlanRoutes';
 
 const router = Router();
 
@@ -14,5 +15,8 @@ router.post('/razorpay/verify', requireJWTFromCookie, validateCSRF, asyncHandler
 
 // ✅ Lemon webhook (raw body; no auth/CSRF)
 router.post('/lemonsqueezy/webhook', asyncHandler(lemonSqueezyWebhook));
+
+// ✅ Creator plan management routes
+router.use(creatorPlanRoutes);
 
 export default router;

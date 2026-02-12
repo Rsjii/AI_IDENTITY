@@ -7,6 +7,7 @@ import { initializePostHog, shutdownPostHog } from './services/posthogService';
 import { validateEnv } from './config/envValidation';
 import { initializeRazorpay } from './services/razorpayService';
 import { processTrainingJobs } from './services/trainingJobService';
+import { initializeCronJobs } from './services/cronService';
 
 // Initialize Sentry (error tracking)
 if (process.env.SENTRY_DSN && !isDev) {
@@ -179,6 +180,16 @@ async function startServer() {
         logger.warn('[TrainingJobs] Processing failed:', err?.message || err);
       });
     }, 2 * 60 * 1000);
+
+    // ✅ Initialize cron jobs for token system maintenance
+    if (dbConnected) {
+      try {
+        initializeCronJobs();
+        logger.info('✅ Cron jobs initialized for token system');
+      } catch (cronError: any) {
+        logger.warn('⚠️ Cron jobs initialization failed:', cronError?.message || cronError);
+      }
+    }
 
     // Handle server errors
     server.on('error', (error: NodeJS.ErrnoException) => {

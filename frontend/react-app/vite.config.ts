@@ -25,5 +25,40 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Vendor chunks
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'ui-vendor': ['@tanstack/react-query'],
+            // Large feature chunks
+            'admin': [
+              './src/pages/AdminPage',
+              './src/pages/AdminUserPage',
+            ],
+            'onboarding': [
+              './src/pages/OnboardingGatePage',
+              './src/pages/OnboardingQuizPage',
+              './src/pages/OnboardingContentPage',
+              './src/pages/OnboardingPricingPage',
+              './src/pages/OnboardingPlanPage',
+              './src/pages/OnboardingDeployPage',
+              './src/pages/OnboardingTrainingPage',
+            ],
+            'dashboard': [
+              './src/pages/CreatorDashboardPage',
+              './src/pages/EndUserDashboardPage',
+            ],
+            'marketplace': [
+              './src/pages/MarketplacePage',
+              './src/pages/MarketplaceListingPage',
+              './src/pages/MarketplaceManagePage',
+            ],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000, // Increase limit to 1MB
+    },
   }
 })

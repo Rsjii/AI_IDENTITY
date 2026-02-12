@@ -36,11 +36,19 @@ export async function uploadVideoAvatar(req: Request, res: Response) {
     const id = generateId.videoAvatar();
     const r = await db.query(
       `INSERT INTO "video_avatars"
-       ("id","userId","provider","avatarId","label","sampleVideoUrl","status","createdAt","updatedAt")
-       VALUES ($1,$2,'did',$3,$4,$5,$6,now(),now())
+       ("id","userId","provider","avatarId","label","sampleVideoUrl","status","file_size_bytes","createdAt","updatedAt")
+       VALUES ($1,$2,'did',$3,$4,$5,$6,$7,now(),now())
        RETURNING *`,
-      [id, userId, avatarId || null, file.originalname, upload.url, status]
+      [id, userId, avatarId || null, file.originalname, upload.url, status, file.size || 0]
     );
+
+    // Update storage usage
+    try {
+      const { updateStorageUsage } = await import('../../middleware/storageQuota');
+      await updateStorageUsage(userId, file.size);
+    } catch (error) {
+      console.warn('Failed to update storage usage for video:', error);
+    }
 
     return res.json({ item: r.rows[0] });
   } catch (err: any) {

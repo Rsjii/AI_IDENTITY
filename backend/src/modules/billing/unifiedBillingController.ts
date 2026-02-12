@@ -367,6 +367,97 @@ export async function lemonSqueezyWebhook(req: Request, res: Response) {
     return res.json({ received: true });
   }
 
+  // ✅ Handle token pack purchases
+  if (activate && type === 'token_pack') {
+    const creatorId = String(custom?.creatorId || '');
+    const packSize = String(custom?.packSize || '');
+    const tokens = Number(custom?.tokens || 0);
+    const buyerUserId = String(custom?.userId || userId);
+    const priceCents = Number(payload?.data?.attributes?.total || 0);
+
+    if (creatorId && buyerUserId && tokens > 0 && priceCents > 0) {
+      // Insert token pack
+      await db.query(
+        `INSERT INTO token_packs
+         (user_id, creator_id, tokens_purchased, tokens_remaining,
+          amount_paid_cents, currency, stripe_payment_intent_id, purchased_at)
+         VALUES ($1, $2, $3, $3, $4, 'USD', $5, NOW())`,
+        [buyerUserId, creatorId, tokens, priceCents, String(subscriptionId || checkoutId || 'lemon')]
+      );
+
+      // Create ledger entry
+      const amount = Math.floor(priceCents);
+      const platformFee = Math.floor(amount * 0.25);
+      const creatorEarnings = amount - platformFee;
+
+      const payId = `tpack_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      await db.query(
+        `INSERT INTO "stripe_payments"
+         ("id","creatorId","payerUserId","amount","currency","status","stripePaymentIntentId","platformFeeCents","creatorEarningsCents","type","createdAt")
+         VALUES ($1,$2,$3,$4,'USD','succeeded',$5,$6,$7,'token_pack',NOW())`,
+        [payId, creatorId, buyerUserId, amount, String(subscriptionId || checkoutId || ''), platformFee, creatorEarnings]
+      );
+
+      logger.info({ creatorId, buyerUserId, packSize, tokens, amount }, '[LEMON-WEBHOOK] Token pack purchased');
+    }
+
+    return res.json({ received: true });
+  }
+
+  // ✅ Handle creator plan upgrades
+  if (activate && type === 'creator_plan') {
+    const creatorUserId = String(custom?.userId || userId);
+    const planTier = String(custom?.tier || tier);
+
+    if (creatorUserId && (planTier === 'starter' || planTier === 'growth' || planTier === 'scale')) {
+      // Import CREATOR_PLANS config
+      const { CREATOR_PLANS } = require('./creatorPlanController');
+      const planConfig = CREATOR_PLANS[planTier as keyof typeof CREATOR_PLANS];
+
+      if (planConfig) {
+        // Update user's plan
+        await db.query(
+          `UPDATE "User"
+           SET plan_tier = $1,
+               plan_token_quota = $2,
+               plan_storage_mb = $3,
+               plan_period_start = NOW(),
+               plan_period_end = NOW() + INTERVAL '30 days',
+               plan_status = 'active'
+           WHERE id = $4`,
+          [planTier, planConfig.tokens, planConfig.storage, creatorUserId]
+        );
+
+        // Update billing transaction
+        await db.query(
+          `UPDATE "billing_transactions"
+           SET "status" = 'succeeded',
+               "gatewayPaymentId" = $1,
+               "updatedAt" = NOW()
+           WHERE "userId" = $2 AND "tier" = $3 AND "status" = 'created'
+           ORDER BY "createdAt" DESC
+           LIMIT 1`,
+          [String(subscriptionId || checkoutId || ''), creatorUserId, planTier]
+        );
+
+        // Initialize creator_token_aggregates if not exists
+        await db.query(
+          `INSERT INTO creator_token_aggregates
+           (creator_id, current_period_start, current_period_end, tokens_used_this_period, total_tokens_all_time)
+           VALUES ($1, NOW(), NOW() + INTERVAL '30 days', 0, 0)
+           ON CONFLICT (creator_id) DO UPDATE SET
+             current_period_start = NOW(),
+             current_period_end = NOW() + INTERVAL '30 days'`,
+          [creatorUserId]
+        );
+
+        logger.info({ creatorUserId, planTier, tokens: planConfig.tokens }, '[LEMON-WEBHOOK] Creator plan upgraded');
+      }
+    }
+
+    return res.json({ received: true });
+  }
+
   if (activate && userId && (tier === 'starter' || tier === 'growth' || tier === 'scale')) {
     await db.query(`UPDATE "User" SET "planTier"=$1 WHERE id=$2`, [tier, userId]);
     try {
