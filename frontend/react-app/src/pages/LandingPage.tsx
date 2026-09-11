@@ -1,8 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { Shield, Sparkles, Zap, Play, Check } from 'lucide-react';
+import { Shield, Sparkles, Zap, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Testimonials } from '@/components/Testimonials';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -254,45 +253,6 @@ export function LandingPage() {
               <div className="text-2xl font-bold mb-2">3</div>
               <div className="text-base font-semibold mb-1">Consistent across platforms</div>
               <div className="text-sm text-muted-foreground">Same voice on Gmail, LinkedIn, Slack</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Social Proof */}
-        <Testimonials />
-
-        {/* Demo Video Section */}
-        <section className="mt-12">
-          <div className="text-center space-y-2 mb-6">
-            <h2 className="text-2xl font-bold">See it in action</h2>
-            <p className="text-muted-foreground">Watch how creators deploy their AI clones in 10 minutes</p>
-          </div>
-          <div className="rounded-2xl border bg-card/40 p-4 md:p-6 glass">
-            <div className="relative overflow-hidden rounded-xl border bg-background/60">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent-secondary/10" />
-              <div className="relative aspect-video w-full">
-                <iframe
-                  className="h-full w-full"
-                  src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
-                  title="Selflyx demo video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Demo (2 mins)</span> — From rules → deploy → earn
-              </div>
-              <Button
-                variant="outline"
-                className="sm:w-auto"
-                onClick={() => window.location.href = authed ? '/mirror' : '/auth'}
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Try it live
-              </Button>
             </div>
           </div>
         </section>
