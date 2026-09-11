@@ -2270,7 +2270,7 @@ export function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Connected Accounts */}
+            {/* Connected Accounts — Google connect hidden from frontend for now, backend routes left untouched.
             <Card className="glass">
               <CardHeader>
                 <CardTitle>Connected Accounts</CardTitle>
@@ -2303,6 +2303,7 @@ export function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            */}
 
             {/* Active Sessions */}
             <Card className="glass">

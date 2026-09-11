@@ -7,7 +7,8 @@ import { Layout } from '@/components/Layout';
 import { apiFetch } from '@/lib/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Chrome, Loader2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+// Chrome icon was used for the Google login button, now commented out below.
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserFriendlyError } from '@/lib/errorMessages';
@@ -118,10 +119,11 @@ export function AuthPage() {
     }
   };
 
-  const goGoogle = () => {
-    // Backend mounted at: /api/auth/google
-    window.location.assign('/api/auth/google');
-  };
+  // Google login hidden from frontend for now — backend routes left untouched.
+  // const goGoogle = () => {
+  //   // Backend mounted at: /api/auth/google
+  //   window.location.assign('/api/auth/google');
+  // };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +249,7 @@ export function AuthPage() {
               )}
 
               {/* OAuth - Prominently at top */}
+              {/* Google login hidden from frontend for now — backend routes left untouched.
               <Button type="button" className="w-full bg-white text-gray-900 hover:bg-gray-100 border border-gray-300" onClick={goGoogle} disabled={loading}>
                 <Chrome className="mr-2 h-4 w-4" />
                 Continue with Google
@@ -258,6 +261,7 @@ export function AuthPage() {
                   or continue with email
                 </div>
               </div>
+              */}
 
               {error ? (
                 <Alert variant="destructive">
