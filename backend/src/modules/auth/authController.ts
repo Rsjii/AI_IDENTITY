@@ -1701,17 +1701,19 @@ export const logout = async (req: any, res: Response, next: NextFunction) => {
     }
 
    // Clear JWT cookie
+   // ✅ Must match the attributes used when setting the cookie (sameSite/secure),
+   // otherwise the browser won't recognize it as the same cookie and won't clear it.
    res.clearCookie('jwtToken', {
     httpOnly: true,
     secure: isProd,
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     path: '/'
-  });    
+  });
 
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: isProd,
-    sameSite: 'lax',
+    sameSite: cookieSameSite,
     path: '/',
   });
     
