@@ -4,6 +4,14 @@ import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { buildApiUrl } from './lib/api'
+
+// ✅ Wake up the Render backend as early as possible on every page load/reload,
+// since free-tier Render instances sleep after inactivity and take ~30-50s to
+// cold-start. Fire-and-forget so it never blocks the UI.
+fetch(buildApiUrl('/health')).catch(() => {
+  // Silently fail — the first real API call will just eat the cold-start delay.
+});
 
 // Initialize Sentry (error tracking) - DISABLED by default
 const sentryDsn = (import.meta.env.VITE_SENTRY_DSN || '').trim()
