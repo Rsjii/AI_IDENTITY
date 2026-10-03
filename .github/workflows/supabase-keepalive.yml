@@ -1,0 +1,24 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          npm install --no-save pg
+          node -e "
+          const { Client } = require('pg');
+          const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          c.connect()
+            .then(() => c.query('SELECT now()'))
+            .then(r => { console.log('OK', r.rows[0]); return c.end(); })
+            .catch(e => { console.error(e); process.exit(1); });
+          "
