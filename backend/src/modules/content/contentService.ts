@@ -99,7 +99,7 @@ export async function createUrlSource(userId: string, url: string, title?: strin
       signal: controller.signal,
       headers: {
         // reduce bot blocks a bit
-        'User-Agent': 'SelflyxBot/1.0 (+local-dev)',
+        'User-Agent': 'MirrorMeBot/1.0 (+local-dev)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
       },
     });

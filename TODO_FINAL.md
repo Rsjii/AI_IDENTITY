@@ -8,7 +8,7 @@ REVENUE SPLIT COMPARISON (2026):
 │ OnlyFans    │ 20%          │ 80% ⭐ HIGHEST   │
 │ Patreon     │ 8-12%        │ 88-92%          │
 │ Gumroad     │ 10%          │ 90%             │
-│ SelfLyx(You)│ 25%          │ 75%             │
+│ MirrorMe(You)│ 25%          │ 75%             │
 └────────────────────────────────────────────────┘
 
 WHY 25% IS JUSTIFIED:
@@ -79,7 +79,7 @@ FIX 1: Clear Flow (frontend/OnboardingDeployPage.tsx)
 ├─────────────────────────────────────────┤
 │                                         │
 │ Your AI is ready at:                    │
-│ selflyx.com/chat/yourname               │
+│ mirrorme.com/chat/yourname               │
 │                                         │
 │ [Copy Link] [Share on Twitter]         │
 │                                         │
@@ -582,7 +582,7 @@ C. Fix Deploy Page (OnboardingDeployPage.tsx)
    ├─────────────────────────────────────────┤
    │                                         │
    │ Your AI chat link:                      │
-   │ selflyx.com/chat/yourname               │
+   │ mirrorme.com/chat/yourname               │
    │ [Copy Link] [Test Chat]                 │
    │                                         │
    │ Share it:                               │

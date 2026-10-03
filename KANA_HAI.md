@@ -7,7 +7,7 @@ ab musno
 non authenticated /logout user jab is page pe aaya to usko ye dikha hai
 
 
-Selflyx.
+MirrorMe.
 Toggle theme
 Sign in
 Edit AI Personality
@@ -131,7 +131,7 @@ Custom Prompt
 No
 Temperature
 0.7
-© 2026 Selflyx
+© 2026 MirrorMe
 Privacy
 Terms
 

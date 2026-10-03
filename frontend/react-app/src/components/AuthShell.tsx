@@ -51,7 +51,7 @@ export function AuthShell({
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <div className="text-xl font-bold tracking-tight">
-            Selflyx<span className="text-primary">.</span>
+            MirrorMe<span className="text-primary">.</span>
           </div>
           <div className="mt-2 text-2xl font-bold tracking-tight">{title}</div>
           {subtitle ? <div className="mt-1 text-sm text-muted-foreground">{subtitle}</div> : null}

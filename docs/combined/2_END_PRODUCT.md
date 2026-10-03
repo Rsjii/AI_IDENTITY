@@ -1,6 +1,6 @@
 # 🎯 END PRODUCT - THE $1B VISION
 
-**Product:** Selflyx
+**Product:** MirrorMe
 **Vision:** All-in-One AI Clone Platform (Text + Voice + Video)
 **Market:** Creator Economy ($100B+ TAM)
 **Unfair Advantage:** NOBODY offers this complete package
@@ -20,7 +20,7 @@
 **What NOBODY Has (Your Edge):**
 
 ```
-Selflyx = The Complete AI Clone Platform
+MirrorMe = The Complete AI Clone Platform
 
 ├─ Text + Voice + Video (all 3)
 ├─ Deploy Everywhere (6+ platforms)
@@ -175,7 +175,7 @@ Deploy your AI clone to ANY platform in 1 click
 
 1. **Website Embed** ❌
    ```html
-   <script src="https://selflyx.ai/embed.js" data-id="user_123"></script>
+   <script src="https://ai-identity-delta.vercel.app/embed.js" data-id="user_123"></script>
    ```
    - Customizable (colors, position, theme)
    - Text + Voice + Video support
@@ -218,7 +218,7 @@ Public marketplace where users discover and rent AI clones
 **Features:**
 
 **A. Public Profiles**
-- URL: `selflyx.ai/c/username`
+- URL: `mirrorme.ai/c/username`
 - Bio, avatar, tags (fitness, business, coaching)
 - Rating & reviews (1-5 stars)
 - Sample conversations (preview AI quality)
@@ -436,7 +436,7 @@ Enterprise: $10K/mo  - Unlimited + dedicated support
 ```
 1. Signup for API account
 2. Generate API key (sk_live_xxx)
-3. Read docs (https://selflyx.ai/docs)
+3. Read docs (https://ai-identity-delta.vercel.app/docs)
 4. Test in sandbox (sk_test_xxx)
 5. Integrate into product
    ├─ Create identity via API

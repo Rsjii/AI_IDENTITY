@@ -53,7 +53,7 @@ All phases have been implemented according to `TODO_ONBOARDING+SETUP.md`.
    ├─ Saves: knowledge_sources, knowledge_chunks
    ├─ Sets: onboardingStep = 'preview'
    ├─ ✅ **CRITICAL**: Sets onboardingCompleted = true (unlocks dashboard)
-   ├─ Sets sessionStorage flag: 'selflyx_post_step2_window' = '1'
+   ├─ Sets sessionStorage flag: 'mirrorme_post_step2_window' = '1'
    └─ Back navigation: BLOCKED (usePreventBack)
    
    Step 3: Try Your AI (OPTIONAL - One-time window)
@@ -422,7 +422,7 @@ deploy        → /onboarding/deploy
    - Back navigation blocked on Step 1/2
 5. **Onboarding complete** (`onboardingCompleted === true`):
    - ✅ Dashboard and all routes accessible
-   - ✅ Step 3/4 accessible **only if** `sessionStorage.selflyx_post_step2_window === '1'`
+   - ✅ Step 3/4 accessible **only if** `sessionStorage.mirrorme_post_step2_window === '1'`
    - ✅ Window flag cleared when user visits any non-onboarding route (dashboard/setup/etc.)
    - ✅ App kill/reopen clears sessionStorage → Step 3/4 never accessible again
 6. **Setup routes**: Always accessible (non-blocking, even during onboarding)
@@ -444,19 +444,19 @@ if (step === 'preview') {
 ### Step 3/4 Window Logic
 ```typescript
 // Frontend: OnboardingUploadPageNew.tsx (Step 2 completion)
-sessionStorage.setItem('selflyx_post_step2_window', '1');
+sessionStorage.setItem('mirrorme_post_step2_window', '1');
 nav('/onboarding/preview');
 
 // Frontend: useOnboardingGuard.ts
 // Allows Step 3/4 only if window flag is active
-const windowActive = sessionStorage.getItem('selflyx_post_step2_window') === '1';
+const windowActive = sessionStorage.getItem('mirrorme_post_step2_window') === '1';
 if (windowActive && isPreviewOrComplete) return; // Allow
 else navigate('/dashboard', { replace: true }); // Block
 
 // Frontend: ProtectedRoute.tsx
 // Clears window flag when user leaves onboarding
 if (onboardingCompleted && !pathname.startsWith('/onboarding')) {
-  sessionStorage.removeItem('selflyx_post_step2_window');
+  sessionStorage.removeItem('mirrorme_post_step2_window');
 }
 ```
 
@@ -574,7 +574,7 @@ All features from `TODO_ONBOARDING+SETUP.md` have been implemented:
 - This unlocks dashboard access immediately after mandatory steps
 
 **Step 3/4 Window Mechanism:**
-- Step 2 completion sets `sessionStorage.selflyx_post_step2_window = '1'`
+- Step 2 completion sets `sessionStorage.mirrorme_post_step2_window = '1'`
 - This flag allows Step 3/4 to be accessible in the same session
 - Flag persists through page refreshes (user can refresh Step 3/4)
 - Flag is cleared when user visits any non-onboarding route (dashboard/setup/etc.)

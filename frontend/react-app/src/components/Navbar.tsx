@@ -65,7 +65,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/" className="text-lg font-bold tracking-tight">
-              Selflyx<span className="text-primary">.</span>
+              MirrorMe<span className="text-primary">.</span>
             </Link>
 
             <div className="hidden md:flex items-center gap-4">

@@ -20,7 +20,7 @@
 **Step 1:** User selects billing country and clicks "Choose Plan" on frontend
 - User sees billing country dropdown: "India" or "Outside India"
 - Prices update immediately based on selection (₹ for India, $ for International)
-- Selection saved to localStorage: `selflyx.billingCountry`
+- Selection saved to localStorage: `mirrorme.billingCountry`
 - Frontend calls `startPlanCheckout({ tier: 'starter' | 'growth' | 'scale', billingCountry: 'IN' | 'OTHER', returnUrl })`
 
 **Step 2:** Frontend → Backend

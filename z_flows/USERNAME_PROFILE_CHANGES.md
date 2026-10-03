@@ -478,8 +478,8 @@ useEffect(() => {
 ```
 User: johndoe
 Options:
-  • app.selflyx.com/chat/johndoe (default)
-  • johndoe.selflyx.com (subdomain)
+  • app.mirrorme.com/chat/johndoe (default)
+  • johndoe.mirrorme.com (subdomain)
   • johndoe.ai (custom domain - Pro plan)
 ```
 

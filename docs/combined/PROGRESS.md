@@ -379,7 +379,7 @@
    - Sets custom title
 
 2. **embed.css:**
-   - Added avatar styling (`#selflyx-widget-avatar`)
+   - Added avatar styling (`#mirrorme-widget-avatar`)
 **Why:** Users want to customize widget appearance per website
 **Status:** ✅ Complete
 

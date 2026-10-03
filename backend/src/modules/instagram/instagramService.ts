@@ -3,7 +3,7 @@ import { platformIntegrationQueries } from '../../config/database';
 
 const META_APP_ID = process.env.META_APP_ID || '';
 const META_APP_SECRET = process.env.META_APP_SECRET || '';
-const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'selflyx_verify_token';
+const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'mirrorme_verify_token';
 
 // ========== INSTAGRAM GRAPH API ==========
 

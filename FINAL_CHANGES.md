@@ -13,7 +13,7 @@ Creator pays YOU monthly to use platform
 FREE TIER (14-day trial, then downgrade):
 ├─ 500 chats/month limit
 ├─ Can't monetize (no payments enabled)
-├─ "Powered by SelfLyx" watermark
+├─ "Powered by MirrorMe" watermark
 ├─ Basic analytics only
 └─ NO marketplace listing (private link only)
 
@@ -272,7 +272,7 @@ STEP 5: Connect Stripe (for payouts) ⭐ NEW STEP
 OAuth flow → Stripe Connect → Done
 
 STEP 6: Deploy
-├─ Get chat link: selflyx.com/chat/yourname
+├─ Get chat link: mirrorme.com/chat/yourname
 ├─ Get embed code (widget)
 ├─ Share & go live
 └─ Done!
@@ -661,7 +661,7 @@ WHY NOT USERS FIRST:
    ├─ Set prices ($10 pay-per-chat, $20/mo subscription)
    └─ Connect Stripe
 3. Gets:
-   ├─ Chat link: selflyx.com/chat/fitnesscoach
+   ├─ Chat link: mirrorme.com/chat/fitnesscoach
    ├─ Widget embed code
    └─ QR code
 4. Shares link in bio/social
@@ -687,7 +687,7 @@ REVENUE:
 1. Discovers creator:
    ├─ Friend shares link
    ├─ OR finds on /explore
-   └─ Clicks: selflyx.com/chat/fitnesscoach
+   └─ Clicks: mirrorme.com/chat/fitnesscoach
 
 2. Chats 3 messages FREE (no signup)
 

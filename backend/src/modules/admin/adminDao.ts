@@ -311,7 +311,7 @@ export async function logError(error: {
             <p><strong>Method:</strong> ${errorDetails.method}</p>
             <p><strong>Time:</strong> ${errorDetails.timestamp}</p>
             ${error.stack ? `<pre style="background: #f5f5f5; padding: 10px; overflow-x: auto;">${error.stack}</pre>` : ''}
-            <p><a href="${process.env['APP_URL'] || 'https://selflyx.com'}/admin">View in Admin Dashboard</a></p>
+            <p><a href="${process.env['APP_URL'] || 'https://ai-identity-delta.vercel.app'}/admin">View in Admin Dashboard</a></p>
           `
         );
       }

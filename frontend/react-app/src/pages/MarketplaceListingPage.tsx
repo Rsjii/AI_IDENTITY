@@ -121,7 +121,7 @@ export function MarketplaceListingPage() {
           amount: res.order.amount,
           currency: res.order.currency,
           order_id: res.order.id,
-          name: 'Selflyx',
+          name: 'MirrorMe',
           description: `Subscribe to ${listing.creator.name || listing.creator.handle || 'creator'}`,
           handler: async (resp: any) => {
             try {

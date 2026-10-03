@@ -1,7 +1,7 @@
 {
   "name": "ai-twin-backend",
   "version": "1.0.0",
-  "description": "Selflyx Backend API Server",
+  "description": "MirrorMe Backend API Server",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
@@ -91,6 +91,6 @@
     "typescript",
     "prisma"
   ],
-  "author": "Selflyx Team",
+  "author": "MirrorMe Team",
   "license": "MIT"
 }

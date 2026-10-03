@@ -21,7 +21,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
   // Widget state
   const [color, setColor] = useState('#2563eb');
   const [position, setPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
-  const [title, setTitle] = useState('Selflyx');
+  const [title, setTitle] = useState('MirrorMe');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [welcomeMessage, setWelcomeMessage] = useState('Hey! Ask me anything!');
@@ -61,7 +61,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
   const publicSlug = (user as any)?.publicSlug || user?.handle || '';
   // Phase 2 Feature: Subdomain links (only if VITE_PUBLIC_BASE_DOMAIN is set)
   // Falls back to /chat/:slug if not set (Phase 1 behavior)
-  const baseDomain = (import.meta.env.VITE_PUBLIC_BASE_DOMAIN || '').trim(); // e.g. "selflyx.com"
+  const baseDomain = (import.meta.env.VITE_PUBLIC_BASE_DOMAIN || '').trim(); // e.g. "mirrorme.com"
 
   const standaloneLink = publicSlug
     ? baseDomain
@@ -87,7 +87,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
       ? `data-popular-questions="${popularQuestions.split(',').map(q => q.trim()).filter(Boolean).join(',')}"`
       : '';
     
-    return `<!-- Selflyx Chat Widget -->
+    return `<!-- MirrorMe Chat Widget -->
 <script
   src="${apiBase}/embed.js"
   data-api-base="${apiBase}"
@@ -110,7 +110,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Selflyx Widget</title>
+    <title>Test MirrorMe Widget</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -129,7 +129,7 @@ export function IntegrationsPage({ embedded = false }: { embedded?: boolean }) {
     </style>
 </head>
 <body>
-    <h1>🧪 Testing Selflyx Embed Widget</h1>
+    <h1>🧪 Testing MirrorMe Embed Widget</h1>
     <div class="info">
         <p><strong>Instructions:</strong></p>
         <ol>

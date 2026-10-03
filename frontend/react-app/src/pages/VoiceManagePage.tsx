@@ -54,7 +54,7 @@ export function VoiceManagePage() {
     try {
       const r = await apiFetch<{ success: true; audioUrl: string }>('/api/voice/generate', {
         method: 'POST',
-        body: JSON.stringify({ voiceId: id, text: 'Hi! This is a quick voice test from Selflyx.' }),
+        body: JSON.stringify({ voiceId: id, text: 'Hi! This is a quick voice test from MirrorMe.' }),
       });
       setAudioUrl(r.audioUrl);
     } catch (e: any) {

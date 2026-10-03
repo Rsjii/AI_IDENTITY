@@ -44,14 +44,14 @@ export async function getAuth(req: any, res: Response) {
 
     // Show login/signup page
     return res.render('auth/auth', {
-      title: 'Login / Signup - Selflyx',
+      title: 'Login / Signup - MirrorMe',
       user: null,
       csrfToken: res.locals['csrfToken'],
     });
   } catch (err) {
     logger.error('getAuth error:', err);
     return res.render('auth/auth', {
-      title: 'Login / Signup - Selflyx',
+      title: 'Login / Signup - MirrorMe',
       user: null,
       csrfToken: res.locals['csrfToken'],
     });
@@ -78,7 +78,7 @@ export function getSignup(req: any, res: Response) {
 export function getLoginVerify(req: any, res: Response) {
   const email = req.query['email'] as string;
   res.render('auth/login-verify', {
-    title: 'Verify OTP - Selflyx',
+    title: 'Verify OTP - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken'],
     email: email
@@ -94,7 +94,7 @@ export function getVerifyOtp(req: any, res: Response) {
   // ✅ REMOVED: const otp = req.query['otp'] as string;
   
   res.render('auth/verify-otp', {
-    title: 'Verify OTP - Selflyx',
+    title: 'Verify OTP - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken'],
     email: email,
@@ -119,7 +119,7 @@ export function getSignupProfile(req: any, res: Response) {
   }
   
   res.render('auth/signup-profile', {
-    title: 'Complete Profile - Selflyx',
+    title: 'Complete Profile - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken'],
     email: email
@@ -131,7 +131,7 @@ export function getSignupProfile(req: any, res: Response) {
  */
 export function getForgotPassword(req: any, res: Response) {
   res.render('auth/forgot-password', {
-    title: 'Forgot Password - Selflyx',
+    title: 'Forgot Password - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken']
   });
@@ -144,7 +144,7 @@ export function getForgotPasswordVerify(req: any, res: Response) {
   const email = req.query['email'] as string;
   
   res.render('auth/forgot-password-verify', {
-    title: 'Verify Reset Code - Selflyx',
+    title: 'Verify Reset Code - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken'],
     email: email
@@ -158,7 +158,7 @@ export function getResetPassword(req: any, res: Response) {
   const email = req.query['email'] as string;
   
   res.render('auth/reset-password', {
-    title: 'Reset Password - Selflyx',
+    title: 'Reset Password - MirrorMe',
     user: null,
     csrfToken: res.locals['csrfToken'],
     email: email

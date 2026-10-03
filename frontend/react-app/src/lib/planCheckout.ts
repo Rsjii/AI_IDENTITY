@@ -3,7 +3,7 @@ import { apiFetch } from './api';
 export type BillingCountry = 'IN' | 'OTHER';
 type TierInput = 'starter' | 'growth' | 'scale';
 
-const BILLING_COUNTRY_KEY = 'selflyx.billingCountry';
+const BILLING_COUNTRY_KEY = 'mirrorme.billingCountry';
 
 export function getLastBillingCountry(): BillingCountry | null {
   try {
@@ -74,7 +74,7 @@ export async function startPlanCheckout(params: {
       amount: r.order.amount,
       currency: r.order.currency,
       order_id: r.order.id,
-      name: 'Selflyx',
+      name: 'MirrorMe',
       description: `Plan: ${r.tier}`,
       handler: async (resp: any) => {
         console.log('[PLAN-CHECKOUT] ✅ Razorpay payment successful:', resp);

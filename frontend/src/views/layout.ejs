@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Selflyx">
+    <meta name="apple-mobile-web-app-title" content="MirrorMe">
     <meta name="description" content="Reply like you. Without thinking. Your communication identity that generates replies in your unique style.">
     <meta name="theme-color" content="#6366f1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,7 +36,7 @@ const base = (typeof baseUrl !== 'undefined' && baseUrl)
   ? baseUrl
   : (typeof req !== 'undefined'
       ? (req.protocol + '://' + req.get('host'))
-      : 'https://selflyx.com'); // ✅ fixed fallback domain
+      : 'https://ai-identity-delta.vercel.app'); // ✅ fixed fallback domain
 
 if (typeof ogImage !== 'undefined' && ogImage) {
   finalOgImage = (ogImage.startsWith('http://') || ogImage.startsWith('https://'))
@@ -56,7 +56,7 @@ const finalOgUrl =
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="<%= finalOgUrl %>">
-<meta property="og:site_name" content="Selflyx">
+<meta property="og:site_name" content="MirrorMe">
 
 <!-- Twitter Card Tags -->
 <meta name="twitter:card" content="summary_large_image">
@@ -875,7 +875,7 @@ const finalOgUrl =
                     <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                         <span class="text-white font-bold text-sm">AI</span>
                     </div>
-                    <span class="text-xl font-bold text-gray-900 dark:text-white">Selflyx</span>
+                    <span class="text-xl font-bold text-gray-900 dark:text-white">MirrorMe</span>
                 </a>
             </div>
             
@@ -929,7 +929,7 @@ const finalOgUrl =
     <!-- Footer -->
     <footer class="mt-10 border-t border-white/20 dark:border-white/10 bg-white/30 dark:bg-white/5 backdrop-blur-xl">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="text-sm text-gray-600 dark:text-gray-400">© <%= new Date().getFullYear() %> Selflyx</div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">© <%= new Date().getFullYear() %> MirrorMe</div>
         <div class="flex gap-4 text-sm">
           <a href="/" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Home</a>
           <a href="/auth" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Login</a>

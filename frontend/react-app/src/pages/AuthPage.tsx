@@ -219,7 +219,7 @@ export function AuthPage() {
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <div className="text-xl font-bold tracking-tight">
-              Selflyx<span className="text-primary">.</span>
+              MirrorMe<span className="text-primary">.</span>
             </div>
             <div className="mt-1 text-sm text-muted-foreground">Ultra clean auth — fast, secure, modern.</div>
           </div>

@@ -71,7 +71,7 @@ Backend processes:
 **File:** [OnboardingDeployPage.tsx](frontend/react-app/src/pages/OnboardingDeployPage.tsx)
 
 **🎉 Chat Link Displayed Prominently:**
-- Large green card at top showing: `https://app.selflyx.com/chat/username`
+- Large green card at top showing: `https://ai-identity-delta.vercel.app/chat/username`
 - Copy button + Test Chat button
 - Clear instructions: "Share this link with your audience"
 
@@ -97,9 +97,9 @@ Backend processes:
 ```
 Creator Username: "johndoe"
        ↓
-Profile URL: https://app.selflyx.com/@johndoe
+Profile URL: https://ai-identity-delta.vercel.app/@johndoe
        ↓
-Chat URL: https://app.selflyx.com/chat/johndoe
+Chat URL: https://ai-identity-delta.vercel.app/chat/johndoe
        ↓
 Embed Widget: <script data-creator-slug="johndoe">
 ```
@@ -156,7 +156,7 @@ app.get('/chat/:slug', async (req, res) => {
 
 **Step 1: User Opens Link**
 ```
-User clicks: https://app.selflyx.com/chat/johndoe
+User clicks: https://ai-identity-delta.vercel.app/chat/johndoe
      ↓
 Frontend loads: PublicChatPage component
      ↓
@@ -261,8 +261,8 @@ export async function sendMessage(req: Request, res: Response) {
 │  4. Upload → Content: 10 blog posts, 5 PDFs                     │
 │  5. Training → AI processes content (~15 mins)                  │
 │  6. Deploy → Gets Links:                                        │
-│              • https://app.selflyx.com/@johndoe (Profile)       │
-│              • https://app.selflyx.com/chat/johndoe (Chat)      │
+│              • https://ai-identity-delta.vercel.app/@johndoe (Profile)       │
+│              • https://ai-identity-delta.vercel.app/chat/johndoe (Chat)      │
 │              • Embed code for website                            │
 │  7. Share → Posts link on Twitter/Bio/Website                   │
 │                                                                  │
@@ -274,7 +274,7 @@ export async function sendMessage(req: Request, res: Response) {
 │ END USER SIDE                                                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  1. User clicks: https://app.selflyx.com/chat/johndoe          │
+│  1. User clicks: https://ai-identity-delta.vercel.app/chat/johndoe          │
 │  2. Page loads with:                                            │
 │     • John Doe's profile picture                                │
 │     • "Chat with John's AI" title                               │
@@ -440,7 +440,7 @@ If creator has voice clone:
 Creator adds to website:
 ```html
 <script
-  src="https://app.selflyx.com/embed.js"
+  src="https://ai-identity-delta.vercel.app/embed.js"
   data-creator-slug="johndoe"
   data-position="bottom-right"
 ></script>
@@ -456,7 +456,7 @@ Widget appears on all pages, visitors can chat directly.
 
 **1. Discovery**
 - Sarah follows John on Twitter
-- John's bio: "Chat with my AI: selflyx.com/chat/johndoe"
+- John's bio: "Chat with my AI: mirrorme.com/chat/johndoe"
 
 **2. First Visit**
 - Sarah clicks link → Lands on chat page

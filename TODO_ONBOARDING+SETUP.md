@@ -381,7 +381,7 @@ Route: /setup/share
 │ Share your AI chat link:                │
 │                                         │
 │ ┌─────────────────────────────────────┐ │
-│ │ selflyx.com/chat/sarahfitness       │ │
+│ │ mirrorme.com/chat/sarahfitness       │ │
 │ │ [Copy Link] [QR Code]               │ │
 │ └─────────────────────────────────────┘ │
 │                                         │

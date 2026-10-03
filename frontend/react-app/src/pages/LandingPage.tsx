@@ -145,7 +145,7 @@ export function LandingPage() {
 
                 <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Powered by your rules</span>
-                  <span className="text-primary">Selflyx</span>
+                  <span className="text-primary">MirrorMe</span>
                 </div>
               </div>
             </div>
@@ -492,12 +492,12 @@ export function LandingPage() {
               <h3 className="font-semibold mb-3">Support</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="/help" className="hover:text-foreground transition-colors">Help Center</a></li>
-                <li><a href="mailto:support@selflyx.com" className="hover:text-foreground transition-colors">Contact</a></li>
+                <li><a href="mailto:support@mirrorme.com" className="hover:text-foreground transition-colors">Contact</a></li>
               </ul>
             </div>
           </div>
           <div className="text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Selflyx. All rights reserved.
+            © {new Date().getFullYear()} MirrorMe. All rights reserved.
           </div>
         </footer>
       </div>

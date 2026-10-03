@@ -118,7 +118,7 @@ export const errorHandlerMiddleware = (
       res.status(err.statusCode).json({
         error: err.message,
         errorCode: err.errorCode,
-        frontend: config.frontendUrl || 'https://selflyx.com'
+        frontend: config.frontendUrl || 'https://ai-identity-delta.vercel.app'
       });
       return;
     }

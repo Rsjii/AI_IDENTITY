@@ -484,7 +484,7 @@ if (used >= limit * 0.8) {
 // OnboardingDeployPage.tsx:31-48 - Embed code generation
 const embedCode = useMemo(() => {
   if (!creatorId) return '';
-  return `<!-- Selflyx Chat Widget -->
+  return `<!-- MirrorMe Chat Widget -->
 <script
   src="${apiBase}/embed.js"
   data-api-base="${apiBase}"

@@ -612,7 +612,7 @@ if (!isProd) {
     res.json({
       message: 'Identity Mirror API',
       version: '1.0.0',
-      frontend: config.frontendUrl || 'https://selflyx.com',
+      frontend: config.frontendUrl || 'https://ai-identity-delta.vercel.app',
       docs: '/health'
     });
   });

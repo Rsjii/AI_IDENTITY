@@ -146,7 +146,7 @@ export function performanceMonitor(req: Request, res: Response, next: NextFuncti
                   <p><strong>Duration:</strong> ${duration}ms</p>
                   <p><strong>Time:</strong> ${new Date().toISOString()}</p>
                   <p><strong>Host:</strong> ${os.hostname()}</p>
-                  <p><a href="${process.env['APP_URL'] || 'https://selflyx.com'}/admin">Open Admin Dashboard</a></p>
+                  <p><a href="${process.env['APP_URL'] || 'https://ai-identity-delta.vercel.app'}/admin">Open Admin Dashboard</a></p>
                 `
               );
             } catch {

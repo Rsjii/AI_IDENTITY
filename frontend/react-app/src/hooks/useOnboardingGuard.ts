@@ -27,7 +27,7 @@ export function useOnboardingGuard() {
 
     if (!isOnboarding) return;
 
-    const windowActive = sessionStorage.getItem('selflyx_post_step2_window') === '1';
+    const windowActive = sessionStorage.getItem('mirrorme_post_step2_window') === '1';
     const isPreviewOrComplete =
       path.startsWith('/onboarding/preview') || path.startsWith('/onboarding/complete');
 
@@ -45,8 +45,8 @@ export function useOnboardingGuard() {
           });
         } catch {}
 
-        sessionStorage.removeItem('selflyx_post_step2_window');
-        sessionStorage.removeItem('selflyx_allow_preview_once');
+        sessionStorage.removeItem('mirrorme_post_step2_window');
+        sessionStorage.removeItem('mirrorme_allow_preview_once');
       })();
     }
 
@@ -107,8 +107,8 @@ export function useRedirectBack(
             });
           } catch {}
 
-          sessionStorage.removeItem('selflyx_post_step2_window');
-          sessionStorage.removeItem('selflyx_allow_preview_once');
+          sessionStorage.removeItem('mirrorme_post_step2_window');
+          sessionStorage.removeItem('mirrorme_allow_preview_once');
         }
 
         navigate(redirectTo, { replace: true });

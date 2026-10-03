@@ -13,7 +13,7 @@ interface LayoutProps {
   mainClassName?: string;
 }
 
-const SIDEBAR_KEY = 'selflyx_sidebar_expanded';
+const SIDEBAR_KEY = 'mirrorme_sidebar_expanded';
 
 export function Layout({
   children,
@@ -109,7 +109,7 @@ export function Layout({
       {showFooter && !isAuthed ? (
         <footer className="border-t border-border-default py-8 text-sm text-text-secondary">
           <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>© {new Date().getFullYear()} Selflyx</div>
+            <div>© {new Date().getFullYear()} MirrorMe</div>
             <div className="flex gap-4">
               <Link className="hover:text-text-primary transition-colors" to="/privacy">Privacy</Link>
               <Link className="hover:text-text-primary transition-colors" to="/terms">Terms</Link>

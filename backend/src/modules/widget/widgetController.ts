@@ -231,7 +231,7 @@ export async function widgetCode(req: Request, res: Response) {
 
   // Returns copy-paste snippet
   return res.type('text/plain').send(
-`<!-- Selflyx Widget -->
+`<!-- MirrorMe Widget -->
 <link rel="stylesheet" href="${apiBase}/embed.css" />
 <script src="${apiBase}/embed.js" data-api-base="${apiBase}" data-creator-id="${creatorId}"></script>`
   );

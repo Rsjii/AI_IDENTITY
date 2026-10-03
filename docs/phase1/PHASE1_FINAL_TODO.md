@@ -78,17 +78,17 @@ const handleVerifyOTP = async (otp: string) => {
   'use strict';
 
   const script = document.currentScript;
-  const apiBase = script.getAttribute('data-api-base') || 'https://selflyx.com';
+  const apiBase = script.getAttribute('data-api-base') || 'https://ai-identity-delta.vercel.app';
   const creatorId = script.getAttribute('data-creator-id');
 
   if (!creatorId) {
-    console.error('[Selflyx] Widget error: data-creator-id is required');
+    console.error('[MirrorMe] Widget error: data-creator-id is required');
     return;
   }
 
   // Create widget container
   const container = document.createElement('div');
-  container.id = 'selflyx-widget';
+  container.id = 'mirrorme-widget';
   container.style.cssText = `
     position: fixed;
     bottom: 20px;
@@ -738,7 +738,7 @@ export async function generatePreviewReply(
 **Implementation:**
 ```css
 /* CREATE: frontend/src/public/embed.css */
-#selflyx-widget {
+#mirrorme-widget {
   --primary-color: #8B5CF6;
   --secondary-color: #6366F1;
   --text-color: #18181B;
@@ -746,12 +746,12 @@ export async function generatePreviewReply(
   --border-radius: 16px;
 }
 
-#selflyx-widget.theme-dark {
+#mirrorme-widget.theme-dark {
   --text-color: #FAFAFA;
   --bg-color: #18181B;
 }
 
-#selflyx-bubble {
+#mirrorme-bubble {
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -766,16 +766,16 @@ export async function generatePreviewReply(
   position: relative;
 }
 
-#selflyx-bubble:hover {
+#mirrorme-bubble:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
 }
 
-#selflyx-bubble:active {
+#mirrorme-bubble:active {
   transform: scale(0.95);
 }
 
-#selflyx-bubble.has-notification::after {
+#mirrorme-bubble.has-notification::after {
   content: '';
   position: absolute;
   top: 8px;
@@ -793,7 +793,7 @@ export async function generatePreviewReply(
   50% { opacity: 0.5; }
 }
 
-#selflyx-iframe {
+#mirrorme-iframe {
   width: 380px;
   height: 600px;
   border: none;
@@ -805,7 +805,7 @@ export async function generatePreviewReply(
   pointer-events: none;
 }
 
-#selflyx-iframe.visible {
+#mirrorme-iframe.visible {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -813,20 +813,20 @@ export async function generatePreviewReply(
 
 /* Mobile responsive */
 @media (max-width: 480px) {
-  #selflyx-widget {
+  #mirrorme-widget {
     bottom: 0 !important;
     right: 0 !important;
     left: 0 !important;
     width: 100% !important;
   }
 
-  #selflyx-iframe {
+  #mirrorme-iframe {
     width: 100%;
     height: 100vh;
     border-radius: 0;
   }
 
-  #selflyx-bubble {
+  #mirrorme-bubble {
     bottom: 16px;
     right: 16px;
   }
@@ -873,7 +873,7 @@ interface EmailOptions {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     await transporter.sendMail({
-      from: `"Selflyx" <${config.mail.from}>`,
+      from: `"MirrorMe" <${config.mail.from}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -891,10 +891,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 // Email Templates
 export const emailTemplates = {
   welcome: (name: string) => ({
-    subject: 'Welcome to Selflyx! 🎉',
+    subject: 'Welcome to MirrorMe! 🎉',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #8B5CF6;">Welcome to Selflyx, ${name}!</h1>
+        <h1 style="color: #8B5CF6;">Welcome to MirrorMe, ${name}!</h1>
         <p>We're excited to have you on board. Your AI clone is ready to be created.</p>
         <a href="${config.appUrl}/onboarding/quiz"
            style="display: inline-block; background: linear-gradient(135deg, #8B5CF6, #6366F1);
@@ -930,7 +930,7 @@ export const emailTemplates = {
   }),
 
   paymentReceipt: (name: string, amount: number, transactionId: string) => ({
-    subject: 'Payment Receipt from Selflyx',
+    subject: 'Payment Receipt from MirrorMe',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1>Payment Received</h1>

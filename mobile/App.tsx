@@ -8,7 +8,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Selflyx Mobile</Text>
+        <Text style={styles.title}>MirrorMe Mobile</Text>
         <Text style={styles.subtitle}>Marketplace, chat, and voice coming soon.</Text>
       </View>
       <View style={styles.stack}>

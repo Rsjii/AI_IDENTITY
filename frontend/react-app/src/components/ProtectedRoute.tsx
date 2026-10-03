@@ -62,8 +62,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     (user?.onboardingCompleted === true || user?.onboardingStep === 'done') &&
     !location.pathname.startsWith('/onboarding')
   ) {
-    sessionStorage.removeItem('selflyx_post_step2_window');
-    sessionStorage.removeItem('selflyx_allow_preview_once'); // cleanup old key if present
+    sessionStorage.removeItem('mirrorme_post_step2_window');
+    sessionStorage.removeItem('mirrorme_allow_preview_once'); // cleanup old key if present
   }
 
   // ✅ NEW: if profileCompleted is missing/unknown, don't redirect yet (prevents flicker/race)

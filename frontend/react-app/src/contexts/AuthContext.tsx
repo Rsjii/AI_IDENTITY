@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Best-effort: claim any guest sessions after login so they appear in /my-chats
         try {
-          const visitorId = localStorage.getItem('selflyx_visitor_id') || '';
-          const k = 'selflyx_pending_claim_session_ids';
+          const visitorId = localStorage.getItem('mirrorme_visitor_id') || '';
+          const k = 'mirrorme_pending_claim_session_ids';
           const ids: string[] = JSON.parse(localStorage.getItem(k) || '[]');
 
           for (const sessionId of ids) {

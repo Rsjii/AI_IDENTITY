@@ -84,7 +84,7 @@ export function Sidebar({
       <div className="h-16 flex items-center justify-between px-4 border-b border-border-subtle flex-shrink-0">
         <Link to="/" className="flex items-center gap-2 min-w-0" onClick={() => onNavigate?.()}>
           <span className="text-accent-primary font-bold text-xl flex-shrink-0">◆</span>
-          {expanded && <span className="text-text-primary font-bold tracking-tight truncate">Selflyx</span>}
+          {expanded && <span className="text-text-primary font-bold tracking-tight truncate">MirrorMe</span>}
         </Link>
         <button
           onClick={onToggle}

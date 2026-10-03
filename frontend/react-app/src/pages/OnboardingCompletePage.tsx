@@ -38,8 +38,8 @@ export function OnboardingCompletePage() {
         body: JSON.stringify({ step: 'done' }),
       });
       await refresh();
-      sessionStorage.removeItem('selflyx_post_step2_window');
-      sessionStorage.removeItem('selflyx_allow_preview_once');
+      sessionStorage.removeItem('mirrorme_post_step2_window');
+      sessionStorage.removeItem('mirrorme_allow_preview_once');
       nav('/setup', { replace: true });
     } catch (error: any) {
       showToast(error.message || 'Failed to continue', 'error');

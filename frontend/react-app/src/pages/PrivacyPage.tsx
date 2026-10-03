@@ -143,7 +143,7 @@ export function PrivacyPage() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>If you have questions about this privacy policy or our data practices, please contact us:</p>
             <ul className="list-none space-y-1 ml-4">
-              <li>Email: support@selflyx.com</li>
+              <li>Email: support@mirrorme.com</li>
               <li>Through your account settings page</li>
             </ul>
           </CardContent>

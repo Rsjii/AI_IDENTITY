@@ -410,7 +410,7 @@ export function OnboardingUploadPageNew() {
                   await refreshAuth();
 
                   // ✅ Set "post-step2 window" flag - allows Step3/4 until user leaves onboarding
-                  sessionStorage.setItem('selflyx_post_step2_window', '1');
+                  sessionStorage.setItem('mirrorme_post_step2_window', '1');
 
                   nav('/onboarding/preview');
                 } catch (error) {
@@ -466,8 +466,8 @@ export function OnboardingUploadPageNew() {
                   await refreshAuth();
 
                   // Clear any onboarding window flags
-                  sessionStorage.removeItem('selflyx_post_step2_window');
-                  sessionStorage.removeItem('selflyx_allow_preview_once');
+                  sessionStorage.removeItem('mirrorme_post_step2_window');
+                  sessionStorage.removeItem('mirrorme_allow_preview_once');
 
                   nav('/dashboard', { replace: true });
                 } catch (error) {

@@ -8,7 +8,7 @@ import { LandingPage } from '@/pages/LandingPage';
  * Falls back to /chat/:slug if not set (Phase 1 behavior)
  */
 function getSubdomainHandle(): string | null {
-  const baseDomain = (import.meta.env.VITE_PUBLIC_BASE_DOMAIN || '').trim(); // "selflyx.com"
+  const baseDomain = (import.meta.env.VITE_PUBLIC_BASE_DOMAIN || '').trim(); // "mirrorme.com"
   if (!baseDomain) return null; // Phase 1: no subdomain, use /chat/:slug
 
   const host = window.location.hostname.toLowerCase();

@@ -1,6 +1,6 @@
 # Go‑Live Guide (Phase 1 + 2 + 3) — A‑Z
 
-This is the **production go‑live** checklist for Selflyx/AI_IDENTITY with Phase 1/2/3 features.
+This is the **production go‑live** checklist for MirrorMe/AI_IDENTITY with Phase 1/2/3 features.
 
 ---
 

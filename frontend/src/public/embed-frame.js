@@ -11,12 +11,12 @@
   const CREATOR_SLUG = params.get('creatorSlug') || '';
 
   if (!API_BASE || !CREATOR_ID) {
-    console.error('[Selflyx Widget] Missing apiBase or creatorId');
+    console.error('[MirrorMe Widget] Missing apiBase or creatorId');
     return;
   }
 
   function getOrCreateVisitorId() {
-    const key = `selflyx_widget_visitor_${CREATOR_ID}`;
+    const key = `mirrorme_widget_visitor_${CREATOR_ID}`;
     const existing = localStorage.getItem(key);
     if (existing) return existing;
     const v = `wv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -26,32 +26,32 @@
 
   const VISITOR_ID = getOrCreateVisitorId();
 
-  const root = document.getElementById('selflyx-widget-root');
+  const root = document.getElementById('mirrorme-widget-root');
   if (!root) return;
 
   root.innerHTML = `
-    <div id="selflyx-widget-panel">
-      <div id="selflyx-widget-header">
-        ${AVATAR_URL ? `<img id="selflyx-widget-avatar" src="${AVATAR_URL}" alt="Avatar" />` : ''}
+    <div id="mirrorme-widget-panel">
+      <div id="mirrorme-widget-header">
+        ${AVATAR_URL ? `<img id="mirrorme-widget-avatar" src="${AVATAR_URL}" alt="Avatar" />` : ''}
         <span>${TITLE}</span>
       </div>
-      <div id="selflyx-widget-messages"></div>
-      <div id="selflyx-widget-popular" style="display:none;padding:8px 16px;"></div>
-      <div id="selflyx-widget-input-container">
-        <input type="text" id="selflyx-widget-input" placeholder="Type a message..." />
-        <button id="selflyx-widget-send" style="background:${COLOR}">Send</button>
+      <div id="mirrorme-widget-messages"></div>
+      <div id="mirrorme-widget-popular" style="display:none;padding:8px 16px;"></div>
+      <div id="mirrorme-widget-input-container">
+        <input type="text" id="mirrorme-widget-input" placeholder="Type a message..." />
+        <button id="mirrorme-widget-send" style="background:${COLOR}">Send</button>
       </div>
     </div>
   `;
 
-  const input = document.getElementById('selflyx-widget-input');
-  const sendBtn = document.getElementById('selflyx-widget-send');
-  const messagesDiv = document.getElementById('selflyx-widget-messages');
-  const popularDiv = document.getElementById('selflyx-widget-popular');
+  const input = document.getElementById('mirrorme-widget-input');
+  const sendBtn = document.getElementById('mirrorme-widget-send');
+  const messagesDiv = document.getElementById('mirrorme-widget-messages');
+  const popularDiv = document.getElementById('mirrorme-widget-popular');
 
   if (WELCOME_MESSAGE) {
     const welcomeMsg = document.createElement('div');
-    welcomeMsg.className = 'selflyx-msg selflyx-msg-bot';
+    welcomeMsg.className = 'mirrorme-msg mirrorme-msg-bot';
     welcomeMsg.textContent = WELCOME_MESSAGE;
     messagesDiv.appendChild(welcomeMsg);
   }
@@ -62,7 +62,7 @@
     popularDiv.style.gap = '8px';
     POPULAR_QUESTIONS.forEach(q => {
       const qBtn = document.createElement('button');
-      qBtn.className = 'selflyx-question-btn';
+      qBtn.className = 'mirrorme-question-btn';
       qBtn.textContent = q.trim();
       qBtn.style.cssText = `
         background: #f3f4f6;
@@ -86,7 +86,7 @@
 
   function addMessage(text, isUser, audioUrl) {
     const msg = document.createElement('div');
-    msg.className = isUser ? 'selflyx-msg selflyx-msg-user' : 'selflyx-msg selflyx-msg-bot';
+    msg.className = isUser ? 'mirrorme-msg mirrorme-msg-user' : 'mirrorme-msg mirrorme-msg-bot';
     msg.textContent = text;
     messagesDiv.appendChild(msg);
 
@@ -104,9 +104,9 @@
 
   function addTypingIndicator() {
     const typing = document.createElement('div');
-    typing.id = 'selflyx-typing';
-    typing.className = 'selflyx-msg selflyx-msg-bot';
-    typing.innerHTML = '<span class="selflyx-typing-dot"></span><span class="selflyx-typing-dot"></span><span class="selflyx-typing-dot"></span>';
+    typing.id = 'mirrorme-typing';
+    typing.className = 'mirrorme-msg mirrorme-msg-bot';
+    typing.innerHTML = '<span class="mirrorme-typing-dot"></span><span class="mirrorme-typing-dot"></span><span class="mirrorme-typing-dot"></span>';
     typing.style.cssText = 'display:flex;gap:4px;padding:12px 16px;';
     messagesDiv.appendChild(typing);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -114,7 +114,7 @@
   }
 
   function removeTypingIndicator() {
-    const typing = document.getElementById('selflyx-typing');
+    const typing = document.getElementById('mirrorme-typing');
     if (typing) typing.remove();
   }
 

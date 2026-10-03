@@ -13,19 +13,19 @@
   const CREATOR_SLUG = script.getAttribute('data-creator-slug') || '';
 
   if (!API_BASE || !CREATOR_ID) {
-    console.error('[Selflyx Widget] Missing data-api-base or data-creator-id');
+    console.error('[MirrorMe Widget] Missing data-api-base or data-creator-id');
     return;
   }
 
   let isOpen = false;
   const container = document.createElement('div');
-  container.id = 'selflyx-widget-container';
+  container.id = 'mirrorme-widget-container';
   const posStyle = POSITION === 'bottom-left' ? 'left:20px;right:auto;' : 'right:20px;left:auto;';
   container.style.cssText = `position:fixed;bottom:20px;${posStyle}z-index:999999;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;`;
 
   // Floating button
   const button = document.createElement('button');
-  button.id = 'selflyx-widget-btn';
+  button.id = 'mirrorme-widget-btn';
   button.innerHTML = AVATAR_URL 
     ? `<img src="${AVATAR_URL}" alt="${TITLE}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`
     : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
@@ -40,7 +40,7 @@
 
   // Chat panel (iframe)
   const iframe = document.createElement('iframe');
-  iframe.id = 'selflyx-widget-panel';
+  iframe.id = 'mirrorme-widget-panel';
   iframe.title = TITLE;
   iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
   iframe.style.cssText = `

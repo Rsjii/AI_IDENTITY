@@ -51,7 +51,7 @@ FONT: Inter  |  ICONS: lucide-react  |  COMPONENTS: shadcn/ui
 3A Desktop Sidebar — Expanded (260px)
 
 ┌──────────────────────────────────────┐
-│  ◆ Selflyx            [◁ collapse]  │  ← logo left, collapse right
+│  ◆ MirrorMe            [◁ collapse]  │  ← logo left, collapse right
 ├──────────────────────────────────────┤
 │                                      │
 │   ╭────────────────────────────╮     │
@@ -622,7 +622,7 @@ Integrations tab:
   Widget Embed Code
   ┌─────────────────────────────────┐
   │  <script                        │
-  │    src="https://selflyx.com/…"  │
+  │    src="https://ai-identity-delta.vercel.app/…"  │
   │    data-handle="johndoe">       │
   │  </script>                      │
   └─────────────────────────────────┘

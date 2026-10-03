@@ -112,7 +112,7 @@ export function formatMonthlyPrice(billingCountry: BillingCountry, tier: Tier) {
 ### Step 1: User Selects Billing Country
 - User sees dropdown: "India" or "Outside India"
 - Prices update immediately to show correct currency
-- Selection saved to localStorage: `selflyx.billingCountry`
+- Selection saved to localStorage: `mirrorme.billingCountry`
 
 ### Step 2: User Clicks "Choose Plan"
 - Frontend calls `startPlanCheckout({ tier, billingCountry, returnUrl })`

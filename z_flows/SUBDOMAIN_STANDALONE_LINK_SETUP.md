@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-Allow creators to have custom subdomain links: `yourname.selflyx.com` instead of `selflyx.com/chat/yourname`
+Allow creators to have custom subdomain links: `yourname.mirrorme.com` instead of `mirrorme.com/chat/yourname`
 
 **Current Phase 1:** Uses `/chat/:slug` (working, zero cost)  
 **Phase 2:** Add subdomain support (better branding, same cost)
@@ -21,7 +21,7 @@ Allow creators to have custom subdomain links: `yourname.selflyx.com` instead of
 
 1. **`frontend/react-app/src/pages/HomeRoute.tsx`**
    - `getSubdomainHandle()` function detects subdomain
-   - Auto-redirects `yourname.selflyx.com` → `/chat/yourname`
+   - Auto-redirects `yourname.mirrorme.com` → `/chat/yourname`
    - **Gated:** Only works if `VITE_PUBLIC_BASE_DOMAIN` env var is set
 
 2. **`frontend/react-app/src/pages/Integrations.tsx`**
@@ -83,8 +83,8 @@ sudo apt install certbot python3-certbot-nginx
 
 # Get wildcard cert (DNS challenge)
 sudo certbot certonly --manual --preferred-challenges dns \
-  -d "*.selflyx.com" \
-  -d "selflyx.com"
+  -d "*.mirrorme.com" \
+  -d "mirrorme.com"
 ```
 
 **DNS Challenge Steps:**
@@ -97,7 +97,7 @@ sudo certbot certonly --manual --preferred-challenges dns \
    ```
 3. Wait 1-2 minutes for DNS propagation
 4. Press Enter in certbot
-5. Cert saved to: `/etc/letsencrypt/live/selflyx.com/`
+5. Cert saved to: `/etc/letsencrypt/live/mirrorme.com/`
 
 **Auto-renewal:**
 ```bash
@@ -114,10 +114,10 @@ sudo certbot renew --dry-run
 Create wildcard server block:
 
 ```nginx
-# /etc/nginx/sites-available/selflyx-wildcard
+# /etc/nginx/sites-available/mirrorme-wildcard
 server {
     listen 80;
-    server_name *.selflyx.com selflyx.com;
+    server_name *.mirrorme.com mirrorme.com;
 
     # Redirect HTTP to HTTPS
     return 301 https://$host$request_uri;
@@ -125,11 +125,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name *.selflyx.com selflyx.com;
+    server_name *.mirrorme.com mirrorme.com;
 
     # SSL certificates (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/selflyx.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/selflyx.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/mirrorme.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mirrorme.com/privkey.pem;
 
     # SSL settings (security best practices)
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -165,7 +165,7 @@ server {
 
 Enable site:
 ```bash
-sudo ln -s /etc/nginx/sites-available/selflyx-wildcard /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/mirrorme-wildcard /etc/nginx/sites-enabled/
 sudo nginx -t  # Test config
 sudo systemctl reload nginx
 ```
@@ -177,7 +177,7 @@ sudo systemctl reload nginx
 Add to `.env` (or `.env.production`):
 
 ```bash
-VITE_PUBLIC_BASE_DOMAIN=selflyx.com
+VITE_PUBLIC_BASE_DOMAIN=mirrorme.com
 ```
 
 **Important:** Don't include `https://` or trailing slash, just the domain name.
@@ -195,19 +195,19 @@ npm run build
 ### 1. DNS Test
 ```bash
 # Check if wildcard DNS resolves
-dig *.selflyx.com
+dig *.mirrorme.com
 # Should return your server IP
 ```
 
 ### 2. SSL Test
 ```bash
 # Check SSL certificate
-openssl s_client -connect yourname.selflyx.com:443 -servername yourname.selflyx.com
+openssl s_client -connect yourname.mirrorme.com:443 -servername yourname.mirrorme.com
 # Should show Let's Encrypt cert
 ```
 
 ### 3. Browser Test
-1. Visit `yourname.selflyx.com`
+1. Visit `yourname.mirrorme.com`
 2. Should redirect to `/chat/yourname`
 3. Should show HTTPS (green lock)
 
@@ -230,10 +230,10 @@ openssl s_client -connect yourname.selflyx.com:443 -servername yourname.selflyx.
 - ✅ Uses `/chat/:slug` (already working)
 - ✅ No DNS/SSL changes needed
 - ✅ Zero deployment complexity
-- ✅ Shareable: `selflyx.com/chat/yourname`
+- ✅ Shareable: `mirrorme.com/chat/yourname`
 
 ### Phase 2 (When Ready)
-- 🌐 Subdomain: `yourname.selflyx.com`
+- 🌐 Subdomain: `yourname.mirrorme.com`
 - 📝 Better branding for creators
 - ⏱️ Setup time: 30-60 minutes
 - 💰 Cost: ₹0 (free SSL)
@@ -254,12 +254,12 @@ If subdomain causes issues, simply:
 
 ## 📝 Checklist (When Implementing)
 
-- [ ] DNS wildcard record added (`*.selflyx.com` → server IP)
+- [ ] DNS wildcard record added (`*.mirrorme.com` → server IP)
 - [ ] Let's Encrypt wildcard cert installed
 - [ ] Nginx wildcard config created and enabled
-- [ ] `VITE_PUBLIC_BASE_DOMAIN=selflyx.com` added to `.env`
+- [ ] `VITE_PUBLIC_BASE_DOMAIN=mirrorme.com` added to `.env`
 - [ ] Frontend rebuilt with new env var
-- [ ] Test: `yourname.selflyx.com` → `/chat/yourname`
+- [ ] Test: `yourname.mirrorme.com` → `/chat/yourname`
 - [ ] Test: HTTPS works (green lock)
 - [ ] Test: Integrations page shows subdomain link
 - [ ] SSL auto-renewal verified (`certbot renew --dry-run`)
@@ -269,7 +269,7 @@ If subdomain causes issues, simply:
 ## 🐛 Troubleshooting
 
 ### Subdomain not resolving
-- Check DNS propagation: `dig *.selflyx.com`
+- Check DNS propagation: `dig *.mirrorme.com`
 - Wait 5-10 minutes after DNS change
 - Clear browser DNS cache
 

@@ -82,7 +82,7 @@ export const config = {
   frontendUrl: process.env['FRONTEND_URL'],
   
   // App URL (for email links)
-  appUrl: process.env['APP_URL'] || process.env['FRONTEND_URL'] || 'https://selflyx.com',
+  appUrl: process.env['APP_URL'] || process.env['FRONTEND_URL'] || 'https://ai-identity-delta.vercel.app',
   
   // Google OAuth Configuration
   google: {

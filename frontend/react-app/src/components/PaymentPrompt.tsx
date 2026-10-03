@@ -96,7 +96,7 @@ export function PaymentPrompt(props: PaymentPromptProps) {
         amount: intent.order.amount,
         currency: intent.order.currency,
         order_id: intent.order.id,
-        name: 'Selflyx',
+        name: 'MirrorMe',
         description: 'Unlock 24h access',
         handler: async (resp: any) => {
           try {

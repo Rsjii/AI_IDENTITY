@@ -82,7 +82,7 @@ function setCookie(name: string, value: string, maxAgeSeconds: number): void {
 }
 
 function getOrCreateVisitorId(): string {
-  const k = 'selflyx_visitor_id';
+  const k = 'mirrorme_visitor_id';
   const existingCookie = getCookie(k);
   const existingLocal = localStorage.getItem(k);
   const existing = existingCookie || existingLocal;
@@ -184,8 +184,8 @@ export function PublicChatPage() {
 
   // ✅ Only create visitorId when authenticated (login-first mode)
   const visitorId = useMemo(() => (isAuthed ? getOrCreateVisitorId() : ''), [isAuthed]);
-  const sessionKey = useMemo(() => `selflyx_session_${slug}`, [slug]);
-  const sessionTsKey = useMemo(() => `selflyx_session_ts_${slug}`, [slug]);
+  const sessionKey = useMemo(() => `mirrorme_session_${slug}`, [slug]);
+  const sessionTsKey = useMemo(() => `mirrorme_session_ts_${slug}`, [slug]);
 
   const [creator, setCreator] = useState<Creator | null>(null);
   const [creatorLoading, setCreatorLoading] = useState(true);
@@ -317,7 +317,7 @@ export function PublicChatPage() {
   // One-time transparency notice (Phase 1 disclosure)
   useEffect(() => {
     if (!creator) return;
-    const k = 'selflyx_transparency_notice_dismissed';
+    const k = 'mirrorme_transparency_notice_dismissed';
     const dismissed = localStorage.getItem(k) === '1';
     if (!dismissed) setShowTransparencyNotice(true);
   }, [creator]);
@@ -812,7 +812,7 @@ export function PublicChatPage() {
           onClick={() => {
             try {
               if (sessionId) {
-                const k = 'selflyx_pending_claim_session_ids';
+                const k = 'mirrorme_pending_claim_session_ids';
                 const prev = JSON.parse(localStorage.getItem(k) || '[]');
                 const next = Array.from(new Set([...(prev || []), sessionId]));
                 localStorage.setItem(k, JSON.stringify(next));
@@ -911,7 +911,7 @@ export function PublicChatPage() {
                     onClick={() => {
                       try {
                         if (sessionId) {
-                          const k = 'selflyx_pending_claim_session_ids';
+                          const k = 'mirrorme_pending_claim_session_ids';
                           const prev = JSON.parse(localStorage.getItem(k) || '[]');
                           const next = Array.from(new Set([...(prev || []), sessionId]));
                           localStorage.setItem(k, JSON.stringify(next));
@@ -936,7 +936,7 @@ export function PublicChatPage() {
           <div className="max-w-5xl mx-auto flex items-center gap-3">
             {/* Logo */}
             <Link to="/" className="font-bold text-text-primary tracking-tight mr-2">
-              Selflyx<span className="text-accent-primary">.</span>
+              MirrorMe<span className="text-accent-primary">.</span>
             </Link>
 
             {/* Mobile hamburger */}
@@ -1044,7 +1044,7 @@ export function PublicChatPage() {
               <button
                 className="px-3 py-2 rounded-lg bg-bg-tertiary text-sm hover:bg-bg-elevated"
                 onClick={() => {
-                  localStorage.setItem('selflyx_transparency_notice_dismissed', '1');
+                  localStorage.setItem('mirrorme_transparency_notice_dismissed', '1');
                   setShowTransparencyNotice(false);
                 }}
               >
@@ -1178,7 +1178,7 @@ export function PublicChatPage() {
                                   onClick={() => {
                                     try {
                                       if (sessionId) {
-                                        const k = 'selflyx_pending_claim_session_ids';
+                                        const k = 'mirrorme_pending_claim_session_ids';
                                         const prev = JSON.parse(localStorage.getItem(k) || '[]');
                                         const next = Array.from(new Set([...(prev || []), sessionId]));
                                         localStorage.setItem(k, JSON.stringify(next));
