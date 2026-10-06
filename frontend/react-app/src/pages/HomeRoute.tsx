@@ -36,7 +36,9 @@ export function HomeRoute() {
     return <Navigate to={`/chat/${encodeURIComponent(handle)}`} replace />;
   }
 
-  if (state.status === 'loading') return null;
+  // Render the (static) landing page immediately while /api/auth/me resolves.
+  // On Render free tier the backend can take ~50s to wake; never block the UI on it.
+  if (state.status === 'loading') return <LandingPage />;
 
   if (state.status === 'authenticated') {
     const user = state.user as any;

@@ -41,7 +41,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (state.status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading…</div>
+        <div className="text-center text-muted-foreground">
+          <div>Loading…</div>
+          <div className="mt-1 text-xs">Server may be waking up, this can take up to a minute.</div>
+        </div>
       </div>
     );
   }
